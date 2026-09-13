@@ -21,7 +21,7 @@ export default async function AdminPilotsPage() {
       <div>
         <h1 className="text-2xl font-bold">אימות מטיסים</h1>
         <p className="text-sm text-muted-foreground">
-          סימון "מטיס מאומת" מוצג במרקטפלייס לצד מטיסים עצמאיים — לאחר בדיקה ידנית של הרישיון והפרטים שלהם.
+          סימון &ldquo;מטיס מאומת&rdquo; מוצג במרקטפלייס לצד מטיסים עצמאיים — לאחר בדיקה ידנית של הרישיון והפרטים שלהם.
         </p>
       </div>
       <AdminPilotsPageClient />

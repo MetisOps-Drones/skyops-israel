@@ -21,7 +21,7 @@ export default async function MarketplacePage() {
         <MarketplacePageClient />
       ) : (
         <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          המרקטפלייס זמין לחשבונות ארגון בלבד. ניתן לשדרג דרך "הפרופיל שלי" ← "מנוי".
+          המרקטפלייס זמין לחשבונות ארגון בלבד. ניתן לשדרג דרך &ldquo;הפרופיל שלי&rdquo; ← &ldquo;מנוי&rdquo;.
         </div>
       )}
     </div>

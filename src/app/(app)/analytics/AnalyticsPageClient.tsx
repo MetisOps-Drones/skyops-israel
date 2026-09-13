@@ -37,6 +37,7 @@ const EVENT_LABELS: Record<string, string> = {
   "membership.requested": "בקשת הצטרפות לארגון",
   "membership.active": "הצטרפות לארגון אושרה",
   "membership.rejected": "בקשת הצטרפות נדחתה",
+  "membership.removed": "הוסר מהארגון",
   "equipment.checked_out": "ציוד נלקח",
   "equipment.returned": "ציוד הוחזר",
   "license.active": "רישיון הועלה",
@@ -302,7 +303,7 @@ export function AnalyticsPageClient() {
   return (
     <Card>
       <CardContent className="pt-6 text-sm text-muted-foreground">
-        אנליטיקס זמין למנהלי צי ולמוקדני תיאום. אם אתם מנהלים ארגון, ודאו שהוא מוגדר כארגון הפעיל שלכם ב"הארגון שלי".
+        אנליטיקס זמין למנהלי צי ולמוקדני תיאום. אם אתם מנהלים ארגון, ודאו שהוא מוגדר כארגון הפעיל שלכם ב&ldquo;הארגון שלי&rdquo;.
       </CardContent>
     </Card>
   );
