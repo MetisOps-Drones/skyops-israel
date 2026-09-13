@@ -1,0 +1,635 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>חוות דעת: מפה ומרקטפלייס — סבב רביעי</title>
+<style>
+  :root {
+    --bg: 40 30% 97%;
+    --fg: 220 47% 14%;
+    --card: 0 0% 100%;
+    --card-fg: 220 47% 14%;
+    --muted: 40 20% 94%;
+    --muted-fg: 220 15% 40%;
+    --border: 39 25% 87%;
+    --navy: 220 47% 16%;
+    --navy-fg: 40 33% 96%;
+    --gold: 39 55% 46%;
+    --gold-fg: 220 47% 14%;
+    --success: 142 60% 32%;
+    --success-bg: 142 55% 94%;
+    --warning: 32 85% 40%;
+    --warning-bg: 38 85% 94%;
+    --danger: 0 65% 45%;
+    --danger-bg: 0 65% 95%;
+    --info: 210 70% 42%;
+    --info-bg: 210 70% 95%;
+    --shadow: 220 47% 16%;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: 222 40% 9%;
+      --fg: 40 25% 95%;
+      --card: 222 36% 13%;
+      --card-fg: 40 25% 95%;
+      --muted: 222 30% 18%;
+      --muted-fg: 220 15% 68%;
+      --border: 222 25% 22%;
+      --navy: 222 40% 9%;
+      --navy-fg: 40 25% 95%;
+      --gold: 39 60% 58%;
+      --gold-fg: 222 40% 10%;
+      --success: 142 55% 55%;
+      --success-bg: 142 40% 16%;
+      --warning: 38 85% 62%;
+      --warning-bg: 36 60% 18%;
+      --danger: 0 70% 65%;
+      --danger-bg: 0 45% 18%;
+      --info: 210 80% 68%;
+      --info-bg: 210 45% 18%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: 222 40% 9%;
+    --fg: 40 25% 95%;
+    --card: 222 36% 13%;
+    --card-fg: 40 25% 95%;
+    --muted: 222 30% 18%;
+    --muted-fg: 220 15% 68%;
+    --border: 222 25% 22%;
+    --navy: 222 40% 9%;
+    --navy-fg: 40 25% 95%;
+    --gold: 39 60% 58%;
+    --gold-fg: 222 40% 10%;
+    --success: 142 55% 55%;
+    --success-bg: 142 40% 16%;
+    --warning: 38 85% 62%;
+    --warning-bg: 36 60% 18%;
+    --danger: 0 70% 65%;
+    --danger-bg: 0 45% 18%;
+    --info: 210 80% 68%;
+    --info-bg: 210 45% 18%;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: hsl(var(--bg));
+    color: hsl(var(--fg));
+    font-family: 'Assistant', system-ui, sans-serif;
+    line-height: 1.65;
+  }
+  h1, h2, h3, h4 { font-family: 'Heebo', system-ui, sans-serif; text-wrap: balance; }
+  code { font-family: ui-monospace, monospace; background: hsl(var(--muted)); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+
+  .hero {
+    background: hsl(var(--navy));
+    color: hsl(var(--navy-fg));
+    padding: 48px 20px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 8% 0%, hsl(var(--gold) / .16), transparent 45%),
+      radial-gradient(circle at 100% 100%, hsl(0 0% 100% / .06), transparent 40%);
+  }
+  .hero-inner { max-width: 960px; margin: 0 auto; position: relative; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
+    color: hsl(var(--gold)); background: hsl(var(--gold) / .14);
+    border: 1px solid hsl(var(--gold) / .3);
+    border-radius: 999px; padding: 5px 14px; margin-bottom: 16px;
+  }
+  .hero h1 { font-size: clamp(26px, 4.2vw, 38px); font-weight: 800; margin: 0 0 10px; }
+  .hero p.lede { font-size: 16px; color: hsl(var(--navy-fg) / .82); max-width: 680px; margin: 0; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .hero-meta span {
+    font-size: 12.5px; color: hsl(var(--navy-fg) / .7);
+    background: hsl(0 0% 100% / .06); border: 1px solid hsl(0 0% 100% / .12);
+    border-radius: 8px; padding: 6px 12px;
+  }
+
+  .toc {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin: -26px 0 40px; position: relative; z-index: 2;
+  }
+  @media (max-width: 720px) { .toc { grid-template-columns: repeat(2, 1fr); } }
+  .toc a {
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    border-radius: 10px; padding: 12px 14px; text-decoration: none;
+    color: hsl(var(--card-fg)); font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 2px 10px hsl(var(--shadow) / .06);
+    transition: transform .15s, border-color .15s;
+  }
+  .toc a:hover { transform: translateY(-1px); border-color: hsl(var(--gold) / .5); }
+  .toc a .n { color: hsl(var(--gold)); font-family: 'Heebo'; margin-inline-end: 6px; }
+
+  section { margin-top: 56px; scroll-margin-top: 20px; }
+  .section-head { margin-bottom: 22px; }
+  .section-head .tag {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .05em;
+    color: hsl(var(--gold)); text-transform: uppercase; display: block; margin-bottom: 6px;
+  }
+  .section-head h2 { font-size: 23px; font-weight: 800; margin: 0 0 6px; }
+  .section-head p { color: hsl(var(--muted-fg)); font-size: 14.5px; margin: 0; max-width: 660px; }
+
+  .progress-list { display: flex; flex-direction: column; gap: 10px; }
+  .progress-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: hsl(var(--success-bg)); border: 1px solid hsl(var(--success) / .25);
+    border-radius: 12px; padding: 14px 18px;
+  }
+  .progress-row .check {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: hsl(var(--success)); color: hsl(var(--success-bg));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; margin-top: 1px;
+  }
+  .progress-row h4 { font-size: 14.5px; margin: 0 0 3px; color: hsl(var(--fg)); }
+  .progress-row p { font-size: 13px; margin: 0; color: hsl(var(--muted-fg)); }
+
+  .complexity-list { display: flex; flex-direction: column; gap: 10px; }
+  .complexity-row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: start;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    border-radius: 12px; padding: 16px 18px;
+  }
+  @media (max-width: 640px) { .complexity-row { grid-template-columns: 1fr; } }
+  .severity {
+    font-family: 'Heebo'; font-size: 11px; font-weight: 800; letter-spacing: .03em;
+    border-radius: 999px; padding: 4px 10px; white-space: nowrap; height: fit-content;
+  }
+  .severity.high { background: hsl(var(--danger-bg)); color: hsl(var(--danger)); }
+  .severity.med { background: hsl(var(--warning-bg)); color: hsl(var(--warning)); }
+  .severity.low { background: hsl(var(--muted)); color: hsl(var(--muted-fg)); }
+  .complexity-row .body h4 { font-size: 15px; margin: 0 0 4px; }
+  .complexity-row .body p { font-size: 13.5px; color: hsl(var(--muted-fg)); margin: 0; }
+  .complexity-row .fix-arrow {
+    font-size: 12.5px; color: hsl(var(--success)); font-weight: 600;
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  @media (max-width: 640px) { .complexity-row .fix-arrow { white-space: normal; } }
+
+  .bug-alert {
+    background: hsl(var(--danger-bg)); border: 1px solid hsl(var(--danger) / .35);
+    border-radius: 16px; padding: 22px 24px; margin-top: 20px;
+    display: grid; grid-template-columns: 44px 1fr; gap: 16px;
+  }
+  .bug-alert .icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: hsl(var(--danger)); color: hsl(var(--danger-bg));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; font-family: 'Heebo';
+  }
+  .bug-alert h4 { font-size: 16px; margin: 0 0 6px; color: hsl(var(--danger)); }
+  .bug-alert p { font-size: 13.8px; margin: 0 0 8px; color: hsl(var(--fg)); }
+  .bug-alert .meta { font-size: 12.5px; color: hsl(var(--muted-fg)); margin: 0; }
+  @media (max-width: 560px) { .bug-alert { grid-template-columns: 1fr; } }
+
+  .idea-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .idea-grid { grid-template-columns: 1fr; } }
+  .idea-card {
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    border-radius: 14px; padding: 18px 20px;
+    box-shadow: 0 2px 10px hsl(var(--shadow) / .05);
+  }
+  .idea-card .kicker {
+    display: inline-flex; font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+    color: hsl(var(--info)); background: hsl(var(--info-bg));
+    border-radius: 999px; padding: 3px 10px; margin-bottom: 10px;
+  }
+  .idea-card h4 { font-size: 14.5px; margin: 0 0 6px; }
+  .idea-card p { font-size: 13.3px; color: hsl(var(--muted-fg)); margin: 0; }
+
+  .verdict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .verdict-grid { grid-template-columns: 1fr; } }
+  .verdict-col { border-radius: 16px; padding: 22px; }
+  .verdict-col.good { background: hsl(var(--success-bg)); border: 1px solid hsl(var(--success) / .25); }
+  .verdict-col.bad { background: hsl(var(--warning-bg)); border: 1px solid hsl(var(--warning) / .3); }
+  .verdict-col h4 { font-size: 14.5px; margin: 0 0 14px; }
+  .verdict-col.good h4 { color: hsl(var(--success)); }
+  .verdict-col.bad h4 { color: hsl(var(--warning)); }
+  .verdict-col ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .verdict-col li { font-size: 13.8px; }
+  .verdict-col li b { display: block; font-size: 14px; margin-bottom: 2px; }
+
+  .priority-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+  .priority-item {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: hsl(var(--navy)); color: hsl(var(--navy-fg));
+    border-radius: 14px; padding: 18px 20px;
+  }
+  .priority-item .rank {
+    font-family: 'Heebo'; font-weight: 800; font-size: 20px; color: hsl(var(--gold));
+    flex-shrink: 0; width: 28px;
+  }
+  .priority-item h4 { font-size: 15px; margin: 0 0 4px; }
+  .priority-item p { font-size: 13.5px; color: hsl(var(--navy-fg) / .78); margin: 0; }
+
+  .subhead { font-size: 15.5px; font-weight: 700; margin: 28px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .subhead .dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--gold)); }
+
+  .closing {
+    margin-top: 60px; padding-top: 28px; border-top: 1px solid hsl(var(--border));
+    font-size: 14px; color: hsl(var(--muted-fg));
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&family=Assistant:wght@400;500;600;700&display=swap">
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">חוות דעת — Design Partner Review · סבב רביעי</span>
+    <h1>מפת הטיסות והמרקטפלייס — בדיקה ממוקדת</h1>
+    <p class="lede">
+      הפעם התמקדתי רק בשני המוקדים האלה, לעומק: עברתי על כל רכיב במפת הטיסות ובמרקטפלייס המטיסים — קוד ובדיקה
+      חיה בדפדפן — כדי לוודא מה באמת עובד, לתפוס באגים בפועל, ולהציע גם רעיונות לחוויית משתמש וגם רעיונות
+      לנתונים עסקיים שאפשר להתחיל לאסוף כבר עכשיו ועדיין לא נאספים.
+    </p>
+    <div class="hero-meta">
+      <span>אי-עקביות תפעולית אחת בזרימת התיאום — נמצאה בבדיקה חיה</span>
+      <span>10 רעיונות לנתונים עסקיים</span>
+      <span>נתוני בדיקה ישנים עדיין חיים במרקטפלייס</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="toc">
+    <a href="#scope"><span class="n">01</span>מה נבדק</a>
+    <a href="#map-works"><span class="n">02</span>מפה — מה עובד</a>
+    <a href="#map-issues"><span class="n">03</span>מפה — ממצאים</a>
+    <a href="#mp-works"><span class="n">04</span>מרקטפלייס — מה עובד</a>
+    <a href="#mp-issues"><span class="n">05</span>מרקטפלייס — ממצאים</a>
+    <a href="#data"><span class="n">06</span>נתונים לעסק</a>
+    <a href="#a11y"><span class="n">07</span>נגישות</a>
+    <a href="#priority"><span class="n">08</span>סדר עדיפויות</a>
+  </nav>
+
+  <section id="scope">
+    <div class="section-head">
+      <span class="tag">מתודולוגיה</span>
+      <h2>מה נבדק, ואיך</h2>
+      <p>לא ביקורת עיצובית כללית — הפעם ירדתי לרמת הקוד של כל רכיב במפה ובמרקטפלייס, ואז בדקתי בדפדפן חי מול נתונים אמיתיים: קליקים על נקודות אמיתיות במפה כדי לבחון את כל ענפי ההחלטה (מרחב חסום/מוגבל/פתוח), ודפדוף מלא במרקטפלייס כולל פתיחת פרופיל מטיס.</p>
+    </div>
+  </section>
+
+  <section id="map-works">
+    <div class="section-head">
+      <span class="tag">מפת טיסות · 01</span>
+      <h2>מה עובד — ולא באופן שטחי</h2>
+      <p>הרשימה הזו חשובה לא פחות מהממצאים: זו הוכחה שהתשתית המשפטית-מרחבית שנבנתה כאן באמת מחזיקה.</p>
+    </div>
+    <div class="progress-list">
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>זרימת "לחץ ותבדוק" על המפה</h4><p>קליק על כל נקודה — פתוחה או חוסמת — פותח כרטיס עם תשובה מיידית (מותר/דורש תיאום/אסור), בלי לגרור את המשתמש לפתוח בקשה בטעות. נבדק על נקודה פתוחה ועל נקודה החוסמת ברמת מנהל רת״א — שתיהן הציגו את המסר הנכון.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>הפרדה נכונה בין שתי מערכות חוק שונות</h4><p>חסימת אזור (CTR/שטח אסור) לעומת "הרשאת הפעלה מיוחדת" (9 התקנות הממוספרות) מטופלות כשני מנגנונים נפרדים בקוד ובממשק כאחד — בדיוק כפי שנדרש. חשבון תחביב רואה בבירור שהוא לא זכאי להרשאה, לא רק "משהו נכשל".</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>גילוי הדרגתי אמיתי בכרטיס המיקום</h4><p>התשובה (מותר/אסור/דורש תיאום) תמיד למעלה; כל הנימוקים המשפטיים המפורטים — חפיפת אזורי AIP, מגבלות קרבה, חישוב תקרת גובה מלא — מקופלים תחת "למה?" אחד. בדיוק העיקרון שהוגדר בסבב הקודם, מיושם נכון כאן.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מזג אוויר משולב בכל שלב</h4><p>לא רק "יש רוח" — רוח, משבים, ראות, משקעים, גובה בסיס עננים (מתורגם גם למ׳ וגם לרגל, עם שם התחנה והמרחק ממנה) וגובה הנקודה עצמה, בליווי תג "מומלץ/בזהירות/לא מומלץ" בשפה פשוטה. מוצג גם בכרטיס המיקום וגם בשורת ה-HUD העליונה וגם בטופס בקשת הטיסה.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>כפתור שיתוף מיקום עם 4 פורמטים</h4><p>DD, DMS, קישור Waze וקישור Google Maps — כל אחד בלחיצה אחת להעתקה. פרט קטן שממש שימושי בשטח, לא רק "נחמד להראות".</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מקרא שכבות עם הסברי מונחים</h4><p>כל קיצור מקצועי (CTR, NFZ, AIP) מגיע עם טולטיפ בעברית פשוטה — וקישור יוצא לאפליקציית DronesIL הרשמית לאימות נוסף, שמבנה אמון במקום להתחזות כמקור סמכות יחיד.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מצב ניגודיות גבוהה לשימוש בשמש</h4><p>מחשבה אמיתית על תנאי שדה — מטיס שמביט במסך בשמש ישראלית לא באמת יכול לקרוא צבעים עדינים.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>היסטוריית תיאומים על המפה</h4><p>נקודות צבעוניות לפי סטטוס בקשה, עם פופאפ שם עיר וסטטוס — דרך נעימה לראות "איפה טסתי" בלי לעבור ליומן טיסות נפרד.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="map-issues">
+    <div class="section-head">
+      <span class="tag">מפת טיסות · 02</span>
+      <h2>ממצאים ורעיונות לשיפור</h2>
+      <p>ממצא אחד הוא אי-עקביות תפעולית אמיתית שנתפסה תוך כדי בדיקה חיה. השאר הם רעיונות חוויית משתמש.</p>
+    </div>
+
+    <div class="bug-alert">
+      <span class="icon">!</span>
+      <div>
+        <h4>אפשר לבקש תיאום לנקודה שהמערכת עצמה אומרת שאסור לטוס בה</h4>
+        <p>
+          נבדק חי: קליק על נקודה באזור בקעת הירדן החזיר בו-זמנית שלושה מסרים — <b>״כן, אך בכפוף לאישור מנהל
+          רת״א״</b> (כרטיסיית הסטטוס הראשית), <b>״אסור לטיסה מהקרקע בנקודה זו״</b> (חישוב תקרת הגובה, מיד
+          מתחתיה) — ולמרות זאת כפתור <b>״בקשת תיאום לנקודה זו״</b> פעיל ולחיץ. הסיבה בקוד: חסימת האזור
+          (<code>zoneBlockLevel</code>) וחסימת הגובה מהקרקע (<code>altitudeResult.blockedFromGround</code>)
+          הן שתי בדיקות בלתי-תלויות לגמרי — הכפתור מגיב רק לראשונה. מוקדן שמקבל בקשה כזו לתור עלול להשקיע זמן
+          בבדיקת בקשה שלא יכולה להיות מאושרת מלכתחילה, כי הגובה עצמו חסום מהקרקע ולא רק האזור.
+        </p>
+        <p class="meta">מומלץ: כש-<code>altitudeResult.blockedFromGround</code> אמת, להסתיר/לנטרל את כפתור בקשת התיאום גם אם רמת האזור לבדה הייתה מתירה בקשה — ולהסביר בקצרה למה (״הגובה המרבי המותר בנקודה זו הוא 0 — אין טעם בבקשת תיאום עד שהמגבלה הזו משתנה״). זה קורה גם ב-<code>LocationInfoCard</code> וגם ב-<code>FlightParamsDrawer</code>, שניהם עם אותה בעיה בדיוק.
+        </p>
+      </div>
+    </div>
+
+    <div class="complexity-list" style="margin-top:16px">
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>אין חיפוש כתובת/מקום על המפה</h4>
+          <p>הדרך היחידה למרכז את המפה היא "המיקום הנוכחי שלי". דיספצ׳ר שמתכנן מראש טיסה בכתובת שהוא לא ליד — למשל תיאום מול לקוח לפני שיוצאים לשטח — צריך לגלול ולזום ידנית עד שמוצא את המקום.</p>
+        </div>
+        <span class="fix-arrow">→ תיבת חיפוש כתובת/עיר עם geocoding, קופצת ישירות לנקודה</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>אין מיקומים שמורים</h4>
+          <p>מטיס שחוזר לאותו אתר שוב ושוב (שדה חקלאי, אתר בדק תשתיות) מצייר את הבועה/פוליגון מאפס בכל פעם — אין דרך לשמור צורה כ"מיקום קבוע" ולפתוח אותה מהר בפעם הבאה.</p>
+        </div>
+        <span class="fix-arrow">→ כפתור "שמירת מיקום" בכרטיס המיקום או בטופס הבקשה</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>כפתור שיתוף המיקום זמין רק ב-HUD, לא בכרטיס המיקום</h4>
+          <p><code>CoordinateShareButton</code> משתף את המיקום הנוכחי החי בלבד. אחרי שבודקים נקודה ספציפית בכרטיס — בדיוק המקרה שבו הכי סביר שרוצים לשתף את הקואורדינטות של אותה נקודה עם עמית — אין את אותו כפתור שם.</p>
+        </div>
+        <span class="fix-arrow">→ אותו כפתור, בכרטיס המיקום, משתף את <code>point</code> ולא את ה-GPS החי</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>מצב ניגודיות גבוהה מתאפס בכל טעינה</h4>
+          <p><code>highContrast</code> הוא <code>useState</code> מקומי בלבד — לא נשמר בפרופיל ולא ב-localStorage. מטיס שזקוק לו (שימוש בשמש) צריך להפעיל אותו מחדש כל כניסה למפה.</p>
+        </div>
+        <span class="fix-arrow">→ לשמור את ההעדפה — localStorage מספיק, לא צריך טבלה</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>מקרא הצבעים ופירוט האזור בכרטיס לא חולקים מקור אחד</h4>
+          <p>שמות סוגי האזורים מופיעים גם ב-<code>LayerControlPanel</code> (מקרא) וגם ב-<code>LocationInfoCard</code> (פירוט "למה") — משני מקורות תיוג נפרדים בקוד. לא באג היום, אבל כל סוג אזור עתידי חדש צריך עדכון בשני מקומות בלי שום דבר שיזכיר את זה.</p>
+        </div>
+        <span class="fix-arrow">→ מקור תיוג/צבע אחד משותף לשני הרכיבים</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="mp-works">
+    <div class="section-head">
+      <span class="tag">מרקטפלייס מטיסים · 01</span>
+      <h2>מה עובד — נבדק קצה-לקצה</h2>
+      <p>עברתי על כל המסלול החי: מילוי פרופיל → שמירה → חיפוש/סינון ברשימה → פתיחת פרופיל מלא → בקשת קשר → אישור → חשיפת טלפון → כתיבת ביקורת → הצגתה.</p>
+    </div>
+    <div class="progress-list">
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מודל אבטחה נכון לחלוטין</h4><p>הטלפון האמיתי לא נחשף אף פעם דרך שאילתת הרשימה או הפרופיל — רק דרך פונקציית RPC ייעודית שבודקת שהבקשה אושרה. נבדק: לפני אישור אין טלפון בתשובה כלל, אחרי אישור הוא מופיע.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>פרופיל מבוסס תגיות, לא רק ביוגרפיה חופשית</h4><p>6 קטגוריות מובנות (דגמי רחפן, סוגי כטב״ם, מצבי הטסה, סקילים, תוכנות, תפקידים) הופכות פרופיל מטיס למשהו שבאמת אפשר לסנן ולהשוות — לא רק לקרוא.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>סינון דינמי לפי מה שקיים בפועל</h4><p>אפשרויות הסינון ("תפקיד", "תחום התמחות") נבנות מתוך התגיות שבאמת נבחרו על ידי מטיסים רשומים — לא מציגות אפשרויות סינון ל-0 תוצאות.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>דף פרופיל מלא בסגנון לינקדאין</h4><p>כותרת מקצועית, שנות ניסיון, תג מטיס מאומת, כל 6 קטגוריות התגיות, וקטע המלצות מאורגנים בעמוד אחד קריא. פרופיל ריק מציג הודעה ברורה במקום שישה כותרי-סעיף ריקים.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מחזור חיים מלא של בקשת קשר וביקורת</h4><p>בקשה → אישור/דחייה מהמטיס → חשיפת טלפון → דירוג בכוכבים עם חוות דעת — כל השלבים נבדקו חי ועובדים, כולל שהדירוג מוצג מיד תחת "המלצות" בפרופיל הציבורי.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mp-issues">
+    <div class="section-head">
+      <span class="tag">מרקטפלייס מטיסים · 02</span>
+      <h2>ממצאים ורעיונות לשיפור</h2>
+    </div>
+
+    <div class="bug-alert">
+      <span class="icon">!</span>
+      <div>
+        <h4>חשבון בדיקה ישן עדיין חי וגלוי במרקטפלייס האמיתי</h4>
+        <p>
+          בבדיקה החיה של הסבב הזה, "מטיס בדיקה" מופיע כרשומה אמיתית ברשימת המרקטפלייס — עם תג "צילום וידאו
+          אווירי" ותיבת ראשי-תיבות כאווטאר, אבל בלי אף תגית ניסיון (הפרופיל המפורט ריק). זה נראה כמו שארית
+          מבדיקה קודמת שבה חשבון הבדיקה עדיין מוגדר <code>freelance_available</code> ו/או
+          <code>professional_category</code>, למרות שהניקוי בסוף הסבב הקודם התמקד בעיקר בשחזור שדות פרופיל
+          אישיים ולא כלל את הדגל הזה. מכיוון שזה מרקטפלייס אמיתי שארגונים אמיתיים יראו, שווי ניקוי מיידי —
+          לא רק תיעוד.
+        </p>
+        <p class="meta">לתקן: לאפס <code>freelance_available</code>/<code>professional_category</code> על כל חשבון בדיקה שנשאר מסבבי הבדיקה הקודמים, ולהוסיף לתהליך הניקוי בסוף כל בדיקה עתידית בדיקת-נוכחות מפורשת ברשימת המרקטפלייס עצמה (לא רק בטבלאות).</p>
+      </div>
+    </div>
+
+    <div class="complexity-list" style="margin-top:16px">
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>אין שדה אזור שירות גיאוגרפי</h4>
+          <p>אין שום דרך לדעת אם מטיס עובד "בשרון", "בנגב" או "בכל הארץ" — לשירות שכולו תלוי מיקום פיזי, זו כנראה עמודת הסינון הכי חסרה כרגע. התשתית הגיאוגרפית (PostGIS, turf) כבר קיימת בפלטפורמה למטרות אחרות.</p>
+        </div>
+        <span class="fix-arrow">→ שדה "אזור שירות עיקרי" (מולטי-בחירה) בפרופיל + סינון תואם ברשימה</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>חיפוש טקסט חופשי לא בודק תגיות</h4>
+          <p>החיפוש בודק רק <code>full_name</code> ו-<code>headline</code>. עסק שמחפש "LiDAR" בתיבת החיפוש יקבל 0 תוצאות גם אם יש מטיס עם התגית הזו בדיוק — כי היא לא מוצגת בכותרת המקצועית שלו. זה מתנגש עם כל הרעיון של מערכת תגיות מובנית.</p>
+        </div>
+        <span class="fix-arrow">→ להרחיב את החיפוש לכלול גם specializations/skills/drone_models</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>רשימת דגמי הרחפן (17 פריטים) הופכת ל"קיר כפתורים" בבורר תגיות</h4>
+          <p><code>TagMultiSelect</code> מציג את כל האפשרויות שלא נבחרו כשבבים בו-זמנית, בלי חיפוש פנימי. עם 17 דגמים (ורשימה שרק תגדל עם הזמן), זה הופך למסך גלילה של כפתורים במקום בחירה נוחה.</p>
+        </div>
+        <span class="fix-arrow">→ שדה חיפוש/סינון בתוך הבורר עצמו כשיש מעל ~10 הצעות</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>אין דרך לבטל בקשת קשר שנשלחה</h4>
+          <p>עסק ששלח בקשה בטעות, או רוצה לתקן הודעה, לא יכול לבטל או לערוך — רק לחכות שהמטיס יגיב. הצד המטיס לבד שולט על סטטוס הבקשה.</p>
+        </div>
+        <span class="fix-arrow">→ כפתור ביטול לבקשה בסטטוס pending, בצד השולח</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>דירוג אחד בלבד לכל זוג ארגון-מטיס, לתמיד</h4>
+          <p>ה-upsert פועל על <code>org_id,pilot_id</code> — עסק ששכר אותו מטיס פעמיים, בעבודה מצוינת ובעבודה בינונית, יכול לשמור רק חוות דעת אחת עדכנית, לא היסטוריה. לא דחוף, אבל שווה לזכור אם המרקטפלייס יגדל למקום שבו יחסי עבודה חוזרים הם הנורמה.</p>
+        </div>
+        <span class="fix-arrow">→ לשקול מודל "ביקורת לכל התקשרות" בעתיד, לא כעת</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>אין מיון לתוצאות הרשימה</h4>
+          <p>הכרטיסים מוצגים בסדר שה-RPC מחזיר, ללא אפשרות למיין לפי דירוג, מספר ביקורות או ניסיון.</p>
+        </div>
+        <span class="fix-arrow">→ Select קטן ל"מיון לפי" ליד תיבת החיפוש</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="section-head">
+      <span class="tag">חשיבה קדימה</span>
+      <h2>רעיונות לנתונים שיחזקו את העסק</h2>
+      <p>מידע שהתשתית הקיימת כבר כמעט תומכת בו, או שקל להתחיל לאסוף, ושיכול להפוך לערך עסקי אמיתי — לא רק "פיצ׳ר נחמד".</p>
+    </div>
+
+    <div class="subhead"><span class="dot"></span>מהמפה</div>
+    <div class="idea-grid">
+      <div class="idea-card">
+        <span class="kicker">בינת עסק</span>
+        <h4>מטרת הטיסה כשדה נבחר, לא רק חופשי</h4>
+        <p>סיווג קבוע (צילום/מיפוי/בדק/ריסוס/משלוחים וכו׳) בכל בקשה יאפשר בהמשך לצלוב עם תגיות הסקילים של המרקטפלייס — "יש ביקוש למיפוי בשרון החודש, אבל אין מטיס מאומת באזור" הוא איתות התרחבות אמיתי.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">אמינות</span>
+        <h4>האם הטיסה בפועל התקיימה</h4>
+        <p>שדה "בוצע בפועל / בוטלה עקב מזג אוויר / בוטלה מסיבה אחרת" שנסגר אחרי חלון הטיסה, יאפשר דוחות אמינות תפעולית אמיתיים — גם כלפי פנים וגם כחומר גיבוי מול רת״א.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">חיסכון בזמן</span>
+        <h4>מיקומים שמורים כישות</h4>
+        <p>מעבר לנוחות המשתמש (סעיף קודם) — ברגע שיש ישות "מיקום", אפשר לדווח "אילו אתרים אנחנו טסים בהם הכי הרבה", מידע שהיום קבור בתוך קואורדינטות חופשיות בכל בקשה.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">בידול תחרותי</span>
+        <h4>נראות דה-קונפליקציה בין ארגונים</h4>
+        <p>הצגה אנונימית ומרוסנת של "יש תיאום מאושר סמוך לכאן בחלון הזמן הזה" (באזורים משותפים) היא משהו שהאפליקציה הרשמית לא נותנת — יתרון תפעולי אמיתי למי שמשלם על החשבון העסקי.</p>
+      </div>
+    </div>
+
+    <div class="subhead"><span class="dot"></span>מהמרקטפלייס</div>
+    <div class="idea-grid">
+      <div class="idea-card">
+        <span class="kicker">אמון מובנה</span>
+        <h4>ניסיון מאומת מהפלטפורמה, לא רק מדווח-עצמי</h4>
+        <p>"שנות ניסיון" הוא היום מספר שהמטיס מקליד. אבל MetisOps כבר יודע כמה טיסות המטיס בפועל תיעד במערכת, כולל כמה מהן היו במרחב מוגבל שדרש תיאום — סימן אמינות שאף רשת חברתית אחרת לא יכולה להציע, כי הוא לא מבוסס דיווח-עצמי.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">מהירות סגירה</span>
+        <h4>טווח תמחור ו/או זמינות בזמן אמת</h4>
+        <p>גם טווח "החל מ-₪X ליום" אופציונלי, וגם דגל "פנוי השבוע" — היום עסק חייב לפתוח דיאלוג בקשת קשר ולחכות לתשובה רק כדי לגלות אם המטיס בכלל פנוי.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">שער ראשון</span>
+        <h4>ביטוח צד ג׳ כשדה בפרופיל</h4>
+        <p>לעיתים קרובות זו השאלה הראשונה שעסק שואל, עוד לפני "מה הטסת" — גם הצהרה עצמית (checkbox עם מספר פוליסה אופציונלי) מבדילה משמעותית מול מרקטפלייס ללא השדה הזה בכלל.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">המרה</span>
+        <h4>תיק עבודות ויזואלי</h4>
+        <p>לשירות שכולו ויזואלי (צילום, מיפוי), 3–6 תמונות/סרטוני דוגמה בפרופיל צפויות להשפיע על החלטת ההתקשרות הרבה יותר מעוד תגית טקסט.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">שימור לקוח</span>
+        <h4>לוח היסטוריה לעסק ששוכר</h4>
+        <p>הנתונים כבר קיימים (<code>contact_requests</code>, <code>pilot_reviews</code>) אבל אין להם שום תצוגה מרוכזת לצד הארגון: "כמה מטיסים שכרנו דרך המרקטפלייס, אילו דירוגים נתנו". תצוגה כזו הופכת שימוש חוזר במרקטפלייס להרגל נמדד.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">קור-סטארט</span>
+        <h4>שים לב: המרקטפלייס עדיין דליל</h4>
+        <p>עם חשבון בדיקה יחיד רשום כרגע, כמעט כל 10 הסקילים ו-10 התפקידים המוגדרים בתשתית לא מופיעים כלל כאפשרויות סינון (כי הן נגזרות רק ממה שנבחר בפועל). זה לא באג — אבל שווה תוכנית פעילה לגיוס מטיסים אמיתיים למרקטפלייס לפני שמשקיעים עוד בשכבת הסינון עצמה.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="a11y">
+    <div class="section-head">
+      <span class="tag">הנגשה</span>
+      <h2>רעיונות שלא חשבנו עליהם עד עכשיו</h2>
+    </div>
+    <div class="complexity-list">
+      <div class="complexity-row">
+        <span class="severity high">גבוהה</span>
+        <div class="body">
+          <h4>הפיצ׳ר המרכזי של המפה נעול לגמרי מאחורי עכבר/מגע</h4>
+          <p>הדרך היחידה לבדוק "האם מותר לטוס כאן" היא קליק פיזי על מפה. משתמש עיוור או משתמש מקלדת-בלבד לא יכול לבצע את הפעולה החשובה ביותר באפליקציה בכלל.</p>
+        </div>
+        <span class="fix-arrow">→ תיבת חיפוש כתובת (ראו סעיף מפה למעלה) היא גם פתרון נגישות: "הזן כתובת ובדוק"</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body">
+          <h4>צבעי אזורי המפה עצמם ללא ערוץ שני מלבד צבע</h4>
+          <p>בניגוד ל-HUD ולתגים (שמשלבים תמיד אייקון+טקסט לצד הצבע, נכון), מילוי/קו האזורים על המפה עצמה (שטח אש מול שמורת טבע מול שטח מוגבל) נבדל רק בגוון — בעייתי למשתמשי עיוורון צבעים בזום נמוך.</p>
+        </div>
+        <span class="fix-arrow">→ תבנית מילוי (hatch) שונה לכל סוג אזור, לא רק גוון</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>כוכבי הדירוג במרקטפלייס — כפילות מסך-קורא</h4>
+          <p>חמשת אייקוני הכוכב לכל דירוג ככל הנראה נקראים בנפרד על ידי טכנולוגיה מסייעת, בזמן שהטקסט הסמוך ("4.5 מתוך 12 ביקורות") כבר נותן את כל המידע הדרוש.</p>
+        </div>
+        <span class="fix-arrow">→ aria-hidden על שורת הכוכבים, להסתמך על הטקסט הסמוך</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body">
+          <h4>אין כיבוד ל-prefers-reduced-motion באנימציית ה-flyTo</h4>
+          <p>קפיצות מהירות במפה (מיקום נוכחי, מיקום שמור עתידי) עלולות להטריד משתמשים רגישים לתנועה — תיקון קטן וזול.</p>
+        </div>
+        <span class="fix-arrow">→ לקצר/לבטל את משך ה-flyTo כש-prefers-reduced-motion פעיל</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="priority">
+    <div class="section-head">
+      <span class="tag">אם היינו בוחרים רק 5</span>
+      <h2>סדר עדיפויות מומלץ</h2>
+    </div>
+    <div class="priority-list">
+      <div class="priority-item">
+        <span class="rank">1</span>
+        <div><h4>ניקוי חשבון הבדיקה מהמרקטפלייס החי</h4><p>הכי מהיר לתקן מכל הרשימה, והכי גלוי כלפי חוץ — כל עסק שנכנס למרקטפלייס רואה אותו עכשיו.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">2</span>
+        <div><h4>לתאם בין חסימת גובה לכפתור בקשת התיאום</h4><p>המצב הנוכחי מציג כפתור פעיל לבקשה שלא יכולה להיות מאושרת — מבלבל למטיס וטורח מיותר למוקדן.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">3</span>
+        <div><h4>שדה אזור שירות גיאוגרפי במרקטפלייס</h4><p>ציר הסינון הכי מתבקש שעדיין חסר, לשירות שכולו תלוי-מיקום.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">4</span>
+        <div><h4>חיפוש כתובת על המפה</h4><p>גם שיפור חוויית משתמש ממשי לתכנון מראש, וגם עוקף מכשול נגישות משמעותי בו-זמנית.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">5</span>
+        <div><h4>הרחבת חיפוש המרקטפלייס לתגיות</h4><p>תיקון קטן שמנצל את ההשקעה שכבר נעשתה במערכת התגיות המובנית, במקום להשאיר אותה רק לסינון.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="closing">
+    שני הרכיבים האלה — המפה והמרקטפלייס — הם כבר לא MVP: יש בהם לוגיקה משפטית-מרחבית אמיתית ומודל אבטחה נכון
+    למטרתו. הפער שנשאר הוא בעיקר בין "עובד נכון" ל"קל לבנות עליו עסק" — נתוני מיקום, זמינות ותמחור במרקטפלייס,
+    ותיאום בין שכבות ההחלטה השונות במפה. אף אחד מהם לא דורש שינוי ארכיטקטורה, רק השלמה.
+  </p>
+</div>
+
+</body></html>

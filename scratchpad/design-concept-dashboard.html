@@ -1,0 +1,321 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>רעיון עיצובי: לוח בקרה</title>
+<style>
+  :root {
+    --bg: 40 25% 96%;
+    --fg: 220 47% 14%;
+    --card: 0 0% 100%;
+    --muted: 40 18% 93%;
+    --muted-fg: 220 15% 42%;
+    --border: 39 22% 87%;
+    --navy: 220 50% 17%;
+    --navy-fg: 40 33% 96%;
+    --gold: 39 62% 45%;
+    --success: 142 60% 30%;
+    --success-bg: 142 50% 94%;
+    --warning: 32 88% 40%;
+    --warning-bg: 38 85% 94%;
+    --danger: 0 68% 45%;
+    --danger-bg: 0 65% 95%;
+    --shadow: 220 47% 16%;
+
+    /* "before" — plain generic-SaaS tokens, for the comparison column only */
+    --b-bg: 0 0% 100%;
+    --b-fg: 222 20% 12%;
+    --b-card: 0 0% 100%;
+    --b-border: 220 15% 90%;
+    --b-muted-fg: 220 10% 46%;
+    --b-primary: 222 47% 40%;
+    --b-success: 142 60% 32%;
+    --b-warning: 32 85% 40%;
+    --b-danger: 0 65% 45%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: 222 38% 8%; --fg: 40 25% 95%; --card: 222 34% 12%; --muted: 222 28% 17%;
+      --muted-fg: 220 15% 68%; --border: 222 24% 21%; --navy: 222 40% 9%; --navy-fg: 40 25% 95%;
+      --gold: 39 60% 58%; --success: 142 55% 55%; --success-bg: 142 40% 16%;
+      --warning: 38 85% 62%; --warning-bg: 36 60% 18%; --danger: 0 70% 65%; --danger-bg: 0 45% 18%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: 222 38% 8%; --fg: 40 25% 95%; --card: 222 34% 12%; --muted: 222 28% 17%;
+    --muted-fg: 220 15% 68%; --border: 222 24% 21%; --navy: 222 40% 9%; --navy-fg: 40 25% 95%;
+    --gold: 39 60% 58%; --success: 142 55% 55%; --success-bg: 142 40% 16%;
+    --warning: 38 85% 62%; --warning-bg: 36 60% 18%; --danger: 0 70% 65%; --danger-bg: 0 45% 18%;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: hsl(var(--bg)); color: hsl(var(--fg)); font-family: 'Assistant', system-ui, sans-serif; line-height: 1.6; }
+  h1, h2, h3, h4 { font-family: 'Heebo', system-ui, sans-serif; text-wrap: balance; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 90px; }
+
+  .hero { background: hsl(var(--navy)); color: hsl(var(--navy-fg)); padding: 44px 20px 36px; }
+  .hero-inner { max-width: 1180px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: hsl(var(--gold));
+    background: hsl(var(--gold) / .14); border: 1px solid hsl(var(--gold) / .3); border-radius: 999px; padding: 5px 14px; margin-bottom: 14px;
+  }
+  .hero h1 { font-size: clamp(24px, 3.6vw, 34px); font-weight: 800; margin: 0 0 8px; }
+  .hero p { font-size: 15px; color: hsl(var(--navy-fg) / .8); max-width: 680px; margin: 0; }
+
+  section { margin-top: 48px; }
+  .section-head h2 { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+  .section-head p { color: hsl(var(--muted-fg)); font-size: 13.5px; margin: 0 0 20px; max-width: 640px; }
+
+  /* Principles */
+  .principle-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .principle-grid { grid-template-columns: repeat(2, 1fr); } }
+  .principle {
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 18px;
+  }
+  .principle .n { font-family: 'Heebo'; font-weight: 800; color: hsl(var(--gold)); font-size: 12px; letter-spacing: .04em; }
+  .principle h4 { font-size: 14px; margin: 8px 0 5px; }
+  .principle p { font-size: 12.8px; color: hsl(var(--muted-fg)); margin: 0; }
+
+  /* Comparison */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .compare { grid-template-columns: 1fr; } }
+  .compare-col-label {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-family: 'Heebo'; font-weight: 700; font-size: 13px;
+  }
+  .compare-col-label.before { color: hsl(220 10% 46%); }
+  .compare-col-label.after { color: hsl(var(--gold)); }
+  .compare-col-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .compare-col-label.before .dot { background: hsl(220 10% 60%); }
+  .compare-col-label.after .dot { background: hsl(var(--gold)); }
+  .frame { border-radius: 16px; overflow: hidden; border: 1px solid hsl(var(--border)); }
+
+  /* ===== BEFORE mock (plain, generic-SaaS look) ===== */
+  .before-screen { background: hsl(var(--b-bg)); color: hsl(var(--b-fg)); padding: 20px; font-family: 'Assistant', sans-serif; }
+  .b-greeting { font-size: 20px; font-weight: 700; margin: 0 0 2px; }
+  .b-sub { font-size: 13px; color: hsl(var(--b-muted-fg)); margin: 0 0 16px; }
+  .b-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  .b-stat { background: hsl(var(--b-card)); border: 1px solid hsl(var(--b-border)); border-radius: 8px; padding: 14px; }
+  .b-stat .v { font-size: 22px; font-weight: 700; }
+  .b-stat .l { font-size: 12px; color: hsl(var(--b-muted-fg)); margin-top: 2px; }
+  .b-card { background: hsl(var(--b-card)); border: 1px solid hsl(var(--b-border)); border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .b-card h5 { font-size: 13px; font-weight: 700; margin: 0 0 10px; }
+  .b-alert-row { display: flex; align-items: center; gap: 10px; border: 1px solid hsl(var(--b-border)); border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+  .b-alert-row .t { flex: 1; }
+  .b-alert-row .t1 { font-size: 12.5px; font-weight: 600; }
+  .b-alert-row .t2 { font-size: 11.5px; color: hsl(var(--b-muted-fg)); }
+  .b-badge { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .b-badge.warn { background: hsl(var(--b-warning) / .12); color: hsl(var(--b-warning)); }
+  .b-badge.danger { background: hsl(var(--b-danger) / .12); color: hsl(var(--b-danger)); }
+  .b-icon { width: 28px; height: 28px; border-radius: 6px; background: hsl(var(--b-border)); flex-shrink: 0; }
+
+  /* ===== AFTER mock (proposed direction) ===== */
+  .after-screen { background: hsl(var(--bg)); color: hsl(var(--fg)); padding: 20px; }
+  .a-greeting { font-family: 'Heebo'; font-size: 21px; font-weight: 800; margin: 0 0 2px; }
+  .a-sub { font-size: 13px; color: hsl(var(--muted-fg)); margin: 0 0 18px; }
+
+  /* Hero metric gets real weight; the rest are quiet secondary tiles */
+  .a-metric-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 640px) { .a-metric-row { grid-template-columns: 1fr; } }
+  .a-hero-metric {
+    background: hsl(var(--navy)); color: hsl(var(--navy-fg)); border-radius: 14px; padding: 18px 20px;
+    display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;
+  }
+  .a-hero-metric::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 100% 0%, hsl(var(--gold) / .18), transparent 55%);
+  }
+  .a-hero-metric .l { font-size: 12.5px; color: hsl(var(--navy-fg) / .75); position: relative; }
+  .a-hero-metric .v { font-family: 'Heebo'; font-size: 34px; font-weight: 800; margin-top: 6px; position: relative; }
+  .a-hero-metric .tag {
+    align-self: flex-start; margin-top: 10px; font-size: 11px; font-weight: 700; background: hsl(var(--gold) / .18);
+    color: hsl(var(--gold)); border-radius: 999px; padding: 3px 10px; position: relative;
+  }
+  .a-mini-stat { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 14px 16px; }
+  .a-mini-stat .v { font-family: 'Heebo'; font-size: 22px; font-weight: 800; }
+  .a-mini-stat .l { font-size: 12px; color: hsl(var(--muted-fg)); margin-top: 2px; }
+
+  .a-section-title { display: flex; align-items: center; gap: 8px; font-family: 'Heebo'; font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+  .a-section-title .bar { width: 3px; height: 14px; border-radius: 2px; background: hsl(var(--gold)); }
+
+  /* Alerts: color leads, not a badge tucked in a corner of a white card */
+  .a-alert {
+    display: flex; align-items: flex-start; gap: 10px; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+    border-inline-start: 3px solid transparent;
+  }
+  .a-alert.danger { background: hsl(var(--danger-bg)); border-inline-start-color: hsl(var(--danger)); }
+  .a-alert.warn { background: hsl(var(--warning-bg)); border-inline-start-color: hsl(var(--warning)); }
+  .a-alert .ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; font-weight: 800; font-family: 'Heebo'; }
+  .a-alert.danger .ic { background: hsl(var(--danger) / .16); color: hsl(var(--danger)); }
+  .a-alert.warn .ic { background: hsl(var(--warning) / .18); color: hsl(var(--warning)); }
+  .a-alert .t1 { font-size: 13px; font-weight: 700; }
+  .a-alert.danger .t1 { color: hsl(var(--danger)); }
+  .a-alert.warn .t1 { color: hsl(var(--warning)); }
+  .a-alert .t2 { font-size: 12px; color: hsl(var(--fg) / .7); margin-top: 1px; }
+
+  .a-license-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 16px; }
+  .a-license-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid hsl(var(--border)); font-size: 13px; }
+  .a-license-row:last-child { border-bottom: none; }
+  .a-license-row .num { color: hsl(var(--muted-fg)); font-size: 12px; }
+  .a-status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; }
+  .a-status-pill.ok { background: hsl(var(--success-bg)); color: hsl(var(--success)); }
+  .a-status-pill.ok::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: hsl(var(--success)); }
+
+  .callouts { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .callout { display: flex; gap: 10px; font-size: 12.5px; color: hsl(var(--muted-fg)); }
+  .callout .num { font-family: 'Heebo'; font-weight: 800; color: hsl(var(--gold)); flex-shrink: 0; }
+
+  .closing { margin-top: 56px; padding-top: 24px; border-top: 1px solid hsl(var(--border)); font-size: 13.5px; color: hsl(var(--muted-fg)); }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&family=Assistant:wght@400;500;600;700&display=swap">
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">רעיון עיצובי · MetisOps</span>
+    <h1>מה בין "עוד לוח מחוונים" ל"חדר בקרה"</h1>
+    <p>
+      הפלטפורמה עובדת נכון — הבעיה היא שהיא נראית כמו כל SaaS דשבורד גנרי: כרטיס לבן אחיד לכל דבר, אותו
+      עיגול-פינות, אותו צל, ותג-סטטוס קטן שצריך לחפש כדי לראות מה דחוף. הרעיון כאן הוא לא "לצבוע הכל
+      מחדש" — הוא לתת לצבע, לגודל ולמבנה לעשות את העבודה שהעין אמורה לעשות: מה הכי חשוב כאן, עכשיו.
+    </p>
+  </div>
+</div>
+
+<div class="wrap">
+  <section id="principles">
+    <div class="section-head">
+      <h2>ארבעה עקרונות, לא שיפוץ כללי</h2>
+      <p>כל אחד ניתן ליישום בנפרד, על הטוקנים והרכיבים שכבר קיימים במערכת (card, badge, cva variants) — לא דורש ספריית עיצוב חדשה.</p>
+    </div>
+    <div class="principle-grid">
+      <div class="principle">
+        <span class="n">01</span>
+        <h4>מדד אחד מוביל, לא שורה של שווים</h4>
+        <p>בכל מסך יש מספר אחד שהכי חשוב עכשיו (בקשות ממתינות, תיאומים דחופים). הוא מקבל גודל, צבע-רקע וכתובת — לא עוד אריח לבן זהה לשכניו.</p>
+      </div>
+      <div class="principle">
+        <span class="n">02</span>
+        <h4>התראה = צבע קודם, לא תג בפינה</h4>
+        <p>שורת התראה דחופה צריכה להיצבע כדחופה מהרגע הראשון — רקע אדמדם/כתום עדין וגבול צבעוני, לא כרטיס לבן עם תג קטן שצריך לקרוא כדי להבין את החומרה.</p>
+      </div>
+      <div class="principle">
+        <span class="n">03</span>
+        <h4>זהב MetisOps כמסמן-מיקוד, לא כדקורציה</h4>
+        <p>הצבע הזהוב שכבר קיים במערכת (brand-gold) כמעט לא בשימוש. להפוך אותו לצבע ה"תשומת לב שלך כאן" — כותרות מקטע, פסי הדגשה, תגי סטטוס נדירים — כדי שיישאר משמעותי ולא יתפוגג מריבוי שימוש.</p>
+      </div>
+      <div class="principle">
+        <span class="n">04</span>
+        <h4>מספרים כמו מספרים</h4>
+        <p>תאריכים, שעות, קואורדינטות וסטטיסטיקות — עם font-variant-numeric: tabular-nums וגופן Heebo למספרים גדולים. כשהעמודות מיושרות באמת, הלוח מרגיש מדויק במקום מוקלד.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="section-head">
+      <h2>אותו לוח בקרה, שני טיפולים</h2>
+      <p>אותם נתונים אמיתיים מ"בקרה ראשית" — משמאל המצב הנוכחי (כרטיס אחיד לכל דבר), מימין הכיוון המוצע.</p>
+    </div>
+
+    <div class="compare">
+      <div>
+        <div class="compare-col-label before"><span class="dot"></span>המצב היום</div>
+        <div class="frame">
+          <div class="before-screen">
+            <p class="b-greeting">ערב טוב, אוהד</p>
+            <p class="b-sub">הנה מה שקורה היום ב-MetisOps שלך</p>
+
+            <div class="b-stat-grid">
+              <div class="b-stat"><div class="v tabular">3</div><div class="l">תיאומי שטח היום</div></div>
+              <div class="b-stat"><div class="v tabular">7</div><div class="l">כלי טיס פעילים</div></div>
+              <div class="b-stat"><div class="v tabular">142.5</div><div class="l">שעות טיסה</div></div>
+              <div class="b-stat"><div class="v tabular">2</div><div class="l">בקשות ממתינות</div></div>
+            </div>
+
+            <div class="b-card">
+              <h5>התראות פעילות</h5>
+              <div class="b-alert-row">
+                <div class="b-icon"></div>
+                <div class="t"><div class="t1">רישיון מטיס פג תוקף</div><div class="t2">תאריך תפוגה: 2.9.2026</div></div>
+                <span class="b-badge danger">דחוף</span>
+              </div>
+              <div class="b-alert-row">
+                <div class="b-icon"></div>
+                <div class="t"><div class="t1">בדיקה 1: רישום CAAI עומד לפוג</div><div class="t2">תוקף רישום: 30.9.2026</div></div>
+                <span class="b-badge warn">לתשומת לב</span>
+              </div>
+            </div>
+
+            <div class="b-card">
+              <h5>רישיונות</h5>
+              <div style="font-size:12.5px; display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid hsl(var(--b-border))">
+                <span>מסחרי עד 25 ק״ג · LIC-4471</span><span class="b-badge warn">פג בקרוב</span>
+              </div>
+              <div style="font-size:12.5px; display:flex; justify-content:space-between; padding:6px 0">
+                <span>תחביב · LIC-1120</span><span class="b-badge" style="background:hsl(142 60% 32% / .12); color:hsl(142 60% 32%)">בתוקף</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="compare-col-label after"><span class="dot"></span>הכיוון המוצע</div>
+        <div class="frame">
+          <div class="after-screen">
+            <p class="a-greeting">ערב טוב, אוהד</p>
+            <p class="a-sub">הנה מה שקורה היום ב-MetisOps שלך</p>
+
+            <div class="a-metric-row">
+              <div class="a-hero-metric">
+                <span class="l">בקשות ממתינות לתיאום</span>
+                <span class="v tabular">2</span>
+                <span class="tag">דורש טיפול היום</span>
+              </div>
+              <div class="a-mini-stat"><div class="v tabular">3</div><div class="l">תיאומי שטח היום</div></div>
+              <div class="a-mini-stat"><div class="v tabular">7</div><div class="l">כלי טיס פעילים</div></div>
+            </div>
+
+            <div class="a-section-title"><span class="bar"></span>התראות פעילות</div>
+            <div class="a-alert danger">
+              <span class="ic">!</span>
+              <div><div class="t1">רישיון מטיס פג תוקף</div><div class="t2">תאריך תפוגה: 2.9.2026 — לא ניתן לתאם טיסות חדשות</div></div>
+            </div>
+            <div class="a-alert warn">
+              <span class="ic">⏱</span>
+              <div><div class="t1">בדיקה 1: רישום CAAI עומד לפוג</div><div class="t2">תוקף רישום: 30.9.2026</div></div>
+            </div>
+
+            <div style="margin-top:16px">
+              <div class="a-section-title"><span class="bar"></span>רישיונות</div>
+              <div class="a-license-card">
+                <div class="a-license-row">
+                  <span>מסחרי עד 25 ק״ג <span class="num tabular">· LIC-4471</span></span>
+                  <span class="a-status-pill" style="background:hsl(var(--warning-bg)); color:hsl(var(--warning))">פג בקרוב</span>
+                </div>
+                <div class="a-license-row">
+                  <span>תחביב <span class="num tabular">· LIC-1120</span></span>
+                  <span class="a-status-pill ok">בתוקף</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callouts">
+          <div class="callout"><span class="num">1</span><span>המדד הדחוף ביותר (בקשות ממתינות) עבר לכרטיס-כהה נפרד בגודל כפול — לא עוד אריח באותה שורה כמו "שעות טיסה".</span></div>
+          <div class="callout"><span class="num">2</span><span>התראות דחופות/לתשומת-לב צבועות ברקע שלהן, לא רק בתג — ניכר מהצצה אחת, בלי לקרוא טקסט.</span></div>
+          <div class="callout"><span class="num">3</span><span>פס זהב + כותרת מקטע קטנה מחליפים את "כותרת כרטיס לבן" הגנרית — עקבי בכל המסכים, לא רק כאן.</span></div>
+          <div class="callout"><span class="num">4</span><span>מספרי רישיון/תאריכים ב-tabular-nums כדי שהעמודה תיושר — הבדל קטן שגורם ללוח נתונים להיראות מדויק.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="closing">
+    שני הצדדים כאן משתמשים באותם רכיבי shadcn ובאותם טוקני צבע שכבר מוגדרים ב-globals.css — אין כאן ספריית
+    עיצוב חדשה או פונטים חדשים. זו בעיקר שאלה של מתי לצבוע רקע שלם במקום תג, מתי לתת למספר אחד גודל כפול,
+    ואיפה להשתמש בזהב שכבר קיים אבל כמעט לא נראה. אם הכיוון מדבר אליך, הייתי מתחיל דווקא ב"בקרה ראשית"
+    ו"מוקד תיאום" — שני המסכים שכל משתמש רואה הכי הרבה.
+  </p>
+</div>
+
+</body></html>

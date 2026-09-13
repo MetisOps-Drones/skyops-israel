@@ -1,0 +1,486 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>חוות דעת: מרכז שליטה — סבב חמישי</title>
+<style>
+  :root {
+    --bg: 40 30% 97%;
+    --fg: 220 47% 14%;
+    --card: 0 0% 100%;
+    --card-fg: 220 47% 14%;
+    --muted: 40 20% 94%;
+    --muted-fg: 220 15% 40%;
+    --border: 39 25% 87%;
+    --navy: 220 47% 16%;
+    --navy-fg: 40 33% 96%;
+    --gold: 39 55% 46%;
+    --gold-fg: 220 47% 14%;
+    --success: 142 60% 32%;
+    --success-bg: 142 55% 94%;
+    --warning: 32 85% 40%;
+    --warning-bg: 38 85% 94%;
+    --danger: 0 65% 45%;
+    --danger-bg: 0 65% 95%;
+    --info: 210 70% 42%;
+    --info-bg: 210 70% 95%;
+    --radar: 168 60% 34%;
+    --radar-bg: 168 55% 94%;
+    --shadow: 220 47% 16%;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: 222 40% 9%; --fg: 40 25% 95%; --card: 222 36% 13%; --card-fg: 40 25% 95%;
+      --muted: 222 30% 18%; --muted-fg: 220 15% 68%; --border: 222 25% 22%;
+      --navy: 222 40% 9%; --navy-fg: 40 25% 95%; --gold: 39 60% 58%; --gold-fg: 222 40% 10%;
+      --success: 142 55% 55%; --success-bg: 142 40% 16%; --warning: 38 85% 62%; --warning-bg: 36 60% 18%;
+      --danger: 0 70% 65%; --danger-bg: 0 45% 18%; --info: 210 80% 68%; --info-bg: 210 45% 18%;
+      --radar: 168 55% 55%; --radar-bg: 168 40% 16%;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: 222 40% 9%; --fg: 40 25% 95%; --card: 222 36% 13%; --card-fg: 40 25% 95%;
+    --muted: 222 30% 18%; --muted-fg: 220 15% 68%; --border: 222 25% 22%;
+    --navy: 222 40% 9%; --navy-fg: 40 25% 95%; --gold: 39 60% 58%; --gold-fg: 222 40% 10%;
+    --success: 142 55% 55%; --success-bg: 142 40% 16%; --warning: 38 85% 62%; --warning-bg: 36 60% 18%;
+    --danger: 0 70% 65%; --danger-bg: 0 45% 18%; --info: 210 80% 68%; --info-bg: 210 45% 18%;
+    --radar: 168 55% 55%; --radar-bg: 168 40% 16%;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: hsl(var(--bg)); color: hsl(var(--fg)); font-family: 'Assistant', system-ui, sans-serif; line-height: 1.65; }
+  h1, h2, h3, h4 { font-family: 'Heebo', system-ui, sans-serif; text-wrap: balance; }
+  code { font-family: ui-monospace, monospace; background: hsl(var(--muted)); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px 80px; }
+
+  .hero { background: hsl(var(--navy)); color: hsl(var(--navy-fg)); padding: 48px 20px 40px; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 8% 0%, hsl(var(--gold) / .16), transparent 45%),
+      radial-gradient(circle at 100% 100%, hsl(var(--radar) / .18), transparent 42%);
+  }
+  .hero-inner { max-width: 980px; margin: 0 auto; position: relative; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
+    color: hsl(var(--gold)); background: hsl(var(--gold) / .14); border: 1px solid hsl(var(--gold) / .3);
+    border-radius: 999px; padding: 5px 14px; margin-bottom: 16px;
+  }
+  .hero h1 { font-size: clamp(26px, 4.2vw, 40px); font-weight: 800; margin: 0 0 10px; }
+  .hero p.lede { font-size: 16px; color: hsl(var(--navy-fg) / .82); max-width: 700px; margin: 0; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .hero-meta span {
+    font-size: 12.5px; color: hsl(var(--navy-fg) / .7); background: hsl(0 0% 100% / .06);
+    border: 1px solid hsl(0 0% 100% / .12); border-radius: 8px; padding: 6px 12px;
+  }
+
+  .toc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: -26px 0 40px; position: relative; z-index: 2; }
+  @media (max-width: 760px) { .toc { grid-template-columns: repeat(2, 1fr); } }
+  .toc a {
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 12px 14px;
+    text-decoration: none; color: hsl(var(--card-fg)); font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 2px 10px hsl(var(--shadow) / .06); transition: transform .15s, border-color .15s;
+  }
+  .toc a:hover { transform: translateY(-1px); border-color: hsl(var(--gold) / .5); }
+  .toc a .n { color: hsl(var(--gold)); font-family: 'Heebo'; margin-inline-end: 6px; }
+
+  section { margin-top: 58px; scroll-margin-top: 20px; }
+  .section-head { margin-bottom: 22px; }
+  .section-head .tag { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; color: hsl(var(--gold)); text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .section-head h2 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
+  .section-head p { color: hsl(var(--muted-fg)); font-size: 14.5px; margin: 0; max-width: 680px; }
+
+  /* Vision restatement */
+  .vision-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .vision-grid { grid-template-columns: 1fr; } }
+  .vision-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 20px; }
+  .vision-card .num { font-family: 'Heebo'; font-weight: 800; font-size: 22px; color: hsl(var(--gold)); }
+  .vision-card h4 { font-size: 15px; margin: 8px 0 6px; }
+  .vision-card p { font-size: 13.3px; color: hsl(var(--muted-fg)); margin: 0; }
+
+  /* Works list */
+  .progress-list { display: flex; flex-direction: column; gap: 10px; }
+  .progress-row { display: flex; align-items: flex-start; gap: 14px; background: hsl(var(--success-bg)); border: 1px solid hsl(var(--success) / .25); border-radius: 12px; padding: 14px 18px; }
+  .progress-row .check { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: hsl(var(--success)); color: hsl(var(--success-bg)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; margin-top: 1px; }
+  .progress-row h4 { font-size: 14.5px; margin: 0 0 3px; color: hsl(var(--fg)); }
+  .progress-row p { font-size: 13px; margin: 0; color: hsl(var(--muted-fg)); }
+
+  /* Headline gap alert */
+  .bug-alert { background: hsl(var(--danger-bg)); border: 1px solid hsl(var(--danger) / .35); border-radius: 16px; padding: 24px 26px; margin-top: 20px; display: grid; grid-template-columns: 46px 1fr; gap: 18px; }
+  .bug-alert .icon { width: 46px; height: 46px; border-radius: 12px; background: hsl(var(--danger)); color: hsl(var(--danger-bg)); display: flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800; font-family: 'Heebo'; }
+  .bug-alert h4 { font-size: 17px; margin: 0 0 8px; color: hsl(var(--danger)); }
+  .bug-alert p { font-size: 14px; margin: 0 0 8px; color: hsl(var(--fg)); }
+  .bug-alert .meta { font-size: 12.5px; color: hsl(var(--muted-fg)); margin: 0; }
+  @media (max-width: 560px) { .bug-alert { grid-template-columns: 1fr; } }
+
+  /* Gap rows (existing vs missing) */
+  .complexity-list { display: flex; flex-direction: column; gap: 10px; }
+  .complexity-row { display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: start; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 16px 18px; }
+  @media (max-width: 680px) { .complexity-row { grid-template-columns: 1fr; } }
+  .severity { font-family: 'Heebo'; font-size: 11px; font-weight: 800; letter-spacing: .03em; border-radius: 999px; padding: 4px 10px; white-space: nowrap; height: fit-content; }
+  .severity.high { background: hsl(var(--danger-bg)); color: hsl(var(--danger)); }
+  .severity.med { background: hsl(var(--warning-bg)); color: hsl(var(--warning)); }
+  .severity.low { background: hsl(var(--muted)); color: hsl(var(--muted-fg)); }
+  .complexity-row .body h4 { font-size: 15px; margin: 0 0 4px; }
+  .complexity-row .body p { font-size: 13.5px; color: hsl(var(--muted-fg)); margin: 0; }
+  .complexity-row .fix-arrow { font-size: 12.5px; color: hsl(var(--success)); font-weight: 600; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  @media (max-width: 680px) { .complexity-row .fix-arrow { white-space: normal; } }
+
+  /* Command center blueprint */
+  .blueprint { background: hsl(var(--navy)); color: hsl(var(--navy-fg)); border-radius: 20px; padding: 28px; margin-top: 20px; }
+  .blueprint-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .blueprint-head .dot { width: 10px; height: 10px; border-radius: 50%; background: hsl(var(--radar)); box-shadow: 0 0 0 4px hsl(var(--radar) / .25); }
+  .blueprint-head h3 { font-size: 17px; margin: 0; }
+  .blueprint-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .blueprint-grid { grid-template-columns: 1fr; } }
+  .blueprint-card { background: hsl(0 0% 100% / .05); border: 1px solid hsl(0 0% 100% / .12); border-radius: 14px; padding: 18px; }
+  .blueprint-card .kicker { font-family: 'Heebo'; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: hsl(var(--gold)); text-transform: uppercase; }
+  .blueprint-card h4 { font-size: 14.5px; margin: 8px 0 6px; }
+  .blueprint-card p { font-size: 13px; color: hsl(var(--navy-fg) / .78); margin: 0; }
+
+  /* Idea cards */
+  .idea-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .idea-grid { grid-template-columns: 1fr; } }
+  .idea-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 18px 20px; box-shadow: 0 2px 10px hsl(var(--shadow) / .05); }
+  .idea-card .kicker { display: inline-flex; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; color: hsl(var(--info)); background: hsl(var(--info-bg)); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+  .idea-card.novel .kicker { color: hsl(var(--radar)); background: hsl(var(--radar-bg)); }
+  .idea-card h4 { font-size: 14.5px; margin: 0 0 6px; }
+  .idea-card p { font-size: 13.3px; color: hsl(var(--muted-fg)); margin: 0; }
+
+  .subhead { font-size: 15.5px; font-weight: 700; margin: 30px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .subhead .dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--gold)); }
+
+  .priority-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+  .priority-item { display: flex; gap: 16px; align-items: flex-start; background: hsl(var(--navy)); color: hsl(var(--navy-fg)); border-radius: 14px; padding: 18px 20px; }
+  .priority-item .rank { font-family: 'Heebo'; font-weight: 800; font-size: 20px; color: hsl(var(--gold)); flex-shrink: 0; width: 28px; }
+  .priority-item h4 { font-size: 15px; margin: 0 0 4px; }
+  .priority-item p { font-size: 13.5px; color: hsl(var(--navy-fg) / .78); margin: 0; }
+
+  .closing { margin-top: 60px; padding-top: 28px; border-top: 1px solid hsl(var(--border)); font-size: 14px; color: hsl(var(--muted-fg)); }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800&family=Assistant:wght@400;500;600;700&display=swap">
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">חוות דעת — Design Partner Review · סבב חמישי</span>
+    <h1>מ"אפליקציית תיאום" ל"מגדל פיקוח דיגיטלי"</h1>
+    <p class="lede">
+      עברתי על כל שכבת הבקרה של הפלטפורמה — מוקד התיאום, ה-API לשותפים, האנליטיקס וכלי האדמין — מול החזון
+      שהצגת: המפה היא הליבה, האדמין צריך מסך שליטה אמיתי על כל המרחב האווירי המתואם, ורת"א צריכה לקבל מצג
+      חי. הממצא המרכזי: התשתית המשפטית-מרחבית פר-נקודה חזקה מאוד, אבל אין היום שום מקום — לא למוקדן ולא
+      לאדמין — שבו רואים את כל התיאומים הפעילים <b>יחד, על מפה אחת, בזמן אמת</b>.
+    </p>
+    <div class="hero-meta">
+      <span>פער קריטי אחד: אין זיהוי חפיפה בין בקשות של מטיסים שונים</span>
+      <span>0 מסכי אדמין ל"כל הארגונים" / "כל המשתמשים" כיום</span>
+      <span>0 יכולות ייצוא CSV בפלטפורמה כולה</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="toc">
+    <a href="#vision"><span class="n">01</span>החזון בקצרה</a>
+    <a href="#works"><span class="n">02</span>מה עובד היום</a>
+    <a href="#gap"><span class="n">03</span>הפער הקריטי</a>
+    <a href="#audit"><span class="n">04</span>ביקורת מפורטת</a>
+    <a href="#command-center"><span class="n">05</span>מרכז השליטה</a>
+    <a href="#caai"><span class="n">06</span>מצג חי לרת"א</a>
+    <a href="#innovation"><span class="n">07</span>שירותים חדשניים</a>
+    <a href="#priority"><span class="n">08</span>סדר עדיפויות</a>
+  </nav>
+
+  <section id="vision">
+    <div class="section-head">
+      <span class="tag">כדי שנהיה מסונכרנים</span>
+      <h2>החזון כפי שהבנתי אותו</h2>
+      <p>שלושה עקרונות שמנחים את כל שאר המסמך הזה — אם משהו מהם לא מדויק, כל התעדוף שאחריו כדאי לבדוק מחדש.</p>
+    </div>
+    <div class="vision-grid">
+      <div class="vision-card">
+        <span class="num">01</span>
+        <h4>המפה היא הליבה, לא פיצ׳ר</h4>
+        <p>מאחורי הקלעים, כל תיאום צריך להישמר כנתון מובנה שאפשר לשלוט בו — לא רק "בקשה שאושרה ונשכחה". האדמין צריך לראות את <b>כל</b> השטחים המתואמים, לא רק את שלו.</p>
+      </div>
+      <div class="vision-card">
+        <span class="num">02</span>
+        <h4>שלוש מטרות עסקיות-ציבוריות</h4>
+        <p>לשפר ציות לחוק בפועל (לא רק להסביר אותו), להציע שירותים שעדיין לא קיימים בשוק הישראלי, ולתת לרת"א כלי אמיתי — לא רק ממשק נחמד למטיסים.</p>
+      </div>
+      <div class="vision-card">
+        <span class="num">03</span>
+        <h4>אדמין = חדר בקרה, לא עוד תפקיד</h4>
+        <p>כל הארגונים, כל המשתמשים, אנליטיקה מורכבת, וייצוא נתונים ל-CSV — כלומר MetisOps הפנימי צריך לפעול כמו כלי ניהול תפעולי אמיתי, לא כמו לוח מחוונים שיווקי.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="works">
+    <div class="section-head">
+      <span class="tag">קודם ההגינות</span>
+      <h2>מה כבר עובד ומהווה בסיס טוב</h2>
+      <p>שום דבר כאן לא נבנה מאפס — יש כבר תשתית אמיתית שהרעיונות בהמשך המסמך בונים עליה, לא מחליפים אותה.</p>
+    </div>
+    <div class="progress-list">
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מודל נתונים מרחבי אמיתי, לא סימולציה</h4><p>כל בקשת טיסה נשמרת כגאומטריית PostGIS אמיתית (נקודה/פוליגון) עם אינדקס GiST — זו בדיוק התשתית שצריך כדי לבנות עליה שכבת "כל התיאומים על מפה", לא צריך לבנות אותה מחדש.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>מוקד תיאום עם זרימת עבודה אמיתית</h4><p>תור בקשות ממתינות, פתיחת כרטיס מטיס+כלי טיס+רישיונות, פרסום NOTAM עם קוד וטלפון ATC, דחייה עם נימוק — כל השלבים שדיספצ׳ר אמיתי צריך, קיימים.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>הבחנה נכונה בין דיווח לפעולה חיצונית</h4><p>שכבת ה-API לשותפים כבר בנויה כ"שכבות" נפרדות (מפה/אזורים/פעולות) עם מפתחות מונפקים ומבוטלים — בדיוק המבנה הנכון להרחיב אליו הזנת-נתונים חיצונית לרת"א, לא צריך ארכיטקטורה חדשה.</p></div>
+      </div>
+      <div class="progress-row">
+        <span class="check">✓</span>
+        <div><h4>אנליטיקס פלטפורמה-רחב כבר קיים לאדמין</h4><p><code>dispatcher_admin</code> כבר רואה אגרגציה של כל הפלטפורמה (לא רק ארגון אחד) — כלומר ההפרדה בין "מבט ארגון" ל"מבט אדמין" כבר קיימת בקוד, רק צריך להעמיק את מה שהיא מציגה.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gap">
+    <div class="section-head">
+      <span class="tag">הממצא המרכזי</span>
+      <h2>הפער שהכי משנה: אין מי שרואה את כל התמונה</h2>
+    </div>
+    <div class="bug-alert">
+      <span class="icon">!</span>
+      <div>
+        <h4>שתי בקשות טיסה חופפות בשטח ובזמן, משני מטיסים שונים, לא יזוהו על ידי המערכת</h4>
+        <p>
+          בדקתי את כל שכבת הבדיקה המרחבית — היא משווה כל בקשה מול <b>אזורי מרחב אווירי סטטיים</b> (CTR, שטחי אש,
+          שמורות) בלבד. אין שום שאילתה, טריגר או בדיקה שמשווה בקשת טיסה חדשה מול <b>בקשות טיסה פעילות אחרות</b> —
+          כלומר אם ארגון א׳ מתאם ריסוס בבאר טוביה ל-14:00–15:00, וארגון ב׳ (שאינו קשור אליו) מתאם צילום באותו
+          שטח בדיוק באותה שעה, שתי הבקשות יאושרו בנפרד בלי שאף מוקדן ידע שהן מתנגשות. זה בדיוק מה ש"אין מי שרואה
+          את כל התמונה" אומר בפועל: לא חסר מודל נתונים — <code>flight_requests</code> כבר שומר גאומטריה ו-GiST
+          index בדיוק בשביל השאילתה הזו — פשוט אף אחד לא כתב אותה עדיין, ואין ממשק שהיה חושף את הצורך.
+        </p>
+        <p class="meta">
+          זה גם ההסבר לכל שאר הפערים בסעיף הבא: מוקד התיאום מציג טבלה שטוחה של בקשות, לא מפה; עמוד המפה מציג רק
+          "היסטוריית תיאומים שלי" (מסונן למשתמש הנוכחי); ואין מסך אחד באפליקציה כולה שמצייר את <b>כל</b> הבועות
+          המאושרות זו לצד זו.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="audit">
+    <div class="section-head">
+      <span class="tag">ביקורת מפורטת</span>
+      <h2>מסך-אחר-מסך: מה יש, ומה חסר ביחס לחזון</h2>
+    </div>
+
+    <div class="subhead"><span class="dot"></span>מוקד תיאום (/ops)</div>
+    <div class="complexity-list">
+      <div class="complexity-row">
+        <span class="severity high">גבוהה</span>
+        <div class="body"><h4>אין מפה בכלל — רק טבלה</h4><p>הדיספצ׳ר מקבל שם, סוג בקשה, כלי טיס ותאריך בשורת טבלה. כדי לראות איפה בפועל הבועה יושבת ביחס לשאר הבקשות הוא צריך לפתוח כל בקשה בנפרד ולהסתכל על תמונת מפה סטטית קטנה בכרטיסייה הצדדית.</p></div>
+        <span class="fix-arrow">→ ראו "מרכז השליטה" בהמשך</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body"><h4>הרשימה מוגבלת ל-pending/submitted בלבד</h4><p><code>usePendingCoordinationRequests</code> שולף רק בקשות שממתינות. ברגע שבקשה אושרה (<code>notam_published</code>) היא נעלמת מהמסך — אין שום "לוח תיאומים פעילים כרגע" למוקדן עצמו, רק תור עבודה.</p></div>
+        <span class="fix-arrow">→ טאב/שכבה נוספת: "פעילים כרגע" לצד "ממתינים"</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body"><h4>אין שדה מובנה ל"סיבת אישור" — רק לדחייה</h4><p>פרסום NOTAM שומר קוד+טלפון ATC+הערה חופשית, אבל אין רישום מובנה של "למה זה אושר בקלות/בקושי" — לצורך מדדי תפקוד עתידיים של המוקד עצמו.</p></div>
+        <span class="fix-arrow">→ שדה סטטוס-סיכון קצר בעת האישור (נמוך/בינוני/דורש מעקב)</span>
+      </div>
+    </div>
+
+    <div class="subhead"><span class="dot"></span>API לשותפים (/admin/api)</div>
+    <div class="complexity-list">
+      <div class="complexity-row">
+        <span class="severity high">גבוהה</span>
+        <div class="body"><h4>כל שכבה חושפת מידע סטטי/משפטי — אף אחת לא חושפת תנועה חיה</h4><p>שכבה 1 בודקת נקודה בודדת; שכבה 2 מחזירה את שכבות האזורים הקבועות (GeoJSON שלא משתנה תוך כדי יום). אף שכבה לא עונה על השאלה שרת"א הכי צריכה: "אילו טיסות רחפן מאושרות פעילות כרגע, איפה".</p></div>
+        <span class="fix-arrow">→ ראו "מצג חי לרת"א" בהמשך</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body"><h4>"מקור נתונים חלופי" הוא כיוון הפוך למה שנחוץ</h4><p>העמוד מאפשר להגדיר שה<b>אפליקציה</b> תשלוף נתונים מ-URL של שותף חיצוני — שימושי לשילוב עתידי, אבל היום אין בכלל את הכיוון ההפוך: לתת לשותף חיצוני (רת"א) URL שהוא יכול למשוך <b>מאיתנו</b>.</p></div>
+        <span class="fix-arrow">→ להוסיף גם "יעד דחיפה" (webhook/feed) לצד "מקור משיכה"</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body"><h4>שכבת "פעולות" מונפקת אך לא מחוברת</h4><p>אפשר להנפיק מפתח לשכבה הזו כבר עכשיו, אבל אין endpoint מאחוריה — המסך בעצמו כבר מסביר את זה יפה ("דורש החלטה על מודל אמון"), פשוט שווה לזכור שזה חוב פתוח, לא "כמעט גמור".</p></div>
+        <span class="fix-arrow">→ להשאיר בכוונה עד שיש שותף אמיתי לבדוק מולו</span>
+      </div>
+    </div>
+
+    <div class="subhead"><span class="dot"></span>ניהול אדמין ואנליטיקס</div>
+    <div class="complexity-list">
+      <div class="complexity-row">
+        <span class="severity high">גבוהה</span>
+        <div class="body"><h4>אין שום מסך "כל הארגונים" או "כל המשתמשים"</h4><p>חיפשתי בכל הקוד — אין שאילתה אחת שמביאה רשימת כל הארגונים בפלטפורמה, ואין מסך admin לרשימת כל המשתמשים (רק "אימות מטיסים", שמוגבל למטיסים עצמאיים במרקטפלייס). אדמין שרוצה לדעת "כמה ארגונים יש לנו, מי הכי פעיל" — פותח את מסד הנתונים ידנית.</p></div>
+        <span class="fix-arrow">→ הליבה של "מרכז השליטה" בהמשך</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity high">גבוהה</span>
+        <div class="body"><h4>אין יכולת ייצוא נתונים בשום מקום בפלטפורמה</h4><p>הדבר היחיד שדומה לייצוא הוא כפתור PDF של דוח טיסות אישי (<code>ExportReportButton</code>) — לא CSV, לא ברמת אדמין, ולא לאף טבלה חוץ מיומן הטיסות של המשתמש עצמו.</p></div>
+        <span class="fix-arrow">→ ייצוא CSV גנרי לכל טבלה מרכזית, עם טווח תאריכים</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity med">בינונית</span>
+        <div class="body"><h4>האנליטיקס הקיים הוא "אירועי מוצר", לא "תמונת תפעול אווירי"</h4><p>הפילוח היום הוא page_view / יצירת בקשה / הצטרפות לארגון וכו׳ — מדדי שימוש באפליקציה, לא "כמה שטח אווירי מתואם החודש", "איזה אזור הכי עמוס", "כמה זמן לוקח למוקדן לאשר בממוצע". אלה בדיוק המדדים שרלוונטיים ל"שיפור ציות לחוק" ול"מצג לרת"א".</p></div>
+        <span class="fix-arrow">→ לוח מדדי-תפעול ייעודי, לא רק להרחיב את הקיים</span>
+      </div>
+      <div class="complexity-row">
+        <span class="severity low">נמוכה</span>
+        <div class="body"><h4>אין יומן ביקורת (audit log) לפעולות אדמין/מוקדן</h4><p>מי אישר, מי דחה, מי סימן מטיס כמאומת — הכל נכתב ישירות על השורה עצמה (<code>reviewed_by</code>, <code>verified_by</code>), בלי טבלת היסטוריה נפרדת. מספיק להצגה נוכחית, לא מספיק לחקירת אירוע אחרי מעשה.</p></div>
+        <span class="fix-arrow">→ טבלת audit_log גנרית, append-only</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="command-center">
+    <div class="section-head">
+      <span class="tag">הרעיון המרכזי</span>
+      <h2>מרכז שליטה לאדמין — לא עוד עמוד, שכבת-על</h2>
+      <p>במקום להוסיף עוד כרטיסים למסכים הקיימים, זה מגיע כמסך חדש (<code>/admin/control</code>, לדוגמה) עם ארבעה אזורים — כולם נשענים על נתונים שכבר קיימים במסד.</p>
+    </div>
+
+    <div class="blueprint">
+      <div class="blueprint-head">
+        <span class="dot"></span>
+        <h3>ארבעת המרכיבים של מרכז השליטה</h3>
+      </div>
+      <div class="blueprint-grid">
+        <div class="blueprint-card">
+          <span class="kicker">01 · מפת תפעול חיה</span>
+          <h4>כל הבועות המתואמות, של כל הארגונים, על מפה אחת</h4>
+          <p>שכבה נוספת ב-<code>BubbleMap</code> (זמינה רק ל-<code>dispatcher_admin</code>) שמציירת את <b>כל</b> ה-<code>flight_requests</code> הפעילים/מאושרים כרגע — לא רק "שלי". סינון לפי סטטוס, ארגון, וטווח זמן. זו בדיוק השכבה שהופכת חפיפות בין ארגונים לגלויות לעין במקום להסתמך על מוקדן שיזכור.</p>
+        </div>
+        <div class="blueprint-card">
+          <span class="kicker">02 · ספריית ארגונים</span>
+          <h4>רשימת כל הארגונים — חברים, צי, פעילות, תוכנית</h4>
+          <p>טבלה חדשה שמושכת מ-<code>organizations</code>+<code>organization_members</code>+<code>drones</code>+<code>flight_requests</code>: כמה חברים, כמה כלי טיס, כמה תיאומים ב-30 הימים האחרונים, איזו תוכנית מנוי. קליק על ארגון פותח דף פרופיל-ארגון מלא (משהו שהיום פשוט לא קיים לאדמין).</p>
+        </div>
+        <div class="blueprint-card">
+          <span class="kicker">03 · ספריית משתמשים</span>
+          <h4>כל המשתמשים בפלטפורמה, לא רק מטיסי מרקטפלייס</h4>
+          <p>הרחבה של אותו רעיון מ"אימות מטיסים" לכל <code>profiles</code>: חיפוש/סינון לפי תפקיד, ארגון, סטטוס רישיון, פעילות אחרונה. שימושי גם לתמיכה ("מה קורה עם המשתמש הזה") וגם לאכיפה (למשל השעיית חשבון).</p>
+        </div>
+        <div class="blueprint-card">
+          <span class="kicker">04 · ייצוא נתונים</span>
+          <h4>CSV לכל טבלה מרכזית, בטווח תאריכים נבחר</h4>
+          <p>כפתור "ייצוא" גנרי על כל אחד מהמסכים למעלה — תיאומים, ארגונים, משתמשים, ביקורות מרקטפלייס. בסיסי מבחינה טכנית (שאילתה + <code>Blob</code> בצד לקוח), אבל זו בדיוק היכולת שהופכת את MetisOps מ"אפליקציה" ל"מקור נתונים לדוחות רשמיים".</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="caai">
+    <div class="section-head">
+      <span class="tag">השירות הכי חדשני במסמך הזה</span>
+      <h2>מצג חי לרת"א — "לוח NOTAM דיגיטלי" בזמן אמת</h2>
+      <p>זה בדיוק המקום שבו MetisOps יכולה להציע משהו שלא קיים היום בישראל: רת"א היום מקבלת בקשות NOTAM דרך תהליכים ידניים/פורמליים איטיים; שום גורם לא נותן לה מצג-על חי של תנועת רחפנים מאושרת.</p>
+    </div>
+
+    <div class="idea-grid">
+      <div class="idea-card novel">
+        <span class="kicker">הרחבת שכבות ה-API הקיימות</span>
+        <h4>שכבה 4: "תפעול חי" (live operations feed)</h4>
+        <p>GeoJSON/REST feed שמחזיר את כל הבועות המאושרות הפעילות כרגע (או בחלון הקרוב), מתעדכן במרווחי זמן קצרים. משתמש באותה תשתית מפתחות-API שכבר קיימת ב-<code>/admin/api</code> — רק שכבה רביעית, לא ארכיטקטורה חדשה.</p>
+      </div>
+      <div class="idea-card novel">
+        <span class="kicker">רמת פירוט לפי דרג אמון</span>
+        <h4>מצג "אנונימי" מול מצג "מלא" לפי סוג המפתח</h4>
+        <p>שותף כללי מקבל רק בועות+גבהים+חלון זמן (אנונימי); רת"א עצמה, עם מפתח ייעודי, מקבלת גם פרטי מפעיל/כלי טיס — מדרג הרשאות אחד, לא מערכת הרשאות נפרדת.</p>
+      </div>
+      <div class="idea-card novel">
+        <span class="kicker">שדרוג התהליך הקיים</span>
+        <h4>ייצוא NOTAM בפורמט רשמי, לא רק שדה טקסט</h4>
+        <p><code>notam_code</code> כבר נשמר על כל בקשה — תבנית ייצוא שמסדרת אותו לפי מבנה ICAO NOTAM רשמי הופכת את המערכת מ"מתעדת" ל"מפיקה מסמך שאפשר להגיש כמו שהוא".</p>
+      </div>
+      <div class="idea-card novel">
+        <span class="kicker">ערך לרת"א, לא רק ל-MetisOps</span>
+        <h4>לוח מחוונים ייעודי לרת"א (לא רק API טכני)</h4>
+        <p>מסך web נפרד, פשוט, בעברית, שרת"א יכולה לפתוח בלי לדעת מה זה API — מפה חיה + רשימת NOTAM-ים פעילים + חיפוש. הופך את MetisOps משחקן-שוק לתשתית ציבורית למחצה.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="innovation">
+    <div class="section-head">
+      <span class="tag">רעיונות נוספים</span>
+      <h2>שירותים שעדיין לא קיימים בשוק הישראלי</h2>
+      <p>לא כולם קשורים ישירות לרת"א — חלקם ערך עסקי ישיר ל-MetisOps וללקוחות שלה.</p>
+    </div>
+    <div class="idea-grid">
+      <div class="idea-card">
+        <span class="kicker">בטיחות</span>
+        <h4>זיהוי חפיפה אוטומטי (deconfliction)</h4>
+        <p>ברגע ששכבת "כל התיאומים" קיימת, בדיקה אוטומטית של חפיפת זמן+מרחב בין בקשה חדשה לבקשות קיימות של <b>מטיסים/ארגונים אחרים</b> — לא רק מול אזורים סטטיים. זה סוגר את הפער הקריטי שנפתח המסמך בו.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">שקיפות</span>
+        <h4>נראות הדדית מוגבלת בין ארגונים (מה שהוצע גם בסבב הקודם)</h4>
+        <p>לא חשיפה מלאה — רק "יש תיאום מאושר סמוך, בחלון הזה" בלי לחשוף מי. יתרון תחרותי אמיתי מול האפליקציה הרשמית, ותוצר לוואי ישיר של שכבת המפה החיה.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">מודיעין עסקי</span>
+        <h4>מפת חום של פעילות רחפנים לפי אזור</h4>
+        <p>אגרגציה (לא נקודתית, כדי לשמור פרטיות) של כל התיאומים ההיסטוריים — "איפה הכי הרבה טיסות בישראל" מבוססת נתונים אמיתיים, לא הערכה. שימושי גם לרת"א (הערכת סיכון אזורי) וגם ל-MetisOps (איפה לגייס מטיסים למרקטפלייס).</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">אכיפה ותיעוד</span>
+        <h4>תעודת ציות אוטומטית לכל טיסה</h4>
+        <p>PDF שנוצר אוטומטית בסיום כל תיאום מאושר: קואורדינטות, גובה, זמן, NOTAM, מטיס+רישיון+כלי טיס באותו רגע — מסמך מוכן להצגה לרשות בביקורת, בלי לחפש בין כמה מסכים.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">שחזור אירועים</span>
+        <h4>"הפעלה מחדש" (playback) של יום/אזור</h4>
+        <p>מסך שמאפשר לאדמין לבחור תאריך ואזור ולראות בדיוק אילו תיאומים היו פעילים באותו רגע — קריטי לחקירת תלונה או תקרית בדיעבד, ונבנה על אותם נתונים שכבר נשמרים.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">מדד תפקוד</span>
+        <h4>SLA-דשבורד למוקד התיאום עצמו</h4>
+        <p>זמן ממוצע מבקשה לאישור, אחוז בקשות שנדחו, בקשות שחרגו מחלון הזמן שלהן בלי סגירה — מדד תפעולי פנימי שמראה אם המוקד עצמו עומד ביעד, לא רק כמה בקשות הגיעו.</p>
+      </div>
+      <div class="idea-card">
+        <span class="kicker">הרחבת המרקטפלייס</span>
+        <h4>"זמינות אמיתית עכשיו" מהצלבת המפה עם המרקטפלייס</h4>
+        <p>אם מטיס פרילנסר יש לו תיאום מאושר פעיל כרגע במקום מסוים, אפשר להציג לעסק שמחפש "מטיס פנוי היום באזור X" — הצלבה בין שני המוקדים המרכזיים שהזכרת (מפה + מרקטפלייס) שאף אחד מהם לבד לא נותן.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="priority">
+    <div class="section-head">
+      <span class="tag">אם היינו בוחרים רק 5</span>
+      <h2>סדר עדיפויות מומלץ</h2>
+      <p>מסודר כך שכל שלב בונה תשתית שהשלב הבא צריך — לא רשימת פיצ׳רים עצמאיים.</p>
+    </div>
+    <div class="priority-list">
+      <div class="priority-item">
+        <span class="rank">1</span>
+        <div><h4>שכבת "כל התיאומים" על המפה, לאדמין בלבד</h4><p>שאילתה אחת חדשה + שכבה נוספת ב-BubbleMap. הבסיס שכל שאר הרעיונות במסמך נשענים עליו.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">2</span>
+        <div><h4>זיהוי חפיפה אוטומטי בין בקשות של מטיסים שונים</h4><p>הפער הבטיחותי/משפטי הכי משמעותי שנמצא בסבב הזה — וברגע ששכבה 1 קיימת, זו בעיקר שאילתת PostGIS.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">3</span>
+        <div><h4>מסך "כל הארגונים" + "כל המשתמשים" לאדמין</h4><p>הפער הכי בסיסי מול "מסך שליטה בכל הפלטפורמה" שביקשת — וכיום נעדר לחלוטין.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">4</span>
+        <div><h4>ייצוא CSV גנרי מהמסכים החדשים</h4><p>זול טכנית ברגע שהמסכים עצמם קיימים — אבל בלעדיו, "מרכז שליטה" נשאר תצוגה בלבד, לא כלי עבודה.</p></div>
+      </div>
+      <div class="priority-item">
+        <span class="rank">5</span>
+        <div><h4>שכבה 4 ב-API לשותפים: "תפעול חי"</h4><p>הכי חיצוני-פונה ולכן הכי תלוי בשלב 1 שכבר קיים — ברגע שיש שכבת "כל התיאומים" פנימית, לחשוף אותה החוצה זו הרחבה, לא בנייה מאפס.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="closing">
+    הדבר שהכי בלט בסבב הזה: כמעט כל "אבן בניין" נחוצה כבר קיימת בקוד — גאומטריה מדויקת, אינדקסים מרחביים, הפרדת
+    תפקיד אדמין, ארכיטקטורת API שכבתית. מה שחסר הוא לא תשתית חדשה אלא <b>שכבת-על אחת</b> שמחברת את מה שכבר קיים
+    למבט-על יחיד — וזו בדיוק ההגדרה של "מגדל פיקוח" לעומת "עוד אפליקציית טפסים".
+  </p>
+</div>
+
+</body></html>

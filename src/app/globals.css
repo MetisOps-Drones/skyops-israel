@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 97%;
+    --foreground: 220 47% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 47% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 47% 14%;
+
+    --primary: 220 47% 16%;
+    --primary-foreground: 40 33% 96%;
+
+    --secondary: 40 30% 94%;
+    --secondary-foreground: 220 47% 16%;
+
+    --muted: 40 20% 94%;
+    --muted-foreground: 220 15% 42%;
+
+    --accent: 40 25% 92%;
+    --accent-foreground: 220 47% 16%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 35%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 45%;
+    --warning-foreground: 210 40% 98%;
+
+    --border: 39 20% 85%;
+    --input: 39 20% 85%;
+    --ring: 220 47% 16%;
+
+    --brand-gold: 39 43% 51%;
+    --brand-gold-foreground: 220 47% 16%;
+    --brand-navy: 220 47% 16%;
+    --brand-navy-foreground: 40 33% 96%;
+
+    --radius: 0.65rem;
+  }
+
+  .dark {
+    --background: 220 45% 8%;
+    --foreground: 40 25% 96%;
+
+    --card: 220 40% 11%;
+    --card-foreground: 40 25% 96%;
+
+    --popover: 220 40% 11%;
+    --popover-foreground: 40 25% 96%;
+
+    --primary: 39 55% 58%;
+    --primary-foreground: 220 47% 12%;
+
+    --secondary: 220 30% 17%;
+    --secondary-foreground: 40 25% 96%;
+
+    --muted: 220 30% 17%;
+    --muted-foreground: 220 15% 68%;
+
+    --accent: 220 30% 19%;
+    --accent-foreground: 40 25% 96%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 220 30% 20%;
+    --input: 220 30% 20%;
+    --ring: 39 55% 58%;
+
+    --brand-gold: 39 55% 58%;
+    --brand-gold-foreground: 220 47% 12%;
+    --brand-navy: 40 25% 96%;
+    --brand-navy-foreground: 220 47% 12%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Mapbox GL overrides so controls read correctly in an RTL shell */
+.mapboxgl-map {
+  direction: ltr;
+}
+
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-logo {
+  direction: ltr;
+}
