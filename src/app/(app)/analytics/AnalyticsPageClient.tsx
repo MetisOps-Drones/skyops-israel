@@ -302,7 +302,7 @@ export function AnalyticsPageClient() {
   return (
     <Card>
       <CardContent className="pt-6 text-sm text-muted-foreground">
-        אנליטיקס זמין למנהלי צי ולמוקדני תיאום. אם אתם מנהלים ארגון, ודאו שהוא מוגדר כארגון הפעיל שלכם ב"הארגון שלי".
+        אנליטיקס זמין למנהלי צי ולמוקדני תיאום. אם אתם מנהלים ארגון, ודאו שהוא מוגדר כארגון הפעיל שלכם ב&ldquo;הארגון שלי&rdquo;.
       </CardContent>
     </Card>
   );

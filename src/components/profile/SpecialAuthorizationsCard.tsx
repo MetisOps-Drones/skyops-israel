@@ -61,7 +61,7 @@ function PurchaseAuthorizationDialog() {
         <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <p>
-            זהו כרגע מעקב פנימי בלבד — "רכישה" שומרת שאתם מתכוונים להשתמש בהרשאה זו, אך <b>אינה</b> מנפיקה אישור רשמי
+            זהו כרגע מעקב פנימי בלבד — &ldquo;רכישה&rdquo; שומרת שאתם מתכוונים להשתמש בהרשאה זו, אך <b>אינה</b> מנפיקה אישור רשמי
             ואינה שולחת דבר בפועל. יש להגיש בקשה אמיתית מול רת״א/שירות התשלומים הממשלתי בעצמכם עד שתחובר אינטגרציה
             מלאה.
           </p>

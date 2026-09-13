@@ -200,6 +200,137 @@ export function useMyAcceptedEngagements() {
   });
 }
 
+export type BookingStatus = Enums<"booking_status">;
+
+export interface MarketplaceBooking {
+  id: string;
+  org_id: string;
+  org_name: string;
+  pilot_id: string;
+  pilot_full_name: string;
+  pilot_avatar_url: string | null;
+  created_by: string;
+  title: string;
+  description: string;
+  start_time: string;
+  end_time: string;
+  status: BookingStatus;
+  association_code: string | null;
+  association_expires_at: string | null;
+  created_at: string;
+}
+
+/** Every booking the caller is a participant in — sent invitations (org side) or received ones (pilot side). Goes through an RPC for the same reason my_accepted_engagements does (0054): embedding profiles/organizations client-side would hit RLS. */
+export function useMyMarketplaceBookings() {
+  return useQuery({
+    queryKey: ["marketplace_bookings", "mine"],
+    queryFn: async (): Promise<MarketplaceBooking[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("my_marketplace_bookings");
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+/** One booking by id — used by the chat screen, which a dispatcher_admin can also open for oversight even though they're not a participant (get_marketplace_booking allows that; my_marketplace_bookings above does not). */
+export function useMarketplaceBooking(bookingId: string | null) {
+  return useQuery({
+    queryKey: ["marketplace_booking", bookingId],
+    queryFn: async (): Promise<MarketplaceBooking | null> => {
+      if (!bookingId) return null;
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("get_marketplace_booking", { target_booking_id: bookingId }).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(bookingId),
+    refetchInterval: 15_000,
+  });
+}
+
+export function useCreateBooking() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      org_id: string;
+      pilot_id: string;
+      title: string;
+      description: string;
+      start_time: string;
+      end_time: string;
+    }) => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("יש להתחבר מחדש");
+      const { error } = await supabase.from("marketplace_bookings").insert({ ...input, created_by: user.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketplace_bookings"] });
+    },
+  });
+}
+
+/** Pilot accepts/declines an invitation. Accepting can fail with a Postgres exclusion-constraint error (23P01) if the proposed hours overlap a booking the pilot already has pending/confirmed — surfaced as a friendly message. */
+export function useRespondToBooking() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; accept: boolean }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("marketplace_bookings")
+        .update({ status: input.accept ? "pending" : "declined" })
+        .eq("id", input.id);
+      if (error) {
+        if (error.code === "23P01") {
+          throw new Error("השעות המבוקשות כבר תפוסות אצלך בעבודה אחרת");
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketplace_bookings"] });
+    },
+  });
+}
+
+/** The final "deal confirmed" action — only the pilot may call this (enforced in enforce_booking_status_transition, 0060). Locks the slot for good and generates the org<->pilot association code. */
+export function useConfirmBooking() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase.from("marketplace_bookings").update({ status: "confirmed" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketplace_bookings"] });
+    },
+  });
+}
+
+export function useCancelBooking() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase.from("marketplace_bookings").update({ status: "cancelled" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketplace_bookings"] });
+    },
+  });
+}
+
 export function useSubmitPilotReview() {
   const queryClient = useQueryClient();
 

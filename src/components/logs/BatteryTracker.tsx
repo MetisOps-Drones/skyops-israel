@@ -200,7 +200,7 @@ function AddReadingDialog({ batteryId }: { batteryId: string }) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            ירידה של 15% ומעלה בקיבולת לעומת מדידה שלפני 30 יום תסמן את הסוללה אוטומטית כ"בירידה".
+            ירידה של 15% ומעלה בקיבולת לעומת מדידה שלפני 30 יום תסמן את הסוללה אוטומטית כ&quot;בירידה&quot;.
           </p>
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>

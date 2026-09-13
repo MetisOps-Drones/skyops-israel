@@ -25,6 +25,8 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { SettingsMenu } from "@/components/profile/SettingsMenu";
 import { SpecialAuthorizationsCard } from "@/components/profile/SpecialAuthorizationsCard";
 import { PilotMarketplaceProfileCard } from "@/components/profile/PilotMarketplaceProfileCard";
+import { PilotPricingCard } from "@/components/profile/PilotPricingCard";
+import { PortfolioCard } from "@/components/profile/PortfolioCard";
 import { DroneRegistrationBadge } from "@/components/logs/DroneRegistrationBadge";
 import { createClient } from "@/lib/supabase/client";
 import { droneSchema, type DroneInput } from "@/lib/validations/flight-log";
@@ -153,6 +155,8 @@ export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) 
       <SpecialAuthorizationsCard role={profile.role} />
 
       {profile.role === "pilot_pro" && <PilotMarketplaceProfileCard />}
+      {profile.role === "pilot_pro" && <PilotPricingCard />}
+      {profile.role === "pilot_pro" && <PortfolioCard />}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">

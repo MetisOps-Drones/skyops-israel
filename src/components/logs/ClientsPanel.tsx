@@ -181,7 +181,7 @@ export function ClientsPanel() {
             {!isLoading && clients.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  אין עדיין לקוחות שמורים — נוצרים אוטומטית גם דרך "לקוח חדש" ברשומת טיסה
+                  אין עדיין לקוחות שמורים — נוצרים אוטומטית גם דרך &ldquo;לקוח חדש&rdquo; ברשומת טיסה
                 </TableCell>
               </TableRow>
             )}

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AdminPilotsPageClient } from "./AdminPilotsPageClient";
+import { AdminMarketplacePageClient } from "./AdminMarketplacePageClient";
 
-export default async function AdminPilotsPage() {
+export default async function AdminMarketplacePage() {
   const supabase = createClient();
   const {
     data: { user },
@@ -19,12 +19,12 @@ export default async function AdminPilotsPage() {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div>
-        <h1 className="text-2xl font-bold">אימות מטיסים</h1>
+        <h1 className="text-2xl font-bold">ניטור מרקטפלייס</h1>
         <p className="text-sm text-muted-foreground">
-          סימון &ldquo;מטיס מאומת&rdquo; מוצג במרקטפלייס לצד מטיסים עצמאיים — לאחר בדיקה ידנית של הרישיון והפרטים שלהם.
+          מצב הזמנות העבודה בפלטפורמה, וסוגיות שחוזרות על עצמן בשיחות בין ארגונים למטיסים.
         </p>
       </div>
-      <AdminPilotsPageClient />
+      <AdminMarketplacePageClient />
     </div>
   );
 }
