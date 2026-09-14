@@ -3,7 +3,20 @@ import { Badge } from "@/components/ui/badge";
 import type { SpatialCheckResult } from "@/lib/geo/spatial";
 import { AIRSPACE_ZONE_LABELS } from "@/lib/constants/airspace-zones";
 
-export function ClearanceBadge({ result }: { result: SpatialCheckResult | null }) {
+export function ClearanceBadge({
+  result,
+  hasAdvisoryWarning = false,
+}: {
+  result: SpatialCheckResult | null;
+  /**
+   * True while the separate AIP-reference-layer check (a different, advisory
+   * zone source — see LocationInfoCard/FlightParamsDrawer) is still loading
+   * or has flagged something. This badge only reflects the authoritative
+   * `airspace_zones` table, so on its own it can't promise "ניתן לטוס" while
+   * that other check might still say otherwise a moment later.
+   */
+  hasAdvisoryWarning?: boolean;
+}) {
   if (!result) {
     return (
       <Badge variant="outline" className="gap-1.5">
@@ -20,7 +33,9 @@ export function ClearanceBadge({ result }: { result: SpatialCheckResult | null }
           אישור מיידי — מרחב אווירי פנוי
         </Badge>
         <p className="text-xs text-muted-foreground">
-          אין חפיפה עם אזורי מרחב אווירי מוגבלים. ניתן לטוס לאחר השלמת רשימת הבדיקה.
+          {hasAdvisoryWarning
+            ? "אין חפיפה עם אזורי מרחב אווירי מוגבלים — יש להתייחס גם להתראה שמופיעה למטה לפני אישור."
+            : "אין חפיפה עם אזורי מרחב אווירי מוגבלים. ניתן לטוס לאחר השלמת רשימת הבדיקה."}
         </p>
       </div>
     );

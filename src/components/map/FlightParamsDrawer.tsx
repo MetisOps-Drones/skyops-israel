@@ -335,7 +335,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           <div>
             <p className="mb-2 text-sm font-medium">סטטוס בדיקת מרחב אווירי</p>
-            <ClearanceBadge result={spatialCheck} />
+            <ClearanceBadge result={spatialCheck} hasAdvisoryWarning={isChecking || requiresAttention} />
           </div>
 
           <WeatherPanel center={center} />
