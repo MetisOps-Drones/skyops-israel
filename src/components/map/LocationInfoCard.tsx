@@ -12,6 +12,7 @@ import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
 import { InlineAuthorizationPurchase } from "@/components/map/InlineAuthorizationPurchase";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { AIP_ZONE_KIND_LABELS } from "@/lib/constants/aip-reference-zones";
 import {
   checkFlightAuthorizationRequirement,
@@ -395,10 +396,11 @@ export function LocationInfoCard({
                 </Button>
               ) : null)}
 
-            <p className="text-[11px] text-muted-foreground">
-              מבוסס על שכבת מרחב אווירי מקורבת ועל נתוני OpenStreetMap — לא לניווט. האחריות לביצוע הטיסה על פי כל דין
-              מוטלת על המטיס.
-            </p>
+            <DemoModeNotice>
+              הבדיקה כאן מבוססת על 4 אזורי בדיקה אוטומטית להדגמה ושכבת AIP ייעוץ לא מסוקרת (דיגיטציה קהילתית) — לא
+              כל המרחב האווירי בישראל. אין להטיס בפועל על סמך תשובה זו בלבד; יש לאמת מול רת&quot;א/DronesIL לפני טיסה.
+              האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.
+            </DemoModeNotice>
           </div>
         )}
       </DialogContent>

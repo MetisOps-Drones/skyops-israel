@@ -31,6 +31,7 @@ import {
   type PlanCategory,
 } from "@/lib/constants/plans";
 import type { Tables } from "@/lib/types/database.types";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 
 function priceLabel(plan: Plan) {
   if (plan.priceIls === null) return "צור קשר לתמחור";
@@ -187,7 +188,9 @@ export function PlanCatalog({ profile }: { profile: Tables<"profiles"> }) {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setUserSelectedTab(v as PlanCategory)} dir="rtl">
+    <div className="flex flex-col gap-3">
+      <DemoModeNotice>אין חיבור לספק סליקה אמיתי — בחירת/שדרוג תוכנית כאן היא תיעוד כוונה בלבד, לא עסקה בפועל.</DemoModeNotice>
+      <Tabs value={activeTab} onValueChange={(v) => setUserSelectedTab(v as PlanCategory)} dir="rtl">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="private">לקוח פרטי</TabsTrigger>
         <TabsTrigger value="business">לקוח פרטי עסקי</TabsTrigger>
@@ -240,6 +243,7 @@ export function PlanCatalog({ profile }: { profile: Tables<"profiles"> }) {
           </div>
         </div>
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }

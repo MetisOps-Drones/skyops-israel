@@ -43,7 +43,7 @@ export function DroneRegistrationBadge({
     <div className="flex items-center gap-1.5">
       <Badge
         variant={status === "expired" ? "destructive" : status === "expiring_soon" ? "warning" : "secondary"}
-        title={`בתוקף עד ${new Date(expiresAt).toLocaleDateString("he-IL")}`}
+        title={`בתוקף עד ${new Date(expiresAt).toLocaleDateString("he-IL")} — מבוסס על התאריך שהוזן, לא אימות ממשלתי מקוון (הדגמה)`}
       >
         {REGISTRATION_STATUS_LABELS[status] ?? status}
       </Badge>

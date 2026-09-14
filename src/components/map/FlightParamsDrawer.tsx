@@ -31,6 +31,7 @@ import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
 import { ClearanceBadge } from "./ClearanceBadge";
 import { PreFlightChecklist } from "./PreFlightChecklist";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { WeatherPanel } from "./WeatherPanel";
 import { createFlightRequest } from "@/actions/flight-requests";
 import { DroneQuickRegisterCard } from "@/components/onboarding/DroneQuickRegisterCard";
@@ -337,6 +338,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             <p className="mb-2 text-sm font-medium">סטטוס בדיקת מרחב אווירי</p>
             <ClearanceBadge result={spatialCheck} hasAdvisoryWarning={isChecking || requiresAttention} />
           </div>
+
+          <DemoModeNotice>
+            הבדיקה מבוססת על 4 אזורי בדיקה אוטומטית להדגמה ושכבת AIP ייעוץ לא מסוקרת — לא כל המרחב האווירי בישראל.
+            יש לאמת מול רת&quot;א/DronesIL לפני טיסה בפועל.
+          </DemoModeNotice>
 
           <WeatherPanel center={center} />
 

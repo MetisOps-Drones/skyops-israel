@@ -30,12 +30,12 @@ export function ClearanceBadge({
       <div className="flex flex-col gap-1">
         <Badge variant="success" className="w-fit gap-1.5">
           <CheckCircle2 className="h-3.5 w-3.5" />
-          אישור מיידי — מרחב אווירי פנוי
+          אישור מיידי — פנוי מאזורי הבדיקה
         </Badge>
         <p className="text-xs text-muted-foreground">
           {hasAdvisoryWarning
             ? "אין חפיפה עם אזורי מרחב אווירי מוגבלים — יש להתייחס גם להתראה שמופיעה למטה לפני אישור."
-            : "אין חפיפה עם אזורי מרחב אווירי מוגבלים. ניתן לטוס לאחר השלמת רשימת הבדיקה."}
+            : "אין חפיפה עם אזורי מרחב אווירי מוגבלים (הדגמה). ניתן לטוס לאחר השלמת רשימת הבדיקה."}
         </p>
       </div>
     );
