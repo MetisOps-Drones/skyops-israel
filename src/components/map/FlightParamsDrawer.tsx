@@ -105,14 +105,16 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   // Zone-based restriction and "special operation authorization" (the 9
   // numbered regulations) are two different legal mechanisms — see
-  // src/lib/geo/flight-rules.ts. Controlled airspace has no legal exception
-  // for anyone. Prohibited/danger zones require a case-by-case CAAI-director
-  // approval — only an organization account may submit here (the dispatcher
-  // still has to chase that approval manually); hobby/solo-pro cannot.
+  // src/lib/geo/flight-rules.ts. Controlled airspace (CTR/ATZ/TMA/CTA) is a
+  // strong warning, not a hard block — see the matching comment in
+  // LocationInfoCard.tsx for why (this data comes from the advisory
+  // `aip_reference_zones` layer, never the authoritative one). Prohibited/
+  // danger zones require a case-by-case CAAI-director approval — only an
+  // organization account may submit here (the dispatcher still has to chase
+  // that approval manually); hobby/solo-pro cannot.
   const zoneBlockLevel = authCheck?.blockLevel ?? "none";
   const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked =
-    zoneBlockLevel === "controlled_airspace" || (zoneBlockLevel === "director_approval_only" && !hasOrg);
+  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
   const matchingRegulations = Array.from(
     new Set(
       relevantProximityFindings
@@ -363,11 +365,13 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     ? "לא ניתן לתאם באזור זה מחשבון פרטי"
                     : groundBlockedByAltitude
                       ? "לא ניתן לבקש תיאום לנקודה זו"
-                      : zoneRequiresDirectorApproval
-                        ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
-                        : needsSpecialAuthorization
-                          ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                          : "אזור זה דורש תיאום בכפוף לתנאים"}
+                      : zoneBlockLevel === "controlled_airspace"
+                        ? "קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית"
+                        : zoneRequiresDirectorApproval
+                          ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
+                          : needsSpecialAuthorization
+                            ? "אזור זה דורש הרשאת הפעלה מיוחדת"
+                            : "אזור זה דורש תיאום בכפוף לתנאים"}
               </div>
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
@@ -381,7 +385,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               </ul>
               {zoneBlockLevel === "controlled_airspace" ? (
                 <p className="text-xs text-muted-foreground">
-                  מרחב פיקוח טיסה — אין חריג בחוק המאפשר הטסת רחפן כאן, גם לא לארגון.
+                  ניתן לשלוח בקשה; מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — המוקדן יאמת מול המקור הרשמי לפני
+                  אישור.
                 </p>
               ) : blockedForHobby ? (
                 <p className="text-xs text-muted-foreground">

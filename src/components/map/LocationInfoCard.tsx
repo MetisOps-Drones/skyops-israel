@@ -62,17 +62,22 @@ export function LocationInfoCard({
   // triggered here by ground-proximity findings) are two different legal
   // mechanisms — see src/lib/geo/flight-rules.ts. Never conflate them: a
   // hobby pilot can still coordinate in a merely-restricted zone the same
-  // as anyone else. Controlled airspace (CTR/ATZ/TMA/CTA) has no exception
-  // in the law at all, so it stays blocked for everyone. Prohibited/danger
-  // zones legally require a case-by-case CAAI-director approval — an
-  // organization is the one tier with the standing process to actually
-  // pursue that, so orgs may still submit a request here (the dispatcher
-  // will need to chase the director's sign-off manually before it can be
-  // approved); a hobby/solo-pro account cannot.
+  // as anyone else. Controlled airspace (CTR/ATZ/TMA/CTA) is a strong
+  // warning, not a hard block: this comes from `aip_reference_zones`, which
+  // 0023/0024's own migration comments describe as an advisory, eyeballed
+  // reference layer that must never drive an automated clearance decision —
+  // a small aerodrome's ATZ 2km buffer showing up with the exact same
+  // "no legal exception exists" severity as sitting inside Ben Gurion's CTR
+  // was exactly that misuse. It's flagged prominently and the dispatcher
+  // verifies it against the real chart before approving, same as any other
+  // zone. Prohibited/danger zones legally require a case-by-case
+  // CAAI-director approval — an organization is the one tier with the
+  // standing process to actually pursue that, so orgs may still submit a
+  // request here (the dispatcher will need to chase the director's sign-off
+  // manually before it can be approved); a hobby/solo-pro account cannot.
   const zoneBlockLevel = aipCheck?.blockLevel ?? "none";
   const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked =
-    zoneBlockLevel === "controlled_airspace" || (zoneBlockLevel === "director_approval_only" && !hasOrg);
+  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
 
   // Altitude isn't chosen yet at this pre-planning stage (that happens in
   // FlightParamsDrawer) — use the role's flat general ceiling as the
@@ -122,11 +127,14 @@ export function LocationInfoCard({
             {/* The answer, first — everything below this is "why", collapsed by default so a
                 pilot who just wants a yes/no doesn't have to read a legal brief to get it. */}
             {zoneBlockLevel === "controlled_airspace" ? (
-              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
-                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="text-base font-semibold">אסור לחלוטין</p>
-                  <p className="mt-0.5 text-sm">מרחב פיקוח טיסה (שדה תעופה) — אין אפשרות לתיאום, אין חריג בחוק.</p>
+                  <p className="text-base font-semibold">קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית</p>
+                  <p className="mt-0.5 text-sm">
+                    ניתן להגיש בקשת תיאום; מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — המוקדן יאמת מול המקור הרשמי
+                    לפני אישור.
+                  </p>
                 </div>
               </div>
             ) : zoneBlockLevel === "director_approval_only" ? (
@@ -234,6 +242,11 @@ export function LocationInfoCard({
                               {hasOrg
                                 ? 'נדרש אישור פרטני של מנהל רת"א — תיאום זמין לחשבון ארגון בלבד'
                                 : 'נדרש אישור פרטני של מנהל רת"א — לא ניתן לתאם דרך המערכת מחשבון פרטי'}
+                            </p>
+                          )}
+                          {(zone.kind === "CTR" || zone.kind === "ATZ" || zone.kind === "TMA" || zone.kind === "CTA") && (
+                            <p className="mt-1 text-xs text-warning">
+                              מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
                             </p>
                           )}
                           {zone.kind === "RESTRICTED" && (
@@ -352,9 +365,7 @@ export function LocationInfoCard({
                       : "לא ניתן לבקש תיאום לנקודה זו"}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {zoneBlockLevel === "controlled_airspace"
-                    ? "מרחב פיקוח טיסה — אין חריג בחוק המאפשר הטסת רחפן כאן, גם לא ארגון עם הרשאות."
-                    : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
+                  {zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
                       ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
                       : blockedForHobby
                         ? "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."
