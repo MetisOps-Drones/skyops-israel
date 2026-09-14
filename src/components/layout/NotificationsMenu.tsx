@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { he } from "date-fns/locale";
@@ -14,6 +15,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMarkNotificationRead, useNotifications, useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import type { Tables } from "@/lib/types/database.types";
+
+/** Only booking-chat messages have an obvious single destination; other kinds (license expiry, NOTAM, etc.) don't point at one page. */
+function notificationHref(n: Tables<"notifications">): string | null {
+  if (n.kind === "booking_message_received") {
+    const bookingId = (n.metadata as { booking_id?: string } | null)?.booking_id;
+    return bookingId ? `/marketplace/bookings/${bookingId}` : null;
+  }
+  return null;
+}
 
 export function NotificationsMenu() {
   const { data: notifications = [] } = useNotifications();
@@ -38,19 +49,34 @@ export function NotificationsMenu() {
         {notifications.length === 0 && (
           <p className="px-2 py-4 text-center text-sm text-muted-foreground">אין התראות חדשות</p>
         )}
-        {notifications.slice(0, 8).map((n) => (
-          <DropdownMenuItem
-            key={n.id}
-            className={cn("flex flex-col items-start gap-0.5", !n.read_at && "bg-accent/50")}
-            onClick={() => !n.read_at && markRead.mutate(n.id)}
-          >
-            <span className="text-sm font-medium">{n.title}</span>
-            <span className="text-xs text-muted-foreground">{n.body}</span>
-            <span className="text-[11px] text-muted-foreground">
-              {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: he })}
-            </span>
-          </DropdownMenuItem>
-        ))}
+        {notifications.slice(0, 8).map((n) => {
+          const href = notificationHref(n);
+          const content = (
+            <>
+              <span className="text-sm font-medium">{n.title}</span>
+              <span className="text-xs text-muted-foreground">{n.body}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: he })}
+              </span>
+            </>
+          );
+          return (
+            <DropdownMenuItem
+              key={n.id}
+              className={cn("flex flex-col items-start gap-0.5", !n.read_at && "bg-accent/50")}
+              onClick={() => !n.read_at && markRead.mutate(n.id)}
+              asChild={Boolean(href)}
+            >
+              {href ? (
+                <Link href={href} className="flex flex-col items-start gap-0.5">
+                  {content}
+                </Link>
+              ) : (
+                content
+              )}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
