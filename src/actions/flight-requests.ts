@@ -99,6 +99,31 @@ export async function createFlightRequest(
   return { success: true, flightRequest, intersectingZones: activeZones, autoCleared };
 }
 
+/**
+ * Ties a flight request to a confirmed marketplace booking via the
+ * short-lived association code generated on confirm (0060/0062) — lets the
+ * hiring org see a flight request the freelancer files for that job, or vice
+ * versa, without changing flight_requests' single-owner (`user_id`) shape.
+ */
+export async function linkFlightRequestToBooking(
+  flightRequestId: string,
+  code: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("link_flight_request_to_booking", {
+    target_flight_request_id: flightRequestId,
+    code,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/map");
+  revalidatePath("/marketplace");
+  return { success: true };
+}
+
 export async function cancelFlightRequest(flightRequestId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = createClient();
   const { error } = await supabase

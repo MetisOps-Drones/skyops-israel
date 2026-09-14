@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { usePublishNotam } from "@/hooks/useFlightRequests";
 import { publishNotamSchema } from "@/lib/validations/flight-request";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 
 export function PublishNotamModal({
   flightRequestId,
@@ -74,8 +75,13 @@ export function PublishNotamModal({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          <DemoModeNotice>
+            המערכת אינה מגישה NOTAM בפועל לרת&quot;א/רשות התעופה — יש להשיג את קוד ה-NOTAM דרך התהליך הרשמי (טלפון/מערכת
+            הרשות) ולתעד אותו כאן בלבד לצורך מעקב פנימי ושליחת התראה למטיס.
+          </DemoModeNotice>
+
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="notamCode">קוד NOTAM</Label>
+            <Label htmlFor="notamCode">קוד NOTAM (כפי שהתקבל מהרשות)</Label>
             <Input
               id="notamCode"
               value={notamCode}

@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { uploadPilotLicenseDocument } from "@/actions/documents";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 
 const LICENSE_TYPE_LABELS: Record<string, string> = {
   hobby: "תחביב",
@@ -97,6 +98,10 @@ export function LicenseUploadDialog() {
         <DialogHeader>
           <DialogTitle>העלאת מסמך רישיון</DialogTitle>
         </DialogHeader>
+        <DemoModeNotice>
+          זיהוי תאריך התפוגה (OCR) עשוי לפעול במצב מדומה אם לא הוגדר ספק OCR אמיתי בסביבה זו — יש לבדוק את התאריך
+          שמוצג ולתקן אותו במידת הצורך.
+        </DemoModeNotice>
         <form action={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="licenseType">סוג רישיון</Label>

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Map, BookOpen, GraduationCap, ShieldCheck, Building2, BarChart3, UserCircle, KeyRound, Store, BadgeCheck, LayoutGrid } from "lucide-react";
+import { LayoutDashboard, Map, BookOpen, GraduationCap, ShieldCheck, Building2, BarChart3, UserCircle, KeyRound, Store, BadgeCheck, LayoutGrid, Handshake, MessagesSquare } from "lucide-react";
 import type { UserRole } from "@/lib/types/database.types";
 
 export interface NavItem {
@@ -33,11 +33,13 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/profile", label: "הפרופיל שלי", icon: UserCircle },
   { href: "/org", label: "הארגון שלי", icon: Building2, orgOnly: true },
   { href: "/marketplace", label: "מרקטפלייס מטיסים", icon: Store, orgOnly: true },
+  { href: "/marketplace/bookings", label: "הזמנות עבודה", icon: Handshake },
   { href: "/analytics", label: "אנליטיקס", icon: BarChart3, fleetManagerOnly: true },
   { href: "/ops", label: "מוקד תיאום", icon: ShieldCheck, roles: ["dispatcher_admin"] },
   { href: "/admin/platform", label: "ניהול פלטפורמה", icon: LayoutGrid, roles: ["dispatcher_admin"] },
   { href: "/admin/api", label: "API לשותפים", icon: KeyRound, roles: ["dispatcher_admin"] },
   { href: "/admin/pilots", label: "אימות מטיסים", icon: BadgeCheck, roles: ["dispatcher_admin"] },
+  { href: "/admin/marketplace", label: "ניטור מרקטפלייס", icon: MessagesSquare, roles: ["dispatcher_admin"] },
 ];
 
 export function visibleNavItems(

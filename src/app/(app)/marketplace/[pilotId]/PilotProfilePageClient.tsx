@@ -21,6 +21,8 @@ import { useMyOrgContext } from "@/hooks/useOrgContext";
 import { useMarketplacePilotProfile, useRequestContact, usePilotContactPhone, usePilotReviews } from "@/hooks/useMarketplace";
 import { StarRow } from "@/components/marketplace/StarRow";
 import { ReviewButton } from "@/components/marketplace/ReviewButton";
+import { SendBookingDialog } from "@/components/marketplace/SendBookingDialog";
+import { PortfolioGallery } from "@/components/marketplace/PortfolioGallery";
 
 const DAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
@@ -146,6 +148,7 @@ export function PilotProfilePageClient({ pilotId }: { pilotId: string }) {
 
             {ctx?.orgId && (
               <div className="flex flex-col items-end gap-2">
+                <SendBookingDialog pilotId={pilot.id} orgId={ctx.orgId} name={pilot.full_name} />
                 {status === "pending" && <Badge variant="warning">בקשת יצירת קשר ממתינה לתשובה</Badge>}
                 {(status === null || status === "declined" || status === undefined) && (
                   <ContactRequestButton pilotId={pilot.id} orgId={ctx.orgId} name={pilot.full_name} />
@@ -210,6 +213,8 @@ export function PilotProfilePageClient({ pilotId }: { pilotId: string }) {
             pilot.software.length === 0 && <p className="text-sm text-muted-foreground">המטיס/ה עדיין לא מילא/ה פרטי ניסיון.</p>}
         </CardContent>
       </Card>
+
+      <PortfolioGallery pilotId={pilot.id} />
 
       <Card>
         <CardHeader>
