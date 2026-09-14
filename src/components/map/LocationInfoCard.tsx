@@ -39,13 +39,20 @@ export function LocationInfoCard({
   onOpenChange: (open: boolean) => void;
   onRequestCoordination: (point: [number, number]) => void;
 }) {
-  const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const proximity = useProximityCheck(point);
   const altitudeCeiling = useAltitudeCeiling(point);
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
+
+  // Every one of these feeds the מותר/אסור verdict below — showing a verdict
+  // before all three have resolved risks a wrong first answer that then
+  // flips (e.g. "מותר" while proximity is still loading, then "אסור" a
+  // moment later once it comes back). Render a loading state in that exact
+  // spot instead of a premature answer.
+  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading;
 
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
@@ -125,8 +132,15 @@ export function LocationInfoCard({
             </p>
 
             {/* The answer, first — everything below this is "why", collapsed by default so a
-                pilot who just wants a yes/no doesn't have to read a legal brief to get it. */}
-            {zoneBlockLevel === "controlled_airspace" ? (
+                pilot who just wants a yes/no doesn't have to read a legal brief to get it.
+                While any of the checks feeding that answer are still in flight, this slot
+                shows a loading state instead — never a verdict that might immediately flip. */}
+            {isChecking ? (
+              <div className="flex items-center gap-3 rounded-xl bg-muted p-4 text-muted-foreground">
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                <p className="text-base font-medium">בודק את הנקודה...</p>
+              </div>
+            ) : zoneBlockLevel === "controlled_airspace" ? (
               <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
@@ -187,12 +201,6 @@ export function LocationInfoCard({
               </div>
             )}
 
-            {proximity.isLoading && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                בודק מגבלות קרבה נוספות (שכונות, שדות ספורט, מתקנים)...
-              </p>
-            )}
             {!proximity.isLoading && proximity.data?.available === false && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <WifiOff className="h-3 w-3" />
@@ -350,38 +358,42 @@ export function LocationInfoCard({
               </Disclosure>
             )}
 
-            {cannotSubmit ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium text-destructive">
-                  {zoneHardBlocked || (groundBlockedByAltitude && !blockedForHobby) ? (
-                    <Ban className="h-4 w-4" />
-                  ) : (
-                    <Lock className="h-4 w-4" />
-                  )}
-                  {zoneHardBlocked
-                    ? "לא ניתן לתאם דרך המערכת"
-                    : blockedForHobby
-                      ? "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"
-                      : "לא ניתן לבקש תיאום לנקודה זו"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
-                      ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
+            {/* Same reasoning as the verdict banner above: cannotSubmit/requiresAttention are
+                derived from the same not-yet-loaded checks, so no action (or "can't request")
+                signal should render until isChecking clears either. */}
+            {!isChecking &&
+              (cannotSubmit ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    {zoneHardBlocked || (groundBlockedByAltitude && !blockedForHobby) ? (
+                      <Ban className="h-4 w-4" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
+                    )}
+                    {zoneHardBlocked
+                      ? "לא ניתן לתאם דרך המערכת"
                       : blockedForHobby
-                        ? "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."
-                        : "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום."}
-                </p>
-                {!groundBlockedByAltitude || blockedForHobby || (zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval) ? (
-                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                    {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
-                  </Link>
-                ) : null}
-              </div>
-            ) : requiresAttention ? (
-              <Button size="lg" onClick={() => onRequestCoordination(point)}>
-                בקשת תיאום לנקודה זו
-              </Button>
-            ) : null}
+                        ? "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"
+                        : "לא ניתן לבקש תיאום לנקודה זו"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
+                        ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
+                        : blockedForHobby
+                          ? "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."
+                          : "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום."}
+                  </p>
+                  {!groundBlockedByAltitude || blockedForHobby || (zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval) ? (
+                    <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
+                      {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
+                    </Link>
+                  ) : null}
+                </div>
+              ) : requiresAttention ? (
+                <Button size="lg" onClick={() => onRequestCoordination(point)}>
+                  בקשת תיאום לנקודה זו
+                </Button>
+              ) : null)}
 
             <p className="text-[11px] text-muted-foreground">
               מבוסס על שכבת מרחב אווירי מקורבת ועל נתוני OpenStreetMap — לא לניווט. האחריות לביצוע הטיסה על פי כל דין

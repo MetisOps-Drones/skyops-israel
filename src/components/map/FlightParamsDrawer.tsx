@@ -71,7 +71,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const spatialCheck = useAirspaceCheck();
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
-  const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
   const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
@@ -129,6 +129,10 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
   const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
   const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+  // Same reasoning as LocationInfoCard: requiresAttention is derived from
+  // aipZones/proximity, both async — while either is still loading, don't
+  // show (or let a hobby pilot act on) a premature "fine to submit" state.
+  const isChecking = aipZonesLoading || proximity.isLoading;
 
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -146,7 +150,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   const canSubmit =
     !blockedForSolo &&
-    !(proximity.isLoading && isHobby) &&
+    !(isChecking && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
     Boolean(startTime && endTime) &&
@@ -338,14 +342,14 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {spatialCheck?.clear && <PreFlightChecklist />}
 
-          {proximity.isLoading && (
+          {isChecking && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              בודק מגבלות קרבה נוספות (שכונות, שדות ספורט, מתקנים)...
+              בודק את הנקודה...
             </p>
           )}
 
-          {requiresAttention && (
+          {!isChecking && requiresAttention && (
             <div
               className={cn(
                 "flex flex-col gap-2 rounded-lg border p-3 text-sm",
