@@ -212,6 +212,11 @@ export interface MarketplaceBooking {
   created_by: string;
   title: string;
   description: string;
+  location: string | null;
+  budget_ils: number | null;
+  operation_type: string | null;
+  drone_type: string | null;
+  purpose: string | null;
   start_time: string;
   end_time: string;
   status: BookingStatus;
@@ -259,6 +264,11 @@ export function useCreateBooking() {
       pilot_id: string;
       title: string;
       description: string;
+      location: string | null;
+      budget_ils: number | null;
+      operation_type: string | null;
+      drone_type: string | null;
+      purpose: string | null;
       start_time: string;
       end_time: string;
     }) => {

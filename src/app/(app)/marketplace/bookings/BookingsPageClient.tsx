@@ -15,6 +15,29 @@ import {
   type MarketplaceBooking,
 } from "@/hooks/useMarketplace";
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_VARIANT } from "@/lib/constants/booking-status";
+import { BOOKING_OPERATION_TYPE_LABELS, BOOKING_PURPOSE_LABELS } from "@/lib/constants/booking-job-details";
+
+function JobDetailBadges({ booking }: { booking: MarketplaceBooking }) {
+  const items = [
+    booking.location,
+    booking.operation_type ? BOOKING_OPERATION_TYPE_LABELS[booking.operation_type] : null,
+    booking.drone_type,
+    booking.purpose ? BOOKING_PURPOSE_LABELS[booking.purpose] : null,
+    booking.budget_ils != null ? `תקציב: ₪${booking.budget_ils.toLocaleString("he-IL")}` : null,
+  ].filter((v): v is string => Boolean(v));
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <Badge key={item} variant="outline" className="text-[11px]">
+          {item}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
 function formatRange(start: string, end: string) {
   const s = new Date(start);
@@ -70,7 +93,8 @@ function BookingRow({ booking, userId }: { booking: MarketplaceBooking; userId: 
           <Badge variant={BOOKING_STATUS_VARIANT[booking.status]}>{BOOKING_STATUS_LABEL[booking.status]}</Badge>
         </div>
 
-        <p className="text-sm text-muted-foreground">{booking.description}</p>
+        {booking.description && <p className="text-sm text-muted-foreground">{booking.description}</p>}
+        <JobDetailBadges booking={booking} />
         <p className="text-xs text-muted-foreground" dir="ltr">
           {formatRange(booking.start_time, booking.end_time)}
         </p>

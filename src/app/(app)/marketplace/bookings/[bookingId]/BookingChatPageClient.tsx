@@ -23,6 +23,29 @@ import { linkFlightRequestToBooking } from "@/actions/flight-requests";
 import { SwipeToConfirm } from "@/components/marketplace/SwipeToConfirm";
 import { cn } from "@/lib/utils";
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_VARIANT } from "@/lib/constants/booking-status";
+import { BOOKING_OPERATION_TYPE_LABELS, BOOKING_PURPOSE_LABELS } from "@/lib/constants/booking-job-details";
+
+function JobDetailBadges({ booking }: { booking: MarketplaceBooking }) {
+  const items = [
+    booking.location,
+    booking.operation_type ? BOOKING_OPERATION_TYPE_LABELS[booking.operation_type] : null,
+    booking.drone_type,
+    booking.purpose ? BOOKING_PURPOSE_LABELS[booking.purpose] : null,
+    booking.budget_ils != null ? `תקציב: ₪${booking.budget_ils.toLocaleString("he-IL")}` : null,
+  ].filter((v): v is string => Boolean(v));
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <Badge key={item} variant="outline" className="text-[11px]">
+          {item}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
 function AssociationSection({ booking, isPilotSide }: { booking: MarketplaceBooking; isPilotSide: boolean }) {
   const { data: flightRequests = [] } = useMyFlightRequests();
@@ -182,7 +205,8 @@ export function BookingChatPageClient({ bookingId }: { bookingId: string }) {
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <p className="text-sm">{booking.description}</p>
+          {booking.description && <p className="text-sm">{booking.description}</p>}
+          <JobDetailBadges booking={booking} />
           <p className="text-xs text-muted-foreground" dir="ltr">
             {new Date(booking.start_time).toLocaleString("he-IL")} — {new Date(booking.end_time).toLocaleString("he-IL")}
           </p>
