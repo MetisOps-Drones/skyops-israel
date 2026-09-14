@@ -1,4 +1,4 @@
--- Single-booking read for the chat screen. my_marketplace_bookings() (0060)
+-- Single-booking read for the chat screen. my_marketplace_bookings() (0062)
 -- only returns bookings the caller is a participant in; the admin
 -- monitoring screen ("בקרה ראשית") needs to open any one booking's chat by
 -- id, so this is the same shape gated by participant-or-admin instead.

@@ -1,4 +1,4 @@
-// Recurring-phrase mining for booking chats (see 0063_chat_phrase_analytics.sql).
+// Recurring-phrase mining for booking chats (see 0065_chat_phrase_analytics.sql).
 // Deliberately simple word/sequence counting, not an LLM call: normalize,
 // drop stopwords, and count 3-5 word n-grams shared across many distinct
 // conversations. "זה יקר לי מדי" showing up in 40 different chats is the

@@ -20,7 +20,7 @@ export interface PilotPricing {
  * The pilot's own rate card. Deliberately never fetched through the
  * marketplace-browse RPCs and never given a policy that lets an org read
  * it directly — prices stay private, negotiated in-chat once a booking is
- * open (see 0059_pilot_pricing_and_portfolio.sql).
+ * open (see 0061_pilot_pricing_and_portfolio.sql).
  */
 export function useMyPilotPricing() {
   return useQuery({

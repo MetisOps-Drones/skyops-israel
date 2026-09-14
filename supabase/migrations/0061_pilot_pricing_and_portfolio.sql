@@ -3,7 +3,7 @@
 --      never joined into the marketplace-browse RPCs (marketplace_freelancers /
 --      get_marketplace_pilot_profile), since prices are deliberately NOT
 --      exposed on the public marketplace (agreed: negotiated in-chat instead,
---      see 0060+). Unlike `pilot_profiles` (0051), this table gets NO blanket
+--      see 0062+). Unlike `pilot_profiles` (0051), this table gets NO blanket
 --      "org accounts read" policy — that's exactly the exposure this needs to
 --      avoid, matching the phone-number lesson from 0049.
 --   2. A portfolio gallery so a pilot can show past work to an org evaluating

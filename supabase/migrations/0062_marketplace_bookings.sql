@@ -34,7 +34,7 @@ create table marketplace_bookings (
   cancelled_at timestamptz,
   cancelled_by uuid references profiles (id) on delete set null,
   -- Set on confirm; lets either side tie a flight_request to this engagement
-  -- afterwards (see 0062) without reworking flight_requests' single-owner
+  -- afterwards (see 0064) without reworking flight_requests' single-owner
   -- shape. Short-lived on purpose — a real calendar integration is future
   -- work, this is the v1 bridge.
   association_code text unique,
