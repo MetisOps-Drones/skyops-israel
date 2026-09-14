@@ -37,6 +37,7 @@ const EVENT_LABELS: Record<string, string> = {
   "membership.requested": "בקשת הצטרפות לארגון",
   "membership.active": "הצטרפות לארגון אושרה",
   "membership.rejected": "בקשת הצטרפות נדחתה",
+  "membership.removed": "הוסר מהארגון",
   "equipment.checked_out": "ציוד נלקח",
   "equipment.returned": "ציוד הוחזר",
   "license.active": "רישיון הועלה",

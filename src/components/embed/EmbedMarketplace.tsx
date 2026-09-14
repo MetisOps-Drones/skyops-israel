@@ -120,7 +120,7 @@ export function EmbedMarketplace({ apiKey }: { apiKey: string }) {
     enabled: Boolean(apiKey),
   });
 
-  const freelancers = data ?? [];
+  const freelancers = useMemo(() => data ?? [], [data]);
   const allAreas = useMemo(() => Array.from(new Set(freelancers.flatMap((f) => f.service_areas))).sort(), [freelancers]);
   const allSpecializations = useMemo(
     () => Array.from(new Set(freelancers.flatMap((f) => f.specializations))).sort(),
