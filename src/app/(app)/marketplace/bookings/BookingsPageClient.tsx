@@ -14,24 +14,7 @@ import {
   useCancelBooking,
   type MarketplaceBooking,
 } from "@/hooks/useMarketplace";
-
-const STATUS_VARIANT: Record<MarketplaceBooking["status"], "success" | "warning" | "destructive" | "secondary" | "outline"> = {
-  invited: "warning",
-  pending: "warning",
-  confirmed: "success",
-  declined: "destructive",
-  cancelled: "destructive",
-  completed: "secondary",
-};
-
-const STATUS_LABEL: Record<MarketplaceBooking["status"], string> = {
-  invited: "ממתין לתשובה",
-  pending: "בתיאום (סלוט מוחזק)",
-  confirmed: "אושר — סלוט נעול",
-  declined: "נדחה",
-  cancelled: "בוטל",
-  completed: "הושלם",
-};
+import { BOOKING_STATUS_LABEL, BOOKING_STATUS_VARIANT } from "@/lib/constants/booking-status";
 
 function formatRange(start: string, end: string) {
   const s = new Date(start);
@@ -84,7 +67,7 @@ function BookingRow({ booking, userId }: { booking: MarketplaceBooking; userId: 
               </p>
             </div>
           </div>
-          <Badge variant={STATUS_VARIANT[booking.status]}>{STATUS_LABEL[booking.status]}</Badge>
+          <Badge variant={BOOKING_STATUS_VARIANT[booking.status]}>{BOOKING_STATUS_LABEL[booking.status]}</Badge>
         </div>
 
         <p className="text-sm text-muted-foreground">{booking.description}</p>
@@ -144,9 +127,17 @@ function BookingRow({ booking, userId }: { booking: MarketplaceBooking; userId: 
 
 export function BookingsPageClient() {
   const { data: ctx } = useMyOrgContext();
-  const { data: bookings = [], isLoading } = useMyMarketplaceBookings();
+  const { data: bookings = [], isLoading, isError } = useMyMarketplaceBookings();
 
   if (isLoading) return <p className="text-sm text-muted-foreground">טוען...</p>;
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-destructive">
+        טעינת ההזמנות נכשלה — נסו לרענן את הדף.
+      </div>
+    );
+  }
 
   if (bookings.length === 0) {
     return (

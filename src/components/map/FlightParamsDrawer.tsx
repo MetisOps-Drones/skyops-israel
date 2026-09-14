@@ -346,7 +346,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           <WeatherPanel center={center} />
 
-          {spatialCheck?.clear && <PreFlightChecklist />}
+          {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
 
           {isChecking && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

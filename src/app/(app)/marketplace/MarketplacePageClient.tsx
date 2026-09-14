@@ -2,15 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Clock, Star, BadgeCheck, MapPin } from "lucide-react";
+import { Search, Clock, BadgeCheck, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { useMarketplaceFreelancers, type MarketplaceFreelancer } from "@/hooks/useMarketplace";
 import { MyEngagementsCard } from "@/components/marketplace/MyEngagementsCard";
+import { StarRow } from "@/components/marketplace/StarRow";
 
 const DAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const ALL_VALUE = "__all__";
@@ -24,16 +24,6 @@ function hoursSummary(raw: unknown): string | null {
   const openDays = raw.filter((d): d is { day: number; open: boolean; from: string; to: string } => Boolean(d?.open));
   if (openDays.length === 0) return null;
   return openDays.map((d) => `${DAY_LABELS[d.day]} ${d.from}-${d.to}`).join(" · ");
-}
-
-function StarRow({ rating }: { rating: number }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} className={cn("h-3.5 w-3.5", n <= Math.round(rating) ? "fill-warning text-warning" : "text-muted-foreground/30")} />
-      ))}
-    </div>
-  );
 }
 
 function FreelancerCard({ freelancer }: { freelancer: MarketplaceFreelancer }) {
@@ -70,7 +60,7 @@ function FreelancerCard({ freelancer }: { freelancer: MarketplaceFreelancer }) {
 
           {freelancer.review_count > 0 ? (
             <div className="flex items-center gap-2">
-              <StarRow rating={freelancer.avg_rating ?? 0} />
+              <StarRow rating={freelancer.avg_rating ?? 0} size="h-3.5 w-3.5" />
               <span className="text-xs text-muted-foreground">
                 {freelancer.avg_rating?.toFixed(1)} ({freelancer.review_count} ביקורות)
               </span>
@@ -117,7 +107,7 @@ function FreelancerCard({ freelancer }: { freelancer: MarketplaceFreelancer }) {
 }
 
 export function MarketplacePageClient() {
-  const { data: freelancers = [], isLoading } = useMarketplaceFreelancers();
+  const { data: freelancers = [], isLoading, isError } = useMarketplaceFreelancers();
   const [search, setSearch] = useState("");
   const [specializationFilter, setSpecializationFilter] = useState(ALL_VALUE);
   const [skillFilter, setSkillFilter] = useState(ALL_VALUE);
@@ -158,6 +148,17 @@ export function MarketplacePageClient() {
       <div className="flex flex-col gap-4">
         <MyEngagementsCard />
         <p className="text-sm text-muted-foreground">טוען...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col gap-4">
+        <MyEngagementsCard />
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          טעינת המרקטפלייס נכשלה — נסו לרענן את הדף.
+        </div>
       </div>
     );
   }

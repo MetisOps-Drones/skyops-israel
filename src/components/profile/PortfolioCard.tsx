@@ -39,7 +39,8 @@ function PortfolioTile({ item, canManage }: { item: PortfolioItem; canManage: bo
           type="button"
           variant="destructive"
           size="icon"
-          className="absolute end-2 top-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-label={`מחיקת "${item.title}" מתיק העבודות`}
+          className="absolute end-2 top-2 h-7 w-7 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
           disabled={deleteItem.isPending}
           onClick={() => deleteItem.mutate({ id: item.id, storagePath: item.storage_path })}
         >

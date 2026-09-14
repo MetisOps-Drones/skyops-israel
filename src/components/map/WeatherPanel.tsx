@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudRain, Cloud, Wind, Eye, AlertTriangle, Mountain } from "lucide-react";
+import { CloudRain, Cloud, Wind, Eye, AlertTriangle, Mountain, Loader2, WifiOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useWeather } from "@/hooks/useWeather";
 import { ftToM } from "@/lib/geo/aip";
@@ -22,8 +22,22 @@ export function WeatherPanel({ center, cloudBase }: { center: [number, number] |
   const { data, isLoading, isError } = useWeather(center);
 
   if (!center) return null;
-  if (isLoading) return <p className="text-sm text-muted-foreground">טוען תחזית מזג אוויר...</p>;
-  if (isError || !data) return <p className="text-sm text-muted-foreground">לא ניתן היה לטעון תחזית מזג אוויר</p>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border p-3 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        טוען תחזית מזג אוויר לאזור הטיסה...
+      </div>
+    );
+  }
+  if (isError || !data) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+        <WifiOff className="h-4 w-4" />
+        לא ניתן היה לטעון תחזית מזג אוויר — יש לבדוק תנאים ידנית לפני הטיסה.
+      </div>
+    );
+  }
 
   const safety = windSafety(data.wind_speed_ms, data.precipitation);
   const windKmh = data.wind_speed_ms !== null ? Math.round(data.wind_speed_ms * 3.6) : null;

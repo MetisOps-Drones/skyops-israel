@@ -7,25 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdminBookingsOverview, useAdminRecurringChatPhrases, useAdminAllBookings } from "@/hooks/useAdminMarketplace";
-import type { Enums } from "@/lib/types/database.types";
-
-const STATUS_LABEL: Record<Enums<"booking_status">, string> = {
-  invited: "ממתין לתשובה",
-  pending: "בתיאום",
-  confirmed: "אושר",
-  declined: "נדחה",
-  cancelled: "בוטל",
-  completed: "הושלם",
-};
-
-const STATUS_VARIANT: Record<Enums<"booking_status">, "success" | "warning" | "destructive" | "secondary"> = {
-  invited: "warning",
-  pending: "warning",
-  confirmed: "success",
-  declined: "destructive",
-  cancelled: "destructive",
-  completed: "secondary",
-};
+import { BOOKING_STATUS_LABEL as STATUS_LABEL, BOOKING_STATUS_VARIANT as STATUS_VARIANT } from "@/lib/constants/booking-status";
 
 function OverviewCards() {
   const { data: overview = [] } = useAdminBookingsOverview();
@@ -62,7 +44,7 @@ function OverviewCards() {
 }
 
 function RecurringPhrasesCard() {
-  const { data: phrases = [], isLoading } = useAdminRecurringChatPhrases();
+  const { data: phrases = [], isLoading, isError } = useAdminRecurringChatPhrases();
 
   return (
     <Card>
@@ -79,7 +61,10 @@ function RecurringPhrasesCard() {
       </CardHeader>
       <CardContent>
         {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
-        {!isLoading && phrases.length === 0 && <p className="text-sm text-muted-foreground">אין עדיין תבניות חוזרות משמעותיות.</p>}
+        {isError && <p className="text-sm text-destructive">טעינת הנתונים נכשלה — נסו לרענן את הדף.</p>}
+        {!isLoading && !isError && phrases.length === 0 && (
+          <p className="text-sm text-muted-foreground">אין עדיין תבניות חוזרות משמעותיות.</p>
+        )}
         <div className="flex flex-col gap-2">
           {phrases.map((p) => (
             <div key={`${p.phrase_length}-${p.phrase}`} className="flex items-center justify-between rounded-lg border p-2.5">
@@ -97,7 +82,7 @@ function RecurringPhrasesCard() {
 }
 
 function AllBookingsTable() {
-  const { data: bookings = [], isLoading } = useAdminAllBookings();
+  const { data: bookings = [], isLoading, isError } = useAdminAllBookings();
 
   return (
     <Card>
@@ -123,7 +108,14 @@ function AllBookingsTable() {
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && bookings.length === 0 && (
+            {isError && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-destructive">
+                  טעינת ההזמנות נכשלה — נסו לרענן את הדף.
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading && !isError && bookings.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground">
                   אין עדיין הזמנות עבודה בפלטפורמה

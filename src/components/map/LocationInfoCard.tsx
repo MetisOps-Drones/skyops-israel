@@ -366,29 +366,29 @@ export function LocationInfoCard({
               (cannotSubmit ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
                   <div className="flex items-center gap-2 font-medium text-destructive">
-                    {zoneHardBlocked || (groundBlockedByAltitude && !blockedForHobby) ? (
-                      <Ban className="h-4 w-4" />
-                    ) : (
-                      <Lock className="h-4 w-4" />
-                    )}
-                    {zoneHardBlocked
-                      ? "לא ניתן לתאם דרך המערכת"
-                      : blockedForHobby
-                        ? "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"
-                        : "לא ניתן לבקש תיאום לנקודה זו"}
+                    {/* groundBlockedByAltitude checked first everywhere below: a 0m legal
+                        ceiling from the ground is unfixable by any account tier, so it must
+                        never be shadowed by (or shown alongside a CTA for) the hobby/org
+                        upgrade messaging — upgrading changes nothing about this case. */}
+                    {groundBlockedByAltitude || zoneHardBlocked ? <Ban className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                    {groundBlockedByAltitude
+                      ? "לא ניתן לבקש תיאום לנקודה זו"
+                      : zoneHardBlocked
+                        ? "לא ניתן לתאם דרך המערכת"
+                        : "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
+                    {groundBlockedByAltitude
+                      ? "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון."
+                      : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
                         ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
-                        : blockedForHobby
-                          ? "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."
-                          : "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום."}
+                        : "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."}
                   </p>
-                  {!groundBlockedByAltitude || blockedForHobby || (zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval) ? (
+                  {!groundBlockedByAltitude && (
                     <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
                       {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
                     </Link>
-                  ) : null}
+                  )}
                 </div>
               ) : requiresAttention ? (
                 <Button size="lg" onClick={() => onRequestCoordination(point)}>

@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { SpatialCheckResult } from "@/lib/geo/spatial";
 import { AIRSPACE_ZONE_LABELS } from "@/lib/constants/airspace-zones";
@@ -26,6 +26,25 @@ export function ClearanceBadge({
   }
 
   if (result.clear) {
+    // A "clear" result here only reflects the authoritative (but demo-scoped)
+    // airspace_zones table — with hasAdvisoryWarning true, the separate AIP
+    // check has flagged something, so the headline itself must not read as
+    // an unconditional all-clear (that was the bug: only the caption below
+    // used to change, leaving a green "אישור מיידי" sitting directly above a
+    // warning/blocked box a few lines later).
+    if (hasAdvisoryWarning) {
+      return (
+        <div className="flex flex-col gap-1">
+          <Badge variant="warning" className="w-fit gap-1.5">
+            <ShieldAlert className="h-3.5 w-3.5" />
+            פנוי מאזורי הבדיקה — נדרשת בדיקה נוספת
+          </Badge>
+          <p className="text-xs text-muted-foreground">
+            אין חפיפה עם אזורי מרחב אווירי מוגבלים (הדגמה) — יש להתייחס גם להתראה שמופיעה למטה לפני אישור.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-1">
         <Badge variant="success" className="w-fit gap-1.5">
@@ -33,9 +52,7 @@ export function ClearanceBadge({
           אישור מיידי — פנוי מאזורי הבדיקה
         </Badge>
         <p className="text-xs text-muted-foreground">
-          {hasAdvisoryWarning
-            ? "אין חפיפה עם אזורי מרחב אווירי מוגבלים — יש להתייחס גם להתראה שמופיעה למטה לפני אישור."
-            : "אין חפיפה עם אזורי מרחב אווירי מוגבלים (הדגמה). ניתן לטוס לאחר השלמת רשימת הבדיקה."}
+          אין חפיפה עם אזורי מרחב אווירי מוגבלים (הדגמה). ניתן לטוס לאחר השלמת רשימת הבדיקה.
         </p>
       </div>
     );

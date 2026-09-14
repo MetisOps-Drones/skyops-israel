@@ -22,15 +22,7 @@ import { useMyFlightRequests } from "@/hooks/useFlightRequests";
 import { linkFlightRequestToBooking } from "@/actions/flight-requests";
 import { SwipeToConfirm } from "@/components/marketplace/SwipeToConfirm";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<MarketplaceBooking["status"], string> = {
-  invited: "ממתין לתשובה",
-  pending: "בתיאום (סלוט מוחזק)",
-  confirmed: "אושר — סלוט נעול",
-  declined: "נדחה",
-  cancelled: "בוטל",
-  completed: "הושלם",
-};
+import { BOOKING_STATUS_LABEL, BOOKING_STATUS_VARIANT } from "@/lib/constants/booking-status";
 
 function AssociationSection({ booking, isPilotSide }: { booking: MarketplaceBooking; isPilotSide: boolean }) {
   const { data: flightRequests = [] } = useMyFlightRequests();
@@ -172,17 +164,15 @@ export function BookingChatPageClient({ bookingId }: { bookingId: string }) {
       </Link>
 
       <Card>
-        <CardHeader className="flex-row items-start justify-between">
-          <div>
-            <CardTitle>{booking.title}</CardTitle>
+        <CardHeader className="flex flex-col flex-wrap items-start justify-between gap-3 sm:flex-row">
+          <div className="min-w-0">
+            <CardTitle className="truncate">{booking.title}</CardTitle>
             <p className="text-sm text-muted-foreground">
               {isPilotSide ? "מול" : "עם"} {otherPartyName}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            <Badge variant={booking.status === "confirmed" ? "success" : booking.status === "declined" || booking.status === "cancelled" ? "destructive" : "warning"}>
-              {STATUS_LABEL[booking.status]}
-            </Badge>
+          <div className="flex flex-col items-start gap-1.5 sm:items-end">
+            <Badge variant={BOOKING_STATUS_VARIANT[booking.status]}>{BOOKING_STATUS_LABEL[booking.status]}</Badge>
             {!isParticipant && (
               <Badge variant="outline" className="flex items-center gap-1">
                 <Eye className="h-3 w-3" />

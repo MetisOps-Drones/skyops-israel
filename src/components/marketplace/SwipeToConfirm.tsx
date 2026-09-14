@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CONFIRM_THRESHOLD = 0.85;
@@ -52,6 +52,19 @@ export function SwipeToConfirm({ onConfirm, pending }: { onConfirm: () => void; 
     if (!confirmedRef.current) setDragX(0);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (pending) return;
+    // Keyboard/screen-reader fallback — dragging a pointer past 85% of the
+    // track has no equivalent for keyboard-only use, so Enter/Space (and the
+    // arrow keys, matching native slider conventions) confirm directly
+    // instead of requiring a drag gesture to complete this required action.
+    if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      confirmedRef.current = true;
+      onConfirm();
+    }
+  }
+
   return (
     <div dir="ltr" className="flex flex-col gap-1.5">
       <div
@@ -62,16 +75,27 @@ export function SwipeToConfirm({ onConfirm, pending }: { onConfirm: () => void; 
           className="pointer-events-none absolute inset-y-0 start-0 rounded-full bg-success/25"
           style={{ width: `calc(${dragX}px + 44px)` }}
         />
-        <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm font-medium text-success">
-          {pending ? "מאשר..." : "החליקו לאישור סופי של העסקה"}
-        </p>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-1.5">
+          <p className="text-sm font-medium text-success">
+            {pending ? "מאשר..." : "החליקו לאישור סופי של העסקה"}
+          </p>
+          {!pending && <ChevronsRight className="h-4 w-4 animate-pulse text-success/60" />}
+        </div>
         <div
+          role="slider"
+          tabIndex={pending ? -1 : 0}
+          aria-label="החליקו או הקישו Enter לאישור סופי של העסקה"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((dragX / Math.max((trackRef.current?.getBoundingClientRect().width ?? 44) - 44, 1)) * 100)}
+          aria-disabled={pending}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onKeyDown={handleKeyDown}
           className={cn(
-            "absolute top-1 flex h-10 w-10 cursor-grab items-center justify-center rounded-full bg-success text-success-foreground shadow active:cursor-grabbing",
+            "absolute top-1 flex h-10 w-10 touch-none cursor-grab items-center justify-center rounded-full bg-success text-success-foreground shadow outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2",
             pending && "cursor-not-allowed opacity-70"
           )}
           style={{ transform: `translateX(${dragX}px)`, left: "4px" }}
@@ -79,7 +103,9 @@ export function SwipeToConfirm({ onConfirm, pending }: { onConfirm: () => void; 
           {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
         </div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">הפעולה תנעל את הסלוט בלוח הזמנים שלכם</p>
+      <p className="text-center text-xs text-muted-foreground">
+        ניתן גם ללחוץ Enter/Space על הכפתור לאישור — הפעולה תנעל את הסלוט בלוח הזמנים שלכם
+      </p>
     </div>
   );
 }
