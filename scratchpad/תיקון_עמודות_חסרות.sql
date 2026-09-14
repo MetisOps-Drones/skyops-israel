@@ -1,6 +1,8 @@
--- Safe to run any number of times — every step only adds something if it's
--- not already there. Fixes the "budget_ils column not found" error by
--- making sure the 5 new columns + the two RPC functions genuinely exist.
+-- Safe to run any number of times. Fixes the "budget_ils column not
+-- found" error by making sure the 5 new columns genuinely exist, and
+-- drops+recreates the two RPC functions (needed because Postgres refuses
+-- to CREATE OR REPLACE a function whose return columns changed — this
+-- just redefines them, no data is touched).
 
 alter table marketplace_bookings
   add column if not exists location text,
@@ -19,7 +21,10 @@ begin
   end if;
 end $$;
 
-create or replace function my_marketplace_bookings()
+drop function if exists my_marketplace_bookings();
+drop function if exists get_marketplace_booking(uuid);
+
+create function my_marketplace_bookings()
 returns table (
   id uuid,
   org_id uuid,
@@ -62,7 +67,7 @@ begin
 end;
 $$;
 
-create or replace function get_marketplace_booking(target_booking_id uuid)
+create function get_marketplace_booking(target_booking_id uuid)
 returns table (
   id uuid,
   org_id uuid,
