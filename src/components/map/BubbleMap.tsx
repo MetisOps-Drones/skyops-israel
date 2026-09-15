@@ -387,6 +387,31 @@ export function BubbleMap({
           </Source>
         )}
 
+        {layerVisibility.buildings && process.env.NEXT_PUBLIC_R2_PUBLIC_URL && (
+          <Source
+            id="buildings"
+            type="vector"
+            tiles={[`${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/buildings/{z}/{x}/{y}.pbf`]}
+            minzoom={14}
+            maxzoom={14}
+          >
+            <Layer
+              id="buildings-fill"
+              type="fill"
+              source-layer="buildings"
+              minzoom={14}
+              paint={{ "fill-color": "#8b8478", "fill-opacity": 0.5 }}
+            />
+            <Layer
+              id="buildings-line"
+              type="line"
+              source-layer="buildings"
+              minzoom={14}
+              paint={{ "line-color": "#6b645a", "line-width": 0.75 }}
+            />
+          </Source>
+        )}
+
         {layerVisibility.allCoordinations && (
           <Source id="all-coordinations" type="geojson" data={allCoordinationsGeojson}>
             <Layer

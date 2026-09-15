@@ -297,6 +297,99 @@ export type Database = {
           },
         ]
       }
+      booking_messages: {
+        Row: {
+          body: string
+          booking_id: string
+          created_at: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          booking_id: string
+          created_at?: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          booking_id?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_messages_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buildings: {
+        Row: {
+          geom: unknown
+          height: string | null
+          id: number
+          occupancy: string | null
+          source_id: number | null
+        }
+        Insert: {
+          geom: unknown
+          height?: string | null
+          id?: number
+          occupancy?: string | null
+          source_id?: number | null
+        }
+        Update: {
+          geom?: unknown
+          height?: string | null
+          id?: number
+          occupancy?: string | null
+          source_id?: number | null
+        }
+        Relationships: []
+      }
+      chat_phrase_stats: {
+        Row: {
+          conversation_count: number
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          occurrence_count: number
+          phrase: string
+          phrase_length: number
+        }
+        Insert: {
+          conversation_count?: number
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          occurrence_count?: number
+          phrase: string
+          phrase_length: number
+        }
+        Update: {
+          conversation_count?: number
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          occurrence_count?: number
+          phrase?: string
+          phrase_length?: number
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           created_at: string
@@ -750,6 +843,7 @@ export type Database = {
       }
       flight_requests: {
         Row: {
+          booking_id: string | null
           center_point: unknown
           center_point_geojson: Json
           created_at: string
@@ -774,6 +868,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          booking_id?: string | null
           center_point: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -798,6 +893,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          booking_id?: string | null
           center_point?: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -822,6 +918,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "flight_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_bookings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "flight_requests_drone_id_fkey"
             columns: ["drone_id"]
@@ -1016,6 +1119,120 @@ export type Database = {
           },
         ]
       }
+      marketplace_bookings: {
+        Row: {
+          association_code: string | null
+          association_expires_at: string | null
+          budget_ils: number | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          created_by: string
+          description: string
+          drone_type: string | null
+          end_time: string
+          id: string
+          location: string | null
+          operation_type: string | null
+          org_id: string
+          pilot_id: string
+          purpose: string | null
+          responded_at: string | null
+          start_time: string
+          status: Database["public"]["Enums"]["booking_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          association_code?: string | null
+          association_expires_at?: string | null
+          budget_ils?: number | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by: string
+          description: string
+          drone_type?: string | null
+          end_time: string
+          id?: string
+          location?: string | null
+          operation_type?: string | null
+          org_id: string
+          pilot_id: string
+          purpose?: string | null
+          responded_at?: string | null
+          start_time: string
+          status?: Database["public"]["Enums"]["booking_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          association_code?: string | null
+          association_expires_at?: string | null
+          budget_ils?: number | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          drone_type?: string | null
+          end_time?: string
+          id?: string
+          location?: string | null
+          operation_type?: string | null
+          org_id?: string
+          pilot_id?: string
+          purpose?: string | null
+          responded_at?: string | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["booking_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_bookings_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_pilot_id_fkey"
+            columns: ["pilot_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string
@@ -1186,6 +1403,38 @@ export type Database = {
           },
         ]
       }
+      pilot_pricing: {
+        Row: {
+          daily_rate_ils: number | null
+          equipment_rates: Json
+          hourly_rate_ils: number | null
+          pilot_id: string
+          updated_at: string
+        }
+        Insert: {
+          daily_rate_ils?: number | null
+          equipment_rates?: Json
+          hourly_rate_ils?: number | null
+          pilot_id: string
+          updated_at?: string
+        }
+        Update: {
+          daily_rate_ils?: number | null
+          equipment_rates?: Json
+          hourly_rate_ils?: number | null
+          pilot_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilot_pricing_pilot_id_fkey"
+            columns: ["pilot_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pilot_profiles: {
         Row: {
           drone_models: string[]
@@ -1282,6 +1531,47 @@ export type Database = {
           {
             foreignKeyName: "pilot_reviews_reviewer_id_fkey"
             columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portfolio_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          media_type: string
+          pilot_id: string
+          sort_order: number
+          storage_path: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          media_type?: string
+          pilot_id: string
+          sort_order?: number
+          storage_path: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          media_type?: string
+          pilot_id?: string
+          sort_order?: number
+          storage_path?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_items_pilot_id_fkey"
+            columns: ["pilot_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1677,6 +1967,13 @@ export type Database = {
             }
             Returns: string
           }
+      admin_marketplace_bookings_overview: {
+        Args: never
+        Returns: {
+          booking_count: number
+          status: Database["public"]["Enums"]["booking_status"]
+        }[]
+      }
       admin_organizations_overview: {
         Args: never
         Returns: {
@@ -1686,6 +1983,16 @@ export type Database = {
           id: string
           member_count: number
           name: string
+        }[]
+      }
+      admin_recurring_chat_phrases: {
+        Args: { limit_count?: number; min_conversations?: number }
+        Returns: {
+          conversation_count: number
+          last_seen_at: string
+          occurrence_count: number
+          phrase: string
+          phrase_length: number
         }[]
       }
       analytics_active_user_count: {
@@ -1713,6 +2020,10 @@ export type Database = {
       assert_analytics_access: {
         Args: { target_org_id: string }
         Returns: undefined
+      }
+      buildings_mvt: {
+        Args: { x: number; y: number; z: number }
+        Returns: string
       }
       create_organization_as_owner: {
         Args: { org_name: string }
@@ -1883,6 +2194,31 @@ export type Database = {
         Returns: boolean
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
+      get_marketplace_booking: {
+        Args: { target_booking_id: string }
+        Returns: {
+          association_code: string
+          association_expires_at: string
+          budget_ils: number
+          created_at: string
+          created_by: string
+          description: string
+          drone_type: string
+          end_time: string
+          id: string
+          location: string
+          operation_type: string
+          org_id: string
+          org_name: string
+          pilot_avatar_url: string
+          pilot_full_name: string
+          pilot_id: string
+          purpose: string
+          start_time: string
+          status: Database["public"]["Enums"]["booking_status"]
+          title: string
+        }[]
+      }
       get_marketplace_pilot_profile: {
         Args: { target_pilot_id: string }
         Returns: {
@@ -1918,6 +2254,10 @@ export type Database = {
         Returns: boolean
       }
       is_same_org: { Args: { target_org_id: string }; Returns: boolean }
+      link_flight_request_to_booking: {
+        Args: { code: string; target_flight_request_id: string }
+        Returns: undefined
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       marketplace_freelancers: {
         Args: { eligible_plan_codes: string[] }
@@ -1947,6 +2287,31 @@ export type Database = {
           pilot_avatar_url: string
           pilot_full_name: string
           pilot_id: string
+        }[]
+      }
+      my_marketplace_bookings: {
+        Args: never
+        Returns: {
+          association_code: string
+          association_expires_at: string
+          budget_ils: number
+          created_at: string
+          created_by: string
+          description: string
+          drone_type: string
+          end_time: string
+          id: string
+          location: string
+          operation_type: string
+          org_id: string
+          org_name: string
+          pilot_avatar_url: string
+          pilot_full_name: string
+          pilot_id: string
+          purpose: string
+          start_time: string
+          status: Database["public"]["Enums"]["booking_status"]
+          title: string
         }[]
       }
       overlapping_flight_requests: {
@@ -2622,6 +2987,13 @@ export type Database = {
         | "degraded"
         | "replace_soon"
         | "condemned"
+      booking_status:
+        | "invited"
+        | "pending"
+        | "confirmed"
+        | "declined"
+        | "cancelled"
+        | "completed"
       contact_request_status: "pending" | "accepted" | "declined"
       document_kind:
         | "pilot_license"
@@ -2692,6 +3064,12 @@ export type Database = {
         | "contact_request_received"
         | "contact_request_decided"
         | "pilot_review_received"
+        | "booking_invited"
+        | "booking_accepted"
+        | "booking_declined"
+        | "booking_confirmed"
+        | "booking_cancelled"
+        | "booking_message_received"
       org_membership_status: "pending" | "active" | "rejected" | "removed"
       special_authorization_status: "pending_payment" | "active" | "expired"
       user_role:
@@ -3328,6 +3706,14 @@ export const Constants = {
         "replace_soon",
         "condemned",
       ],
+      booking_status: [
+        "invited",
+        "pending",
+        "confirmed",
+        "declined",
+        "cancelled",
+        "completed",
+      ],
       contact_request_status: ["pending", "accepted", "declined"],
       document_kind: [
         "pilot_license",
@@ -3406,6 +3792,12 @@ export const Constants = {
         "contact_request_received",
         "contact_request_decided",
         "pilot_review_received",
+        "booking_invited",
+        "booking_accepted",
+        "booking_declined",
+        "booking_confirmed",
+        "booking_cancelled",
+        "booking_message_received",
       ],
       org_membership_status: ["pending", "active", "rejected", "removed"],
       special_authorization_status: ["pending_payment", "active", "expired"],
