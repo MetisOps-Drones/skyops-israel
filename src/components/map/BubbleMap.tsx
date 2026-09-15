@@ -393,7 +393,7 @@ export function BubbleMap({
             type="vector"
             tiles={[`${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/buildings/{z}/{x}/{y}.pbf`]}
             minzoom={14}
-            maxzoom={14}
+            maxzoom={15}
           >
             <Layer
               id="buildings-fill"

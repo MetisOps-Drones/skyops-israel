@@ -10,6 +10,7 @@ import { TermTooltip } from "@/components/map/TermTooltip";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
+import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
 import { InlineAuthorizationPurchase } from "@/components/map/InlineAuthorizationPurchase";
 import { AIP_ZONE_KIND_LABELS } from "@/lib/constants/aip-reference-zones";
@@ -82,6 +83,7 @@ export function LocationInfoCard({
   // 32), not a fixed number — see src/lib/geo/flight-rules.ts.
   const conservativeAltitudeM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, conservativeAltitudeM);
+  const buildingProximity = useBuildingProximity(point, requiredDistanceM);
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
   const matchingRegulations = Array.from(
@@ -186,10 +188,37 @@ export function LocationInfoCard({
               </p>
             )}
             {!proximity.isLoading && proximity.data?.available === false && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <WifiOff className="h-3 w-3" />
-                לא ניתן היה לבדוק מגבלות קרבה נוספות כרגע — יש לבדוק ידנית.
-              </p>
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <p className="flex items-center gap-1.5">
+                  <WifiOff className="h-3 w-3" />
+                  לא ניתן היה לבדוק שכונות/מתקנים ספציפיים כרגע (OpenStreetMap) — הבדיקה הבאה מבוססת על נתוני מבנים
+                  מקומיים בלבד.
+                </p>
+                {buildingProximity.isLoading ? (
+                  <p className="flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    בודק מול נתוני מבנים מקומיים...
+                  </p>
+                ) : buildingProximity.data?.available ? (
+                  <p
+                    className={cn(
+                      "flex items-center gap-1.5 font-medium",
+                      buildingProximity.data.isNearBuilding ? "text-destructive" : "text-success"
+                    )}
+                  >
+                    {buildingProximity.data.isNearBuilding ? (
+                      <ShieldAlert className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ShieldCheck className="h-3 w-3 shrink-0" />
+                    )}
+                    {buildingProximity.data.isNearBuilding
+                      ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — כנראה נדרשת הרשאת הפעלה מיוחדת`
+                      : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
+                  </p>
+                ) : (
+                  <p>גם הבדיקה מול נתוני המבנים המקומיים לא זמינה כרגע — יש לבדוק ידנית.</p>
+                )}
+              </div>
             )}
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}
