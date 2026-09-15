@@ -201,7 +201,7 @@ export function LocationInfoCard({
             {buildingProximity.isLoading ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                בודק מרחק ממבנים (נתוני מבנים מקומיים)...
+                בודק מרחק ממבנים בסביבה...
               </p>
             ) : buildingProximity.data?.available ? (
               <p
@@ -226,18 +226,6 @@ export function LocationInfoCard({
               </p>
             )}
 
-            {proximity.isLoading && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                בודק מוסדות ספציפיים בקרבת מקום (בתי ספר, בתי חולים, מתקנים)...
-              </p>
-            )}
-            {!proximity.isLoading && proximity.data?.available === false && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <WifiOff className="h-3 w-3" />
-                לא ניתן היה לבדוק מוסדות ספציפיים כרגע (OpenStreetMap) — הבדיקה מעל מבוססת על נתוני המבנים בלבד.
-              </p>
-            )}
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -299,9 +287,8 @@ export function LocationInfoCard({
                     <div>
                       <p className="text-sm font-medium">מוסדות ואתרים ספציפיים בקרבת מקום (משלים, לא קובע)</p>
                       <p className="text-xs text-muted-foreground">
-                        מבוסס OpenStreetMap — מזהה בתי ספר/בתי חולים/מתקנים ספציפיים, אבל המרחק ל&quot;שכונת
-                        מגורים&quot; נמדד ממרכז הכובד של האזור המתויג במפה, לא מהבית הקרוב ביותר בפועל — יכול להטעות
-                        באזורים גדולים. ההגדרה הקובעת אם צריך הרשאה מיוחדת היא בדיקת המבנים למעלה. הסף החוקי המזערי{" "}
+                        מזהה בתי ספר/בתי חולים/מתקנים ספציפיים בסביבה — ההגדרה הקובעת אם צריך הרשאה מיוחדת היא בדיקת
+                        המבנים למעלה. הסף החוקי המזערי{" "}
                         {isHobby
                           ? `למטיסן הוא ${requiredDistanceM} מ' קבועים`
                           : `למטיס הוא כגובה ההטסה עצמו (כאן: ${requiredDistanceM} מ׳, לפי תקרת הרישיון — הסף בפועל ישתנה לפי הגובה שתבחרו בטופס הבקשה)`}
@@ -422,8 +409,7 @@ export function LocationInfoCard({
             ) : null}
 
             <p className="text-[11px] text-muted-foreground">
-              מבוסס על שכבת מרחב אווירי מקורבת ועל נתוני OpenStreetMap — לא לניווט. האחריות לביצוע הטיסה על פי כל דין
-              מוטלת על המטיס.
+              מבוסס על שכבת מרחב אווירי מקורבת — לא לניווט. האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.
             </p>
           </div>
         )}

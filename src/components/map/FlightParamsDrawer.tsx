@@ -351,12 +351,6 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               בודק מרחק ממבנים...
             </p>
           )}
-          {proximity.isLoading && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              בודק מוסדות ספציפיים בקרבת מקום (בתי ספר, בתי חולים, מתקנים)...
-            </p>
-          )}
 
           {requiresAttention && (
             <div
@@ -388,7 +382,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
                 {authCheck?.reasons.map((reason, i) => <li key={`aip-${i}`}>{reason.label}</li>)}
                 {isNearBuildingLocally && (
-                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos; (נתוני מבנים מקומיים — הבדיקה הקובעת)</li>
+                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
                 )}
                 {relevantProximityFindings.map((f, i) => (
                   <li key={`prox-${i}`}>
