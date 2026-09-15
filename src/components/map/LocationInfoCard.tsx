@@ -86,12 +86,21 @@ export function LocationInfoCard({
   const buildingProximity = useBuildingProximity(point, requiredDistanceM);
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
+  // The OSM-based findings above measure distance to a landuse polygon's
+  // centroid, not its nearest edge — for a city-scale "residential" way that
+  // can read "2,471m" from a point that's visibly ~200m from the nearest
+  // houses. The building-grid check is the authoritative signal for "is
+  // there a building nearby" (real footprints, not administrative zone
+  // centroids), so it drives the same תקנה 32 regardless of what OSM says —
+  // OSM's findings are kept only as supplementary detail (named sites).
+  const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
   const matchingRegulations = Array.from(
-    new Set(
-      relevantProximityFindings
+    new Set([
+      ...relevantProximityFindings
         .map((f) => PROXIMITY_CATEGORY_REGULATION[f.category])
-        .filter((reg): reg is string => Boolean(reg))
-    )
+        .filter((reg): reg is string => Boolean(reg)),
+      ...(isNearBuildingLocally ? ["תקנה 32"] : []),
+    ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
   const blockedForHobby = needsSpecialAuthorization && isHobby;
@@ -102,7 +111,10 @@ export function LocationInfoCard({
   const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
   const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   const hasDetails = Boolean(
-    (aipCheck && aipCheck.reasons.length > 0) || proximityFindings.length > 0 || needsSpecialAuthorization
+    (aipCheck && aipCheck.reasons.length > 0) ||
+      proximityFindings.length > 0 ||
+      needsSpecialAuthorization ||
+      buildingProximity.data?.available
   );
 
   return (
@@ -181,44 +193,50 @@ export function LocationInfoCard({
               </div>
             )}
 
+            {/* Primary safety signal: distance to the nearest real building footprint
+                (src/lib/geo/proximity-grid.ts), not OSM's landuse-polygon centroid — a
+                large "residential" way in OSM can read as 2+ km away from a point that's
+                visibly ~200m from the nearest houses, because Overpass's `center` is the
+                polygon's centroid, not its nearest edge. */}
+            {buildingProximity.isLoading ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                בודק מרחק ממבנים (נתוני מבנים מקומיים)...
+              </p>
+            ) : buildingProximity.data?.available ? (
+              <p
+                className={cn(
+                  "flex items-center gap-1.5 text-sm font-medium",
+                  buildingProximity.data.isNearBuilding ? "text-destructive" : "text-success"
+                )}
+              >
+                {buildingProximity.data.isNearBuilding ? (
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                )}
+                {buildingProximity.data.isNearBuilding
+                  ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
+                  : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <WifiOff className="h-3 w-3" />
+                בדיקת מרחק ממבנים לא זמינה כרגע — יש לבדוק ידנית.
+              </p>
+            )}
+
             {proximity.isLoading && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                בודק מגבלות קרבה נוספות (שכונות, שדות ספורט, מתקנים)...
+                בודק מוסדות ספציפיים בקרבת מקום (בתי ספר, בתי חולים, מתקנים)...
               </p>
             )}
             {!proximity.isLoading && proximity.data?.available === false && (
-              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                <p className="flex items-center gap-1.5">
-                  <WifiOff className="h-3 w-3" />
-                  לא ניתן היה לבדוק שכונות/מתקנים ספציפיים כרגע (OpenStreetMap) — הבדיקה הבאה מבוססת על נתוני מבנים
-                  מקומיים בלבד.
-                </p>
-                {buildingProximity.isLoading ? (
-                  <p className="flex items-center gap-1.5">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    בודק מול נתוני מבנים מקומיים...
-                  </p>
-                ) : buildingProximity.data?.available ? (
-                  <p
-                    className={cn(
-                      "flex items-center gap-1.5 font-medium",
-                      buildingProximity.data.isNearBuilding ? "text-destructive" : "text-success"
-                    )}
-                  >
-                    {buildingProximity.data.isNearBuilding ? (
-                      <ShieldAlert className="h-3 w-3 shrink-0" />
-                    ) : (
-                      <ShieldCheck className="h-3 w-3 shrink-0" />
-                    )}
-                    {buildingProximity.data.isNearBuilding
-                      ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — כנראה נדרשת הרשאת הפעלה מיוחדת`
-                      : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
-                  </p>
-                ) : (
-                  <p>גם הבדיקה מול נתוני המבנים המקומיים לא זמינה כרגע — יש לבדוק ידנית.</p>
-                )}
-              </div>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <WifiOff className="h-3 w-3" />
+                לא ניתן היה לבדוק מוסדות ספציפיים כרגע (OpenStreetMap) — הבדיקה מעל מבוססת על נתוני המבנים בלבד.
+              </p>
             )}
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}
@@ -279,9 +297,11 @@ export function LocationInfoCard({
                 {proximityFindings.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <div>
-                      <p className="text-sm font-medium">מגבלות קרבה לנקודה ספציפית</p>
+                      <p className="text-sm font-medium">מוסדות ואתרים ספציפיים בקרבת מקום (משלים, לא קובע)</p>
                       <p className="text-xs text-muted-foreground">
-                        מרחק נמדד מהמתקן/האתר עצמו — לא מגבול אזור מרחב אווירי כלשהו. הסף החוקי המזערי{" "}
+                        מבוסס OpenStreetMap — מזהה בתי ספר/בתי חולים/מתקנים ספציפיים, אבל המרחק ל&quot;שכונת
+                        מגורים&quot; נמדד ממרכז הכובד של האזור המתויג במפה, לא מהבית הקרוב ביותר בפועל — יכול להטעות
+                        באזורים גדולים. ההגדרה הקובעת אם צריך הרשאה מיוחדת היא בדיקת המבנים למעלה. הסף החוקי המזערי{" "}
                         {isHobby
                           ? `למטיסן הוא ${requiredDistanceM} מ' קבועים`
                           : `למטיס הוא כגובה ההטסה עצמו (כאן: ${requiredDistanceM} מ׳, לפי תקרת הרישיון — הסף בפועל ישתנה לפי הגובה שתבחרו בטופס הבקשה)`}

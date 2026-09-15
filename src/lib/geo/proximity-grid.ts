@@ -34,8 +34,17 @@ async function loadGrid(bufferM: ProximityBufferM): Promise<Buffer> {
   if (!base) throw new Error("NEXT_PUBLIC_R2_PUBLIC_URL not configured");
   const res = await fetch(`${base}/proximity-grid/${bufferM}m.bin`);
   if (!res.ok) throw new Error(`proximity grid fetch failed: ${res.status}`);
-  const gz = Buffer.from(await res.arrayBuffer());
-  const packed = gunzipSync(gz);
+  const body = Buffer.from(await res.arrayBuffer());
+  // The object is stored gzip-compressed, but Node's fetch (like a browser)
+  // already transparently decompresses a gzip Content-Encoding response —
+  // so `body` may already be plain here. Try gunzip and fall back to the
+  // raw bytes rather than assuming either behavior.
+  let packed: Buffer;
+  try {
+    packed = gunzipSync(body);
+  } catch {
+    packed = body;
+  }
   gridCache.set(bufferM, packed);
   return packed;
 }

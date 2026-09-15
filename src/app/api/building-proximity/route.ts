@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
   try {
     const near = await isNearBuilding(lon, lat, bufferM);
     return NextResponse.json({ available: true, isNearBuilding: near, bufferM });
-  } catch {
+  } catch (err) {
+    console.error("building-proximity failed:", err);
     return NextResponse.json({ available: false, isNearBuilding: false, bufferM });
   }
 }

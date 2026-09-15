@@ -21,6 +21,7 @@ import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
+import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import {
   checkFlightAuthorizationRequirement,
   PROXIMITY_CATEGORY_REGULATION,
@@ -102,6 +103,12 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const plannedAltitudeM = ALTITUDE_BAND_METERS[altitudeBand];
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, plannedAltitudeM);
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
+  // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
+  // distance is to a landuse polygon's centroid, not its nearest edge, and
+  // can badly understate real proximity for a city-scale way. The building
+  // grid (real footprints) drives תקנה 32 regardless of what OSM found.
+  const buildingProximity = useBuildingProximity(checkPoint, requiredDistanceM);
+  const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
 
   // Zone-based restriction and "special operation authorization" (the 9
   // numbered regulations) are two different legal mechanisms — see
@@ -114,11 +121,12 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const zoneHardBlocked =
     zoneBlockLevel === "controlled_airspace" || (zoneBlockLevel === "director_approval_only" && !hasOrg);
   const matchingRegulations = Array.from(
-    new Set(
-      relevantProximityFindings
+    new Set([
+      ...relevantProximityFindings
         .map((f) => PROXIMITY_CATEGORY_REGULATION[f.category])
-        .filter((reg): reg is string => Boolean(reg))
-    )
+        .filter((reg): reg is string => Boolean(reg)),
+      ...(isNearBuildingLocally ? ["תקנה 32"] : []),
+    ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
   const blockedForHobby = needsSpecialAuthorization && isHobby;
@@ -145,6 +153,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const canSubmit =
     !blockedForSolo &&
     !(proximity.isLoading && isHobby) &&
+    !(buildingProximity.isLoading && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
     Boolean(startTime && endTime) &&
@@ -336,10 +345,16 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {spatialCheck?.clear && <PreFlightChecklist />}
 
+          {buildingProximity.isLoading && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              בודק מרחק ממבנים...
+            </p>
+          )}
           {proximity.isLoading && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              בודק מגבלות קרבה נוספות (שכונות, שדות ספורט, מתקנים)...
+              בודק מוסדות ספציפיים בקרבת מקום (בתי ספר, בתי חולים, מתקנים)...
             </p>
           )}
 
@@ -372,6 +387,9 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
                 {authCheck?.reasons.map((reason, i) => <li key={`aip-${i}`}>{reason.label}</li>)}
+                {isNearBuildingLocally && (
+                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos; (נתוני מבנים מקומיים — הבדיקה הקובעת)</li>
+                )}
                 {relevantProximityFindings.map((f, i) => (
                   <li key={`prox-${i}`}>
                     {f.label}
