@@ -17,11 +17,14 @@ import { useMarkNotificationRead, useNotifications, useUnreadNotificationCount }
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
 
-/** Only booking-chat messages have an obvious single destination; other kinds (license expiry, NOTAM, etc.) don't point at one page. */
+/** Only booking-chat messages and new coordination requests have an obvious single destination; other kinds (license expiry, NOTAM, etc.) don't point at one page. */
 function notificationHref(n: Tables<"notifications">): string | null {
   if (n.kind === "booking_message_received") {
     const bookingId = (n.metadata as { booking_id?: string } | null)?.booking_id;
     return bookingId ? `/marketplace/bookings/${bookingId}` : null;
+  }
+  if (n.kind === "coordination_requested") {
+    return "/ops";
   }
   return null;
 }

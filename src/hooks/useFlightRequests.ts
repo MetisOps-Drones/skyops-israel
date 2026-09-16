@@ -26,6 +26,7 @@ export function useMyFlightRequests() {
       if (error) throw error;
       return data as unknown as FlightRequestWithRelations[];
     },
+    refetchInterval: 30_000,
   });
 }
 

@@ -3191,6 +3191,8 @@ export type Database = {
         | "booking_confirmed"
         | "booking_cancelled"
         | "booking_message_received"
+        | "coordination_requested"
+        | "flight_request_rejected"
       org_membership_status: "pending" | "active" | "rejected" | "removed"
       special_authorization_status: "pending_payment" | "active" | "expired"
       user_role:
@@ -3926,6 +3928,8 @@ export const Constants = {
         "booking_confirmed",
         "booking_cancelled",
         "booking_message_received",
+        "coordination_requested",
+        "flight_request_rejected",
       ],
       org_membership_status: ["pending", "active", "rejected", "removed"],
       special_authorization_status: ["pending_payment", "active", "expired"],
