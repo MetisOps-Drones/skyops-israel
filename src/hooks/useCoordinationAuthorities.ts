@@ -7,7 +7,7 @@ import type { Tables, CoordinationContactStatus } from "@/lib/types/database.typ
 export type CoordinationAuthority = Tables<"coordination_authorities">;
 export type FlightRequestCoordination = Tables<"flight_request_coordination">;
 
-/** Admin-only directory (RLS gated to is_dispatcher_admin() — see 0071). Listed for the "ניהול גורמי תיאום" admin screen. */
+/** Admin-only directory (RLS gated to is_dispatcher_admin() — see 0072). Listed for the "ניהול גורמי תיאום" admin screen. */
 export function useCoordinationAuthorities() {
   return useQuery({
     queryKey: ["coordination_authorities"],

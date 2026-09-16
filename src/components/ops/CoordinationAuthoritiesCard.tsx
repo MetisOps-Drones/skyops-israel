@@ -176,7 +176,7 @@ function AuthorityDialog({
   );
 }
 
-/** Admin-only ("מוקד תיאום" is already gated server-side to dispatcher_admin) directory of who to call for airspace coordination — phone numbers here never reach the org/pilot side (see 0071). */
+/** Admin-only ("מוקד תיאום" is already gated server-side to dispatcher_admin) directory of who to call for airspace coordination — phone numbers here never reach the org/pilot side (see 0072). */
 export function CoordinationAuthoritiesCard() {
   const { data: authorities = [], isLoading } = useCoordinationAuthorities();
   const deleteAuthority = useDeleteCoordinationAuthority();

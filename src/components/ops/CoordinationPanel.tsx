@@ -62,7 +62,7 @@ function AuthorityRow({ authority, message }: { authority: CoordinationAuthority
 /**
  * Admin-only ("מוקד תיאום" is already gated server-side to dispatcher_admin)
  * — never rendered anywhere an org/pilot can reach. Auto-identifies who to
- * coordinate with for this request's location (0071), lets the dispatcher
+ * coordinate with for this request's location (0072), lets the dispatcher
  * forward everything with one click instead of retyping it, and tracks the
  * *external* coordination's own status separately from the request's
  * CAAI-facing status/dispatcher_notes.
