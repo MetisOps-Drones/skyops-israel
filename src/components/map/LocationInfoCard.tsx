@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPinned, ShieldAlert, ShieldCheck, ArrowUpToLine, Lock, Ban, Loader2, WifiOff, Info } from "lucide-react";
+import { MapPinned, ShieldAlert, ShieldCheck, ArrowUpToLine, Lock, Ban, Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -282,12 +282,7 @@ export function LocationInfoCard({
                   ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
                   : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
               </p>
-            ) : (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <WifiOff className="h-3 w-3" />
-                בדיקת מרחק ממבנים לא זמינה כרגע — יש לבדוק ידנית.
-              </p>
-            )}
+            ) : null}
 
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}
@@ -358,17 +353,7 @@ export function LocationInfoCard({
 
                 {proximityFindings.length > 0 && (
                   <div className="flex flex-col gap-2">
-                    <div>
-                      <p className="text-sm font-medium">מוסדות ואתרים ספציפיים בקרבת מקום (משלים, לא קובע)</p>
-                      <p className="text-xs text-muted-foreground">
-                        מזהה בתי ספר/בתי חולים/מתקנים ספציפיים בסביבה — ההגדרה הקובעת אם צריך הרשאה מיוחדת היא בדיקת
-                        המבנים למעלה. הסף החוקי המזערי{" "}
-                        {isHobby
-                          ? `למטיסן הוא ${requiredDistanceM} מ' קבועים`
-                          : `למטיס הוא כגובה ההטסה עצמו (כאן: ${requiredDistanceM} מ׳, לפי תקרת הרישיון — הסף בפועל ישתנה לפי הגובה שתבחרו בטופס הבקשה)`}
-                        .
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium">מוסדות ואתרים בקרבת מקום</p>
                     {proximityFindings.map((f, i) => {
                       const breaches = f.distanceM < requiredDistanceM;
                       return (
@@ -438,11 +423,7 @@ export function LocationInfoCard({
 
                 <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                   <Info className="mt-0.5 h-3 w-3 shrink-0" />
-                  <span>
-                    נדרשת גם ראות טיסה של 3 ק&quot;מ לפחות, ואסור להיכנס לתוך ענן, מעליו או ביניהם. מרחק קבוע מכלי טיס
-                    אחרים מחוץ לנתיב מתואם אינו מוגדר בתקנות כמספר — חלה חובת &quot;ראייה והימנעות&quot; (See and Avoid)
-                    באחריות המטיס.
-                  </span>
+                  <span>נדרשת ראות 3 ק&quot;מ, ללא כניסה לעננים, ובאחריות המטיס לשמור מרחק מכלי טיס אחרים.</span>
                 </div>
               </Disclosure>
             )}
@@ -485,7 +466,7 @@ export function LocationInfoCard({
               ) : null)}
 
             <p className="text-[11px] text-muted-foreground">
-              המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה — לא לניווט. האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.
+              לא לניווט — אינו תחליף לבדיקה רשמית לפני טיסה. האחריות על המטיס.
             </p>
           </div>
         )}
