@@ -21,6 +21,7 @@ import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
+import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import {
   checkFlightAuthorizationRequirement,
   PROXIMITY_CATEGORY_REGULATION,
@@ -31,7 +32,6 @@ import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
 import { ClearanceBadge } from "./ClearanceBadge";
 import { PreFlightChecklist } from "./PreFlightChecklist";
-import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { WeatherPanel } from "./WeatherPanel";
 import { createFlightRequest } from "@/actions/flight-requests";
 import { DroneQuickRegisterCard } from "@/components/onboarding/DroneQuickRegisterCard";
@@ -103,25 +103,32 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const plannedAltitudeM = ALTITUDE_BAND_METERS[altitudeBand];
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, plannedAltitudeM);
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
+  // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
+  // distance is to a landuse polygon's centroid, not its nearest edge, and
+  // can badly understate real proximity for a city-scale way. The building
+  // grid (real footprints) drives תקנה 32 regardless of what OSM found.
+  const buildingProximity = useBuildingProximity(checkPoint, requiredDistanceM);
+  const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
 
   // Zone-based restriction and "special operation authorization" (the 9
   // numbered regulations) are two different legal mechanisms — see
   // src/lib/geo/flight-rules.ts. Controlled airspace (CTR/ATZ/TMA/CTA) is a
-  // strong warning, not a hard block — see the matching comment in
-  // LocationInfoCard.tsx for why (this data comes from the advisory
-  // `aip_reference_zones` layer, never the authoritative one). Prohibited/
-  // danger zones require a case-by-case CAAI-director approval — only an
-  // organization account may submit here (the dispatcher still has to chase
-  // that approval manually); hobby/solo-pro cannot.
+  // strong warning, not a hard block — most `aip_reference_zones` rows now
+  // carry real geometry from the official AIP (see useAipReferenceZones.ts),
+  // but there's no live NOTAM feed, so the dispatcher still confirms before
+  // approving. Prohibited/danger zones require a case-by-case CAAI-director
+  // approval — only an organization account may submit here (the dispatcher
+  // still has to chase that approval manually); hobby/solo-pro cannot.
   const zoneBlockLevel = authCheck?.blockLevel ?? "none";
   const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
   const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
   const matchingRegulations = Array.from(
-    new Set(
-      relevantProximityFindings
+    new Set([
+      ...relevantProximityFindings
         .map((f) => PROXIMITY_CATEGORY_REGULATION[f.category])
-        .filter((reg): reg is string => Boolean(reg))
-    )
+        .filter((reg): reg is string => Boolean(reg)),
+      ...(isNearBuildingLocally ? ["תקנה 32"] : []),
+    ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
   const blockedForHobby = needsSpecialAuthorization && isHobby;
@@ -131,9 +138,10 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
   const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   // Same reasoning as LocationInfoCard: requiresAttention is derived from
-  // aipZones/proximity, both async — while either is still loading, don't
-  // show (or let a hobby pilot act on) a premature "fine to submit" state.
-  const isChecking = aipZonesLoading || proximity.isLoading;
+  // aipZones/proximity/buildingProximity, all async — while any is still
+  // loading, don't show (or let a hobby pilot act on) a premature "fine to
+  // submit" state.
+  const isChecking = aipZonesLoading || proximity.isLoading || buildingProximity.isLoading;
 
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -339,11 +347,6 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             <ClearanceBadge result={spatialCheck} hasAdvisoryWarning={isChecking || requiresAttention} />
           </div>
 
-          <DemoModeNotice>
-            הבדיקה מבוססת על 4 אזורי בדיקה אוטומטית להדגמה ושכבת AIP ייעוץ לא מסוקרת — לא כל המרחב האווירי בישראל.
-            יש לאמת מול רת&quot;א/DronesIL לפני טיסה בפועל.
-          </DemoModeNotice>
-
           <WeatherPanel center={center} />
 
           {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
@@ -385,7 +388,17 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               </div>
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
-                {authCheck?.reasons.map((reason, i) => <li key={`aip-${i}`}>{reason.label}</li>)}
+                {authCheck?.reasons.map((reason, i) => (
+                  <li key={`aip-${i}`}>
+                    {reason.label}
+                    {reason.zone && !reason.zone.geometry_precise && (
+                      <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
+                    )}
+                  </li>
+                ))}
+                {isNearBuildingLocally && (
+                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
+                )}
                 {relevantProximityFindings.map((f, i) => (
                   <li key={`prox-${i}`}>
                     {f.label}
@@ -395,8 +408,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               </ul>
               {zoneBlockLevel === "controlled_airspace" ? (
                 <p className="text-xs text-muted-foreground">
-                  ניתן לשלוח בקשה; מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — המוקדן יאמת מול המקור הרשמי לפני
-                  אישור.
+                  ניתן לשלוח בקשה — המוקדן יאמת מול NOTAM עדכני לפני אישור.
                 </p>
               ) : blockedForHobby ? (
                 <p className="text-xs text-muted-foreground">
@@ -431,6 +443,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               ))}
             </div>
           )}
+
+          <p className="text-[11px] text-muted-foreground">
+            המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה. האחריות לביצוע הטיסה על פי כל דין
+            מוטלת על המטיס.
+          </p>
 
           <div className="flex gap-2">
             <Button

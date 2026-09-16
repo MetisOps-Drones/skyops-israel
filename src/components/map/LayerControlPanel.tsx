@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TermTooltip } from "@/components/map/TermTooltip";
-import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { AIRSPACE_ZONE_COLORS, AIRSPACE_ZONE_LABELS } from "@/lib/constants/airspace-zones";
 import type { AviationGlossaryTerm } from "@/lib/constants/aviation-glossary";
 import { cn } from "@/lib/utils";
@@ -93,30 +92,27 @@ export function LayerControlPanel({
         <DropdownMenuSeparator />
 
         <DropdownMenuLabel className="px-1 py-0 text-xs text-muted-foreground">שכבות מפה</DropdownMenuLabel>
-        <DemoModeNotice compact className="mt-1.5 px-1">
-          אזורי הבדיקה האוטומטית (למטה) הן 4 אזורי הדגמה בלבד — לא כל המרחב האווירי בישראל
-        </DemoModeNotice>
         <div className="mt-1.5 grid grid-cols-2 gap-1">
           <DropdownMenuCheckboxItem
             checked={visibility.nfz}
             onCheckedChange={() => toggle("nfz")}
             className="py-1.5 text-xs"
           >
-            <TermTooltip term="NFZ">אזורים אסורים (הדגמה)</TermTooltip>
+            <TermTooltip term="NFZ">אזורים אסורים</TermTooltip>
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.natureReserves}
             onCheckedChange={() => toggle("natureReserves")}
             className="py-1.5 text-xs"
           >
-            <TermTooltip term="שמורת טבע">שמורות טבע (הדגמה)</TermTooltip>
+            <TermTooltip term="שמורת טבע">שמורות טבע</TermTooltip>
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.infrastructure}
             onCheckedChange={() => toggle("infrastructure")}
             className="py-1.5 text-xs"
           >
-            <TermTooltip term="CTR">תשתיות/CTR (הדגמה)</TermTooltip>
+            <TermTooltip term="CTR">תשתיות/CTR</TermTooltip>
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.windHazard}
@@ -130,7 +126,7 @@ export function LayerControlPanel({
             onCheckedChange={() => toggle("aipReference")}
             className="col-span-2 py-1.5 text-xs"
           >
-            <TermTooltip term="AIP">שכבת AIP ייעוץ — 91 אזורים, דיגיטציה קהילתית לא מסוקרת</TermTooltip>
+            <TermTooltip term="AIP">שכבת מרחב אווירי (ייעוץ, ללא NOTAM בזמן אמת)</TermTooltip>
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.myHistory}
@@ -138,6 +134,13 @@ export function LayerControlPanel({
             className="col-span-2 py-1.5 text-xs"
           >
             היסטוריית תיאומים שלי
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={visibility.buildings}
+            onCheckedChange={() => toggle("buildings")}
+            className="col-span-2 py-1.5 text-xs"
+          >
+            מבנים וישובים (נראה מרמת התקרבות גבוהה)
           </DropdownMenuCheckboxItem>
           {isAdmin && (
             <DropdownMenuCheckboxItem

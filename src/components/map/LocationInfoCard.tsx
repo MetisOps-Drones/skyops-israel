@@ -10,9 +10,9 @@ import { TermTooltip } from "@/components/map/TermTooltip";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
+import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
 import { InlineAuthorizationPurchase } from "@/components/map/InlineAuthorizationPurchase";
-import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { AIP_ZONE_KIND_LABELS } from "@/lib/constants/aip-reference-zones";
 import {
   checkFlightAuthorizationRequirement,
@@ -95,14 +95,24 @@ export function LocationInfoCard({
   // 32), not a fixed number — see src/lib/geo/flight-rules.ts.
   const conservativeAltitudeM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, conservativeAltitudeM);
+  const buildingProximity = useBuildingProximity(point, requiredDistanceM);
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
+  // The OSM-based findings above measure distance to a landuse polygon's
+  // centroid, not its nearest edge — for a city-scale "residential" way that
+  // can read "2,471m" from a point that's visibly ~200m from the nearest
+  // houses. The building-grid check is the authoritative signal for "is
+  // there a building nearby" (real footprints, not administrative zone
+  // centroids), so it drives the same תקנה 32 regardless of what OSM says —
+  // OSM's findings are kept only as supplementary detail (named sites).
+  const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
   const matchingRegulations = Array.from(
-    new Set(
-      relevantProximityFindings
+    new Set([
+      ...relevantProximityFindings
         .map((f) => PROXIMITY_CATEGORY_REGULATION[f.category])
-        .filter((reg): reg is string => Boolean(reg))
-    )
+        .filter((reg): reg is string => Boolean(reg)),
+      ...(isNearBuildingLocally ? ["תקנה 32"] : []),
+    ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
   const blockedForHobby = needsSpecialAuthorization && isHobby;
@@ -113,7 +123,10 @@ export function LocationInfoCard({
   const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
   const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   const hasDetails = Boolean(
-    (aipCheck && aipCheck.reasons.length > 0) || proximityFindings.length > 0 || needsSpecialAuthorization
+    (aipCheck && aipCheck.reasons.length > 0) ||
+      proximityFindings.length > 0 ||
+      needsSpecialAuthorization ||
+      buildingProximity.data?.available
   );
 
   return (
@@ -147,8 +160,7 @@ export function LocationInfoCard({
                 <div>
                   <p className="text-base font-semibold">קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית</p>
                   <p className="mt-0.5 text-sm">
-                    ניתן להגיש בקשת תיאום; מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — המוקדן יאמת מול המקור הרשמי
-                    לפני אישור.
+                    ניתן להגיש בקשת תיאום — המוקדן יאמת מול NOTAM עדכני לפני אישור.
                   </p>
                 </div>
               </div>
@@ -202,12 +214,39 @@ export function LocationInfoCard({
               </div>
             )}
 
-            {!proximity.isLoading && proximity.data?.available === false && (
+            {/* Primary safety signal: distance to the nearest real building footprint
+                (src/lib/geo/proximity-grid.ts), not OSM's landuse-polygon centroid — a
+                large "residential" way in OSM can read as 2+ km away from a point that's
+                visibly ~200m from the nearest houses, because Overpass's `center` is the
+                polygon's centroid, not its nearest edge. */}
+            {buildingProximity.isLoading ? (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                בודק מרחק ממבנים בסביבה...
+              </p>
+            ) : buildingProximity.data?.available ? (
+              <p
+                className={cn(
+                  "flex items-center gap-1.5 text-sm font-medium",
+                  buildingProximity.data.isNearBuilding ? "text-destructive" : "text-success"
+                )}
+              >
+                {buildingProximity.data.isNearBuilding ? (
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                )}
+                {buildingProximity.data.isNearBuilding
+                  ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
+                  : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
+              </p>
+            ) : (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <WifiOff className="h-3 w-3" />
-                לא ניתן היה לבדוק מגבלות קרבה נוספות כרגע — יש לבדוק ידנית.
+                בדיקת מרחק ממבנים לא זמינה כרגע — יש לבדוק ידנית.
               </p>
             )}
+
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -241,11 +280,17 @@ export function LocationInfoCard({
                           <p className="font-medium">
                             {zone.name}
                             {zone.code ? ` (${zone.code})` : ""}
+                            {!zone.geometry_precise && <span className="text-warning"> *</span>}
                           </p>
                           <p className="text-xs text-muted-foreground">{AIP_ZONE_KIND_LABELS[zone.kind]}</p>
                           <p className="text-xs font-medium">
                             {formatAltitudeRangeMeters(zone.min_altitude_ft, zone.max_altitude_ft)}
                           </p>
+                          {!zone.geometry_precise && (
+                            <p className="mt-1 text-xs text-warning">
+                              * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת
+                            </p>
+                          )}
                           {(zone.kind === "DANGER" || zone.kind === "PROHIBITED") && (
                             <p className="mt-1 text-xs text-destructive">
                               {hasOrg
@@ -255,7 +300,7 @@ export function LocationInfoCard({
                           )}
                           {(zone.kind === "CTR" || zone.kind === "ATZ" || zone.kind === "TMA" || zone.kind === "CTA") && (
                             <p className="mt-1 text-xs text-warning">
-                              מבוסס על שכבת ייחוס מקורבת (לא סקר מדויק) — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
+                              אין כאן עדכוני NOTAM בזמן אמת — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
                             </p>
                           )}
                           {zone.kind === "RESTRICTED" && (
@@ -272,9 +317,10 @@ export function LocationInfoCard({
                 {proximityFindings.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <div>
-                      <p className="text-sm font-medium">מגבלות קרבה לנקודה ספציפית</p>
+                      <p className="text-sm font-medium">מוסדות ואתרים ספציפיים בקרבת מקום (משלים, לא קובע)</p>
                       <p className="text-xs text-muted-foreground">
-                        מרחק נמדד מהמתקן/האתר עצמו — לא מגבול אזור מרחב אווירי כלשהו. הסף החוקי המזערי{" "}
+                        מזהה בתי ספר/בתי חולים/מתקנים ספציפיים בסביבה — ההגדרה הקובעת אם צריך הרשאה מיוחדת היא בדיקת
+                        המבנים למעלה. הסף החוקי המזערי{" "}
                         {isHobby
                           ? `למטיסן הוא ${requiredDistanceM} מ' קבועים`
                           : `למטיס הוא כגובה ההטסה עצמו (כאן: ${requiredDistanceM} מ׳, לפי תקרת הרישיון — הסף בפועל ישתנה לפי הגובה שתבחרו בטופס הבקשה)`}
@@ -396,11 +442,9 @@ export function LocationInfoCard({
                 </Button>
               ) : null)}
 
-            <DemoModeNotice>
-              הבדיקה כאן מבוססת על 4 אזורי בדיקה אוטומטית להדגמה ושכבת AIP ייעוץ לא מסוקרת (דיגיטציה קהילתית) — לא
-              כל המרחב האווירי בישראל. אין להטיס בפועל על סמך תשובה זו בלבד; יש לאמת מול רת&quot;א/DronesIL לפני טיסה.
-              האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.
-            </DemoModeNotice>
+            <p className="text-[11px] text-muted-foreground">
+              המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה — לא לניווט. האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.
+            </p>
           </div>
         )}
       </DialogContent>
