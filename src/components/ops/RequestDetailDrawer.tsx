@@ -36,8 +36,8 @@ export function RequestDetailDrawer({
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const rejectMutation = useRejectFlightRequest();
-  const { data: licenses = [] } = usePilotLicensesForDispatcher(request?.user_id ?? null);
-  const { data: overlaps = [] } = useOverlappingFlightRequests(request?.id ?? null);
+  const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
+  const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
 
   if (!request) return null;
 
@@ -104,7 +104,9 @@ export function RequestDetailDrawer({
 
           <CoordinationPanel request={request} lng={lng} lat={lat} dmsCoordinates={dmsCoordinates} />
 
-          {overlaps.length > 0 && (
+          {overlapsLoading ? (
+            <p className="text-xs text-muted-foreground">בודק חפיפות עם בקשות אחרות...</p>
+          ) : overlaps.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -148,7 +150,11 @@ export function RequestDetailDrawer({
                   {license.license_type}: {LICENSE_STATUS_LABELS[license.status]}
                 </Badge>
               ))}
-              {licenses.length === 0 && <span className="text-xs text-muted-foreground">אין רישיונות רשומים</span>}
+              {licensesLoading ? (
+                <span className="text-xs text-muted-foreground">בודק רישיונות...</span>
+              ) : (
+                licenses.length === 0 && <span className="text-xs text-muted-foreground">אין רישיונות רשומים</span>
+              )}
             </div>
           </div>
 
