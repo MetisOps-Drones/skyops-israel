@@ -493,6 +493,48 @@ export type Database = {
           },
         ]
       }
+      coordination_authorities: {
+        Row: {
+          id: string
+          name: string
+          unit_type: string
+          phone: string
+          backup_phone: string | null
+          notes: string | null
+          center_lng: number
+          center_lat: number
+          radius_m: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          unit_type: string
+          phone: string
+          backup_phone?: string | null
+          notes?: string | null
+          center_lng: number
+          center_lat: number
+          radius_m: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          unit_type?: string
+          phone?: string
+          backup_phone?: string | null
+          notes?: string | null
+          center_lng?: number
+          center_lat?: number
+          radius_m?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           id: string
@@ -840,6 +882,54 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flight_request_coordination: {
+        Row: {
+          id: string
+          flight_request_id: string
+          authority_id: string | null
+          status: Database["public"]["Enums"]["coordination_contact_status"]
+          notes: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          flight_request_id: string
+          authority_id?: string | null
+          status?: Database["public"]["Enums"]["coordination_contact_status"]
+          notes?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          flight_request_id?: string
+          authority_id?: string | null
+          status?: Database["public"]["Enums"]["coordination_contact_status"]
+          notes?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_request_coordination_flight_request_id_fkey"
+            columns: ["flight_request_id"]
+            isOneToOne: true
+            referencedRelation: "flight_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flight_request_coordination_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "coordination_authorities"
             referencedColumns: ["id"]
           },
         ]
@@ -2066,6 +2156,28 @@ export type Database = {
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      find_coordination_authority: {
+        Args: { lat: number; lng: number }
+        Returns: {
+          id: string
+          name: string
+          unit_type: string
+          phone: string
+          backup_phone: string | null
+          notes: string | null
+          center_lng: number
+          center_lat: number
+          radius_m: number
+          created_at: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "coordination_authorities"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       find_intersecting_zones: {
         Args: {
           candidate_geom_geojson: Json
@@ -2998,6 +3110,12 @@ export type Database = {
         | "cancelled"
         | "completed"
       contact_request_status: "pending" | "accepted" | "declined"
+      coordination_contact_status:
+        | "not_started"
+        | "awaiting_contact"
+        | "awaiting_response"
+        | "approved"
+        | "denied"
       document_kind:
         | "pilot_license"
         | "drone_registration"
@@ -3718,6 +3836,13 @@ export const Constants = {
         "completed",
       ],
       contact_request_status: ["pending", "accepted", "declined"],
+      coordination_contact_status: [
+        "not_started",
+        "awaiting_contact",
+        "awaiting_response",
+        "approved",
+        "denied",
+      ],
       document_kind: [
         "pilot_license",
         "drone_registration",
@@ -3829,3 +3954,5 @@ export type GovernmentValidationStatus = Enums<"government_validation_status">
 export type FlightRequestStatus = Enums<"flight_request_status">
 export type ApiLayer = Enums<"api_layer">
 export type FlightPurpose = Enums<"flight_purpose">
+export type FlightRequestType = Enums<"flight_request_type">
+export type CoordinationContactStatus = Enums<"coordination_contact_status">

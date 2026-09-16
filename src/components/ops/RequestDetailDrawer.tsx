@@ -17,6 +17,7 @@ import { FLIGHT_PURPOSE_LABELS } from "@/lib/constants/flight-purpose";
 import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
+import { CoordinationPanel } from "./CoordinationPanel";
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -100,6 +101,8 @@ export function RequestDetailDrawer({
               {dmsCoordinates}
             </p>
           </div>
+
+          <CoordinationPanel request={request} lng={lng} lat={lat} dmsCoordinates={dmsCoordinates} />
 
           {overlaps.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
