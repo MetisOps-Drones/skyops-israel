@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, XCircle, Loader2, Wind, ArrowUpToLine, FlaskConical } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Wind, ArrowUpToLine } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import { windSafety } from "@/components/map/WeatherPanel";
 import { useLocationClearance } from "@/hooks/useLocationClearance";
@@ -47,11 +47,6 @@ export function AirspaceHUD({
       )}
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning">
-          <FlaskConical className="h-3 w-3" />
-          מצב הדגמה — 4 אזורי בדיקה בלבד
-        </span>
-
         {!coords ? null : isChecking ? (
           <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />

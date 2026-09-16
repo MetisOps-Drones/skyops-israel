@@ -388,7 +388,14 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               </div>
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
-                {authCheck?.reasons.map((reason, i) => <li key={`aip-${i}`}>{reason.label}</li>)}
+                {authCheck?.reasons.map((reason, i) => (
+                  <li key={`aip-${i}`}>
+                    {reason.label}
+                    {reason.zone && !reason.zone.geometry_precise && (
+                      <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
+                    )}
+                  </li>
+                ))}
                 {isNearBuildingLocally && (
                   <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
                 )}

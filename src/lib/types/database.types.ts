@@ -45,6 +45,7 @@ export type Database = {
           code: string | null
           created_at: string
           geom_geojson: Json
+          geometry_precise: boolean
           id: string
           kind: Database["public"]["Enums"]["aip_zone_kind"]
           max_altitude_ft: number | null
@@ -58,6 +59,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           geom_geojson: Json
+          geometry_precise?: boolean
           id?: string
           kind: Database["public"]["Enums"]["aip_zone_kind"]
           max_altitude_ft?: number | null
@@ -71,6 +73,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           geom_geojson?: Json
+          geometry_precise?: boolean
           id?: string
           kind?: Database["public"]["Enums"]["aip_zone_kind"]
           max_altitude_ft?: number | null

@@ -280,11 +280,17 @@ export function LocationInfoCard({
                           <p className="font-medium">
                             {zone.name}
                             {zone.code ? ` (${zone.code})` : ""}
+                            {!zone.geometry_precise && <span className="text-warning"> *</span>}
                           </p>
                           <p className="text-xs text-muted-foreground">{AIP_ZONE_KIND_LABELS[zone.kind]}</p>
                           <p className="text-xs font-medium">
                             {formatAltitudeRangeMeters(zone.min_altitude_ft, zone.max_altitude_ft)}
                           </p>
+                          {!zone.geometry_precise && (
+                            <p className="mt-1 text-xs text-warning">
+                              * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת
+                            </p>
+                          )}
                           {(zone.kind === "DANGER" || zone.kind === "PROHIBITED") && (
                             <p className="mt-1 text-xs text-destructive">
                               {hasOrg
