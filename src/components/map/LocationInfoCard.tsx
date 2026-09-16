@@ -48,12 +48,35 @@ export function LocationInfoCard({
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
 
+  // Altitude isn't chosen yet at this pre-planning stage (that happens in
+  // FlightParamsDrawer) — use the role's flat general ceiling as the
+  // conservative worst case, since that's the highest this account could
+  // legally request anyway. For a מטיס (commercial), the legal minimum
+  // distance from infrastructure equals the flight altitude itself (תקנה
+  // 32), not a fixed number — see src/lib/geo/flight-rules.ts. Computed
+  // ahead of isChecking below since buildingProximity now gates it too.
+  const conservativeAltitudeM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
+  const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, conservativeAltitudeM);
+  const buildingProximity = useBuildingProximity(point, requiredDistanceM);
+
   // Every one of these feeds the מותר/אסור verdict below — showing a verdict
-  // before all three have resolved risks a wrong first answer that then
+  // before all four have resolved risks a wrong first answer that then
   // flips (e.g. "מותר" while proximity is still loading, then "אסור" a
   // moment later once it comes back). Render a loading state in that exact
-  // spot instead of a premature answer.
-  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading;
+  // spot instead of a premature answer. buildingProximity is included here
+  // too — it wasn't before (FlightParamsDrawer already got this right),
+  // which meant isNearBuildingLocally silently defaulted to "not near" while
+  // still loading and could flip the verdict after first paint.
+  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
+  // The building-footprint check alone (src/lib/geo/proximity-grid.ts) is an
+  // O(1) local bitmap lookup — genuinely fast and high-precision — so it
+  // doesn't need to wait on the slower aip_reference_zones fetch (185 zones'
+  // worth of polygon geometry) or the OSM-based proximity check. Once *just*
+  // buildings resolves, show that read immediately instead of the generic
+  // spinner; it upgrades into the full verdict the moment everything else
+  // finishes, and can only escalate (add a restriction it found), never
+  // quietly retract one already shown.
+  const buildingsOnlyReady = !buildingProximity.isLoading;
 
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
@@ -87,15 +110,6 @@ export function LocationInfoCard({
   const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
   const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
 
-  // Altitude isn't chosen yet at this pre-planning stage (that happens in
-  // FlightParamsDrawer) — use the role's flat general ceiling as the
-  // conservative worst case, since that's the highest this account could
-  // legally request anyway. For a מטיס (commercial), the legal minimum
-  // distance from infrastructure equals the flight altitude itself (תקנה
-  // 32), not a fixed number — see src/lib/geo/flight-rules.ts.
-  const conservativeAltitudeM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
-  const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, conservativeAltitudeM);
-  const buildingProximity = useBuildingProximity(point, requiredDistanceM);
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
   // The OSM-based findings above measure distance to a landuse polygon's
@@ -148,11 +162,39 @@ export function LocationInfoCard({
             {/* The answer, first — everything below this is "why", collapsed by default so a
                 pilot who just wants a yes/no doesn't have to read a legal brief to get it.
                 While any of the checks feeding that answer are still in flight, this slot
-                shows a loading state instead — never a verdict that might immediately flip. */}
-            {isChecking ? (
+                shows a loading state instead — never a verdict that might immediately flip.
+                Exception: the building check alone (fast, O(1), see buildingsOnlyReady above)
+                gets an immediate provisional read the moment *it* resolves, clearly marked as
+                still pending the airspace-zone check — it can only escalate from there, never
+                silently drop a restriction it already found. */}
+            {!buildingsOnlyReady ? (
               <div className="flex items-center gap-3 rounded-xl bg-muted p-4 text-muted-foreground">
                 <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
                 <p className="text-base font-medium">בודק את הנקודה...</p>
+              </div>
+            ) : isChecking ? (
+              <div
+                className={cn(
+                  "flex items-start gap-3 rounded-xl p-4",
+                  isNearBuildingLocally ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"
+                )}
+              >
+                {isNearBuildingLocally ? (
+                  <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+                ) : (
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+                )}
+                <div>
+                  <p className={cn("text-base font-semibold", !isNearBuildingLocally && "text-foreground")}>
+                    {isNearBuildingLocally
+                      ? "נמצא מבנה בקרבת מקום — כנראה נדרשת הרשאה מיוחדת"
+                      : "אין מבנה בקרבת מקום (בדיקה מיידית מול שכבת המבנים)"}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-sm">
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                    בודק גם מרחב אווירי...
+                  </p>
+                </div>
               </div>
             ) : zoneBlockLevel === "controlled_airspace" ? (
               <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
