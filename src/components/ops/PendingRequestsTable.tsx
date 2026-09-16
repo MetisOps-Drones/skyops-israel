@@ -20,13 +20,9 @@ import {
   type FlightRequestWithRelations,
 } from "@/hooks/useFlightRequests";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
+import { FLIGHT_REQUEST_TYPE_LABELS } from "@/lib/constants/flight-request-type";
 
 type SortMode = "urgency" | "start_date";
-
-const REQUEST_TYPE_LABELS: Record<string, string> = {
-  basic_auto_100m: "טיסה בסיסית",
-  manual_notam_bubble: "בועת NOTAM",
-};
 
 function urgencyHours(request: FlightRequestWithRelations): number {
   return (new Date(request.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
@@ -109,7 +105,7 @@ export function PendingRequestsTable({
             return (
               <TableRow key={request.id} className="cursor-pointer" onClick={() => onSelect(request)}>
                 <TableCell>{request.profiles?.full_name ?? "—"}</TableCell>
-                <TableCell>{REQUEST_TYPE_LABELS[request.request_type]}</TableCell>
+                <TableCell>{FLIGHT_REQUEST_TYPE_LABELS[request.request_type]}</TableCell>
                 <TableCell>{request.drones?.nickname ?? "—"}</TableCell>
                 <TableCell>
                   {formatDistanceToNow(new Date(request.start_time), { addSuffix: true, locale: he })}

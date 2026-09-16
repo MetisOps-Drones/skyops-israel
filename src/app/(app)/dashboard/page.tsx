@@ -10,6 +10,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FLIGHT_REQUEST_TYPE_LABELS } from "@/lib/constants/flight-request-type";
+import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
+
+/** "בשעה 14:05 בתאריך 16/09/26" — Israel-local regardless of where the server runs, matching greetingForIsraelHour below. */
+function formatSubmittedAt(iso: string): string {
+  const parts = new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `בשעה ${get("hour")}:${get("minute")} בתאריך ${get("day")}/${get("month")}/${get("year")}`;
+}
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -189,6 +206,41 @@ export default async function DashboardPage() {
           tone={alerts.length > 0 ? "destructive" : "success"}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>מעקב בקשות תיאום</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>סוג בקשה</TableHead>
+                <TableHead>מועד שליחה</TableHead>
+                <TableHead>סטטוס</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(myRequests ?? []).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    אין כרגע בקשות תיאום פתוחות
+                  </TableCell>
+                </TableRow>
+              )}
+              {(myRequests ?? []).map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell>{FLIGHT_REQUEST_TYPE_LABELS[request.request_type]}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatSubmittedAt(request.created_at)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{FLIGHT_REQUEST_STATUS_LABELS[request.status]}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AlertsList alerts={alerts} />
