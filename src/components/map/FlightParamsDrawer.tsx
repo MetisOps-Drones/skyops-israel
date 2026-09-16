@@ -142,6 +142,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // loading, don't show (or let a hobby pilot act on) a premature "fine to
   // submit" state.
   const isChecking = aipZonesLoading || proximity.isLoading || buildingProximity.isLoading;
+  // Same fast-path as LocationInfoCard: the building-footprint check alone
+  // is an O(1) local lookup, so once *it* resolves (even while aipZones/
+  // proximity are still loading) show that read immediately instead of the
+  // generic spinner.
+  const buildingsOnlyReady = !buildingProximity.isLoading;
 
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -351,10 +356,24 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
 
-          {isChecking && (
+          {!buildingsOnlyReady && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               בודק את הנקודה...
+            </p>
+          )}
+
+          {buildingsOnlyReady && isChecking && (
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                isNearBuildingLocally ? "text-warning" : "text-muted-foreground"
+              )}
+            >
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              {isNearBuildingLocally
+                ? "נמצא מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."
+                : "אין מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."}
             </p>
           )}
 
