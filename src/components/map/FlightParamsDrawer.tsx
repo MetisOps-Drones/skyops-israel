@@ -109,6 +109,12 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // grid (real footprints) drives תקנה 32 regardless of what OSM found.
   const buildingProximity = useBuildingProximity(checkPoint, requiredDistanceM);
   const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
+  // The grid fetch (R2-hosted bitmap) can fail — unreachable host, missing
+  // file, etc. That must never read as "confirmed no building nearby"; the
+  // server re-runs this same check before actually auto-clearing anything
+  // (src/actions/flight-requests.ts), but the UI still needs to say plainly
+  // that it couldn't verify, not show a false-clear "מותר לטיסה".
+  const buildingCheckUnavailable = !buildingProximity.isLoading && buildingProximity.data?.available === false;
 
   // Zone-based restriction and "special operation authorization" (the 9
   // numbered regulations) are two different legal mechanisms — see
@@ -135,7 +141,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // Independent of zone-based blocking — the legal altitude ceiling at this exact point can be 0
   // from the ground even when the zone itself would otherwise allow a coordination request.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
-  const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
+  const requiresAttention =
+    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
   const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   // Same reasoning as LocationInfoCard: requiresAttention is derived from
   // aipZones/proximity/buildingProximity, all async — while any is still
@@ -403,10 +410,15 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                           ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
                           : needsSpecialAuthorization
                             ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                            : "אזור זה דורש תיאום בכפוף לתנאים"}
+                            : buildingCheckUnavailable
+                              ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
+                              : "אזור זה דורש תיאום בכפוף לתנאים"}
               </div>
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
+                {buildingCheckUnavailable && (
+                  <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
+                )}
                 {authCheck?.reasons.map((reason, i) => (
                   <li key={`aip-${i}`}>
                     {reason.label}
@@ -451,6 +463,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               ) : needsSpecialAuthorization ? (
                 <p className="text-xs text-muted-foreground">
                   ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
+                </p>
+              ) : buildingCheckUnavailable ? (
+                <p className="text-xs text-muted-foreground">
+                  לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
+                  אוטומטי.
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">

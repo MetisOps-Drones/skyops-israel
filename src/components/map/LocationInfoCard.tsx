@@ -120,6 +120,11 @@ export function LocationInfoCard({
   // centroids), so it drives the same תקנה 32 regardless of what OSM says —
   // OSM's findings are kept only as supplementary detail (named sites).
   const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
+  // Same failure mode as FlightParamsDrawer: the grid fetch can fail (bad
+  // host, missing file), and that must never read as "confirmed no
+  // building nearby" — the server re-runs this exact check before actually
+  // auto-clearing anything (src/actions/flight-requests.ts).
+  const buildingCheckUnavailable = !buildingProximity.isLoading && buildingProximity.data?.available === false;
   const matchingRegulations = Array.from(
     new Set([
       ...relevantProximityFindings
@@ -134,7 +139,8 @@ export function LocationInfoCard({
   // this exact point is still 0 from the ground — the two checks are independent. Without this,
   // the "request coordination" button could stay active for a point that can never be approved.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
-  const requiresAttention = zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude;
+  const requiresAttention =
+    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
   const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   const hasDetails = Boolean(
     (aipCheck && aipCheck.reasons.length > 0) ||
@@ -239,9 +245,17 @@ export function LocationInfoCard({
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="text-base font-semibold">
-                    {needsSpecialAuthorization ? "אפשרי, בכפוף להרשאה מיוחדת" : "אפשרי, בכפוף לתנאי האזור"}
+                    {needsSpecialAuthorization
+                      ? "אפשרי, בכפוף להרשאה מיוחדת"
+                      : buildingCheckUnavailable
+                        ? "בדיקת קרבה למבנים לא זמינה כרגע"
+                        : "אפשרי, בכפוף לתנאי האזור"}
                   </p>
-                  <p className="mt-0.5 text-sm">יש לתאם לפני הטיסה — הפרטים המלאים למטה.</p>
+                  <p className="mt-0.5 text-sm">
+                    {buildingCheckUnavailable && !needsSpecialAuthorization
+                      ? "לא ניתן לאשר אוטומטית — יש לתאם עם מוקדן שיבדוק קרבה למבנים ידנית."
+                      : "יש לתאם לפני הטיסה — הפרטים המלאים למטה."}
+                  </p>
                   {blockedForHobby && (
                     <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
                       מה כן אפשר: לשדרג לחשבון עסקי ←
@@ -282,7 +296,12 @@ export function LocationInfoCard({
                   ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
                   : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
               </p>
-            ) : null}
+            ) : (
+              <p className="flex items-center gap-1.5 text-sm font-medium text-warning">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                בדיקת קרבה למבנים לא הייתה זמינה כרגע — יש לתאם עם מוקדן לבדיקה ידנית
+              </p>
+            )}
 
 
             {/* Quick facts a pilot actually wants at a glance — kept visible, not buried. */}

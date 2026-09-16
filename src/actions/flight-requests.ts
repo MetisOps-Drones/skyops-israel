@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createFlightRequestSchema, type CreateFlightRequestInput } from "@/lib/validations/flight-request";
 import type { Tables } from "@/lib/types/database.types";
 import { pointToWKT, multiPolygonToWKT } from "@/lib/geo/wkt";
+import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
+import { requiredInfrastructureDistanceM } from "@/lib/geo/flight-rules";
 
 export interface CreateFlightRequestResult {
   success: boolean;
@@ -22,7 +24,13 @@ export interface CreateFlightRequestResult {
  * supabase/migrations/0005_airspace_zones.sql) against the live
  * `airspace_zones` table rather than the bundled mock GeoJSON, so a stale
  * client can never talk its way into an auto-clearance the server disagrees
- * with.
+ * with. Also re-runs the building-proximity check (src/lib/geo/proximity-grid.ts)
+ * server-side — the client-side warning in FlightParamsDrawer is advisory
+ * only, so without this a request over a building could still auto-clear
+ * here as long as it missed the 4 demo airspace_zones rows. If the grid is
+ * unreachable, this fails closed (no auto-clear, sent to a dispatcher)
+ * rather than assuming "no building" the way an unavailable client check
+ * used to.
  */
 export async function createFlightRequest(
   input: CreateFlightRequestInput
@@ -42,6 +50,9 @@ export async function createFlightRequest(
     return { success: false, error: "יש להתחבר מחדש" };
   }
 
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const isHobby = profile?.role === "pilot_hobby";
+
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
       ? data.polygon
@@ -60,7 +71,32 @@ export async function createFlightRequest(
   }
 
   const activeZones = (intersectingZones ?? []) as Tables<"airspace_zones">[];
-  const autoCleared = data.request_type === "basic_auto_100m" && activeZones.length === 0;
+
+  let autoCleared = false;
+  let dispatcherNotes: string | null = null;
+
+  if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {
+    const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, data.max_altitude_meters);
+    const bufferM = nearestSupportedBufferM(requiredDistanceM);
+    let nearBuilding = true;
+    let buildingCheckAvailable = false;
+    try {
+      const [lng, lat] = data.center_point.coordinates;
+      nearBuilding = await isNearBuilding(lng, lat, bufferM);
+      buildingCheckAvailable = true;
+    } catch (err) {
+      console.error("building-proximity check failed during flight request creation:", err);
+    }
+
+    if (buildingCheckAvailable && !nearBuilding) {
+      autoCleared = true;
+      dispatcherNotes = "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה ידוע בטווח המרחק החוקי מהנקודה.";
+    } else {
+      dispatcherNotes = buildingCheckAvailable
+        ? 'נשלח לבדיקת מוקדן: נמצא מבנה בטווח המרחק החוקי מהנקודה (תקנה 32) — נדרשת הרשאת הפעלה מיוחדת.'
+        : "נשלח לבדיקת מוקדן: בדיקת קרבה למבנים לא הייתה זמינה כרגע, יש לאמת קרבה למבנים באופן ידני.";
+    }
+  }
 
   const { data: flightRequest, error: insertError } = await supabase
     .from("flight_requests")
@@ -81,9 +117,7 @@ export async function createFlightRequest(
       status: autoCleared ? "auto_cleared" : "pending_dispatcher",
       emergency_contact_phone: data.emergency_contact_phone,
       intersecting_zone_ids: activeZones.map((z) => z.id),
-      dispatcher_notes: autoCleared
-        ? "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל."
-        : null,
+      dispatcher_notes: dispatcherNotes,
     })
     .select()
     .single();
