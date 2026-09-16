@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createFlightRequestSchema, type CreateFlightRequestInput } from "@/lib/validations/flight-request";
 import type { Tables } from "@/lib/types/database.types";
 import { pointToWKT, multiPolygonToWKT } from "@/lib/geo/wkt";
-import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { requiredInfrastructureDistanceM } from "@/lib/geo/flight-rules";
 
 export interface CreateFlightRequestResult {
@@ -24,13 +23,13 @@ export interface CreateFlightRequestResult {
  * supabase/migrations/0005_airspace_zones.sql) against the live
  * `airspace_zones` table rather than the bundled mock GeoJSON, so a stale
  * client can never talk its way into an auto-clearance the server disagrees
- * with. Also re-runs the building-proximity check (src/lib/geo/proximity-grid.ts)
- * server-side — the client-side warning in FlightParamsDrawer is advisory
- * only, so without this a request over a building could still auto-clear
- * here as long as it missed the 4 demo airspace_zones rows. If the grid is
- * unreachable, this fails closed (no auto-clear, sent to a dispatcher)
- * rather than assuming "no building" the way an unavailable client check
- * used to.
+ * with. Also re-runs the building-proximity check server-side, via the same
+ * buildings_near_point RPC (0075) the client uses against the real
+ * `buildings` table (0067) — the client-side warning in FlightParamsDrawer
+ * is advisory only, so without this a request over a building could still
+ * auto-clear here as long as it missed the 4 demo airspace_zones rows. If
+ * the RPC fails, this fails closed (no auto-clear, sent to a dispatcher)
+ * rather than assuming "no building".
  */
 export async function createFlightRequest(
   input: CreateFlightRequestInput
@@ -77,15 +76,16 @@ export async function createFlightRequest(
 
   if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {
     const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, data.max_altitude_meters);
-    const bufferM = nearestSupportedBufferM(requiredDistanceM);
-    let nearBuilding = true;
-    let buildingCheckAvailable = false;
-    try {
-      const [lng, lat] = data.center_point.coordinates;
-      nearBuilding = await isNearBuilding(lng, lat, bufferM);
-      buildingCheckAvailable = true;
-    } catch (err) {
-      console.error("building-proximity check failed during flight request creation:", err);
+    const [lng, lat] = data.center_point.coordinates;
+    const { data: nearBuildingResult, error: buildingRpcError } = await supabase.rpc("buildings_near_point", {
+      lng,
+      lat,
+      distance_m: requiredDistanceM,
+    });
+    const buildingCheckAvailable = !buildingRpcError;
+    const nearBuilding = buildingRpcError ? true : nearBuildingResult;
+    if (buildingRpcError) {
+      console.error("buildings_near_point failed during flight request creation:", buildingRpcError);
     }
 
     if (buildingCheckAvailable && !nearBuilding) {

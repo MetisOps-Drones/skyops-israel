@@ -2118,6 +2118,10 @@ export type Database = {
         Args: { x: number; y: number; z: number }
         Returns: string
       }
+      buildings_near_point: {
+        Args: { distance_m: number; lat: number; lng: number }
+        Returns: boolean
+      }
       create_organization_as_owner: {
         Args: { org_name: string }
         Returns: string
