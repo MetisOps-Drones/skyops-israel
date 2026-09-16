@@ -7,11 +7,14 @@ import type { Tables } from "@/lib/types/database.types";
 export type AipReferenceZone = Tables<"aip_reference_zones">;
 
 /**
- * Advisory-only overlay digitized from the official CAAI CVFR low-level
- * transit charts (North sheet ed. 1/23, South sheet ed. 2/25) — approximate
- * circles, not surveyed boundaries. Never used for the automated clearance
- * check (see 0023_aip_reference_zones.sql for why); purely a visual/lookup
- * aid rendered behind its own toggle in the map's layer control.
+ * Reference zone layer — most rows now carry real polygon boundaries from
+ * the official AIP (see 0037_a17_official_geometry_rebuild.sql; a handful
+ * of codes still fall back to an approximate circle, see that migration's
+ * notes). Despite the historical "advisory-only" framing in 0023, this DOES
+ * feed the real authorization-block check (flight-rules.ts's
+ * checkFlightAuthorizationRequirement) — it has no live NOTAM feed and
+ * isn't a substitute for official pre-flight verification, but its
+ * geometry is not merely a visual aid.
  */
 export function useAipReferenceZones() {
   return useQuery({

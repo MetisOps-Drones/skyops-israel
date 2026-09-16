@@ -126,7 +126,7 @@ export function LayerControlPanel({
             onCheckedChange={() => toggle("aipReference")}
             className="col-span-2 py-1.5 text-xs"
           >
-            <TermTooltip term="AIP">שכבת מרחב אווירי מקורבת (ייעוץ)</TermTooltip>
+            <TermTooltip term="AIP">שכבת מרחב אווירי (ייעוץ, ללא NOTAM בזמן אמת)</TermTooltip>
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.myHistory}
