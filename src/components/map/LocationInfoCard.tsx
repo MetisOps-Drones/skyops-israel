@@ -40,13 +40,20 @@ export function LocationInfoCard({
   onOpenChange: (open: boolean) => void;
   onRequestCoordination: (point: [number, number]) => void;
 }) {
-  const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const proximity = useProximityCheck(point);
   const altitudeCeiling = useAltitudeCeiling(point);
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
+
+  // Every one of these feeds the מותר/אסור verdict below — showing a verdict
+  // before all three have resolved risks a wrong first answer that then
+  // flips (e.g. "מותר" while proximity is still loading, then "אסור" a
+  // moment later once it comes back). Render a loading state in that exact
+  // spot instead of a premature answer.
+  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading;
 
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
@@ -63,17 +70,22 @@ export function LocationInfoCard({
   // triggered here by ground-proximity findings) are two different legal
   // mechanisms — see src/lib/geo/flight-rules.ts. Never conflate them: a
   // hobby pilot can still coordinate in a merely-restricted zone the same
-  // as anyone else. Controlled airspace (CTR/ATZ/TMA/CTA) has no exception
-  // in the law at all, so it stays blocked for everyone. Prohibited/danger
-  // zones legally require a case-by-case CAAI-director approval — an
-  // organization is the one tier with the standing process to actually
-  // pursue that, so orgs may still submit a request here (the dispatcher
-  // will need to chase the director's sign-off manually before it can be
-  // approved); a hobby/solo-pro account cannot.
+  // as anyone else. Controlled airspace (CTR/ATZ/TMA/CTA) is a strong
+  // warning, not a hard block: this comes from `aip_reference_zones`, which
+  // 0023/0024's own migration comments describe as an advisory, eyeballed
+  // reference layer that must never drive an automated clearance decision —
+  // a small aerodrome's ATZ 2km buffer showing up with the exact same
+  // "no legal exception exists" severity as sitting inside Ben Gurion's CTR
+  // was exactly that misuse. It's flagged prominently and the dispatcher
+  // verifies it against the real chart before approving, same as any other
+  // zone. Prohibited/danger zones legally require a case-by-case
+  // CAAI-director approval — an organization is the one tier with the
+  // standing process to actually pursue that, so orgs may still submit a
+  // request here (the dispatcher will need to chase the director's sign-off
+  // manually before it can be approved); a hobby/solo-pro account cannot.
   const zoneBlockLevel = aipCheck?.blockLevel ?? "none";
   const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked =
-    zoneBlockLevel === "controlled_airspace" || (zoneBlockLevel === "director_approval_only" && !hasOrg);
+  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
 
   // Altitude isn't chosen yet at this pre-planning stage (that happens in
   // FlightParamsDrawer) — use the role's flat general ceiling as the
@@ -134,13 +146,22 @@ export function LocationInfoCard({
             </p>
 
             {/* The answer, first — everything below this is "why", collapsed by default so a
-                pilot who just wants a yes/no doesn't have to read a legal brief to get it. */}
-            {zoneBlockLevel === "controlled_airspace" ? (
-              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
-                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
+                pilot who just wants a yes/no doesn't have to read a legal brief to get it.
+                While any of the checks feeding that answer are still in flight, this slot
+                shows a loading state instead — never a verdict that might immediately flip. */}
+            {isChecking ? (
+              <div className="flex items-center gap-3 rounded-xl bg-muted p-4 text-muted-foreground">
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                <p className="text-base font-medium">בודק את הנקודה...</p>
+              </div>
+            ) : zoneBlockLevel === "controlled_airspace" ? (
+              <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="text-base font-semibold">אסור לחלוטין</p>
-                  <p className="mt-0.5 text-sm">מרחב פיקוח טיסה (שדה תעופה) — אין אפשרות לתיאום, אין חריג בחוק.</p>
+                  <p className="text-base font-semibold">קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית</p>
+                  <p className="mt-0.5 text-sm">
+                    ניתן להגיש בקשת תיאום — המוקדן יאמת מול NOTAM עדכני לפני אישור.
+                  </p>
                 </div>
               </div>
             ) : zoneBlockLevel === "director_approval_only" ? (
@@ -271,6 +292,11 @@ export function LocationInfoCard({
                                 : 'נדרש אישור פרטני של מנהל רת"א — לא ניתן לתאם דרך המערכת מחשבון פרטי'}
                             </p>
                           )}
+                          {(zone.kind === "CTR" || zone.kind === "ATZ" || zone.kind === "TMA" || zone.kind === "CTA") && (
+                            <p className="mt-1 text-xs text-warning">
+                              אין כאן עדכוני NOTAM בזמן אמת — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
+                            </p>
+                          )}
                           {zone.kind === "RESTRICTED" && (
                             <p className="mt-1 text-xs text-muted-foreground">
                               ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן
@@ -373,40 +399,42 @@ export function LocationInfoCard({
               </Disclosure>
             )}
 
-            {cannotSubmit ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium text-destructive">
-                  {zoneHardBlocked || (groundBlockedByAltitude && !blockedForHobby) ? (
-                    <Ban className="h-4 w-4" />
-                  ) : (
-                    <Lock className="h-4 w-4" />
+            {/* Same reasoning as the verdict banner above: cannotSubmit/requiresAttention are
+                derived from the same not-yet-loaded checks, so no action (or "can't request")
+                signal should render until isChecking clears either. */}
+            {!isChecking &&
+              (cannotSubmit ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    {/* groundBlockedByAltitude checked first everywhere below: a 0m legal
+                        ceiling from the ground is unfixable by any account tier, so it must
+                        never be shadowed by (or shown alongside a CTA for) the hobby/org
+                        upgrade messaging — upgrading changes nothing about this case. */}
+                    {groundBlockedByAltitude || zoneHardBlocked ? <Ban className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                    {groundBlockedByAltitude
+                      ? "לא ניתן לבקש תיאום לנקודה זו"
+                      : zoneHardBlocked
+                        ? "לא ניתן לתאם דרך המערכת"
+                        : "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {groundBlockedByAltitude
+                      ? "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון."
+                      : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
+                        ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
+                        : "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."}
+                  </p>
+                  {!groundBlockedByAltitude && (
+                    <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
+                      {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
+                    </Link>
                   )}
-                  {zoneHardBlocked
-                    ? "לא ניתן לתאם דרך המערכת"
-                    : blockedForHobby
-                      ? "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"
-                      : "לא ניתן לבקש תיאום לנקודה זו"}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {zoneBlockLevel === "controlled_airspace"
-                    ? "מרחב פיקוח טיסה — אין חריג בחוק המאפשר הטסת רחפן כאן, גם לא ארגון עם הרשאות."
-                    : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
-                      ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
-                      : blockedForHobby
-                        ? "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."
-                        : "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום."}
-                </p>
-                {!groundBlockedByAltitude || blockedForHobby || (zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval) ? (
-                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                    {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
-                  </Link>
-                ) : null}
-              </div>
-            ) : requiresAttention ? (
-              <Button size="lg" onClick={() => onRequestCoordination(point)}>
-                בקשת תיאום לנקודה זו
-              </Button>
-            ) : null}
+              ) : requiresAttention ? (
+                <Button size="lg" onClick={() => onRequestCoordination(point)}>
+                  בקשת תיאום לנקודה זו
+                </Button>
+              ) : null)}
 
             <p className="text-[11px] text-muted-foreground">
               המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה — לא לניווט. האחריות לביצוע הטיסה על פי כל דין מוטלת על המטיס.

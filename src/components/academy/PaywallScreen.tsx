@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { LmsCourseId } from "@/lib/types/database.types";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 
 const DEFAULT_FEATURES: Record<LmsCourseId, string[]> = {
   commercial_25kg: [
@@ -119,9 +120,7 @@ export function PaywallScreen({
           {activating && <Loader2 className="h-4 w-4 animate-spin" />}
           {priceLabel ? `רכישת הקורס — ${priceLabel} (הדגמה)` : "הפעלת מנוי (הדגמה)"}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          זהו כפתור הדגמה. יש לחבר ספק סליקה אמיתי לפני עלייה לייצור.
-        </p>
+        <DemoModeNotice>אין חיבור לספק סליקה אמיתי — הפעלת המנוי כאן היא תיעוד כוונה בלבד, לא עסקה בפועל.</DemoModeNotice>
       </CardContent>
     </Card>
   );

@@ -50,9 +50,7 @@ create table marketplace_bookings (
 );
 
 create index marketplace_bookings_org_id_idx on marketplace_bookings (org_id);
-
 create index marketplace_bookings_pilot_id_idx on marketplace_bookings (pilot_id);
-
 create index marketplace_bookings_status_idx on marketplace_bookings (status);
 
 create trigger marketplace_bookings_set_updated_at
@@ -164,15 +162,10 @@ create trigger marketplace_bookings_log_event
 -- ---------------------------------------------------------------------------
 
 alter type notification_kind add value 'booking_invited';
-
 alter type notification_kind add value 'booking_accepted';
-
 alter type notification_kind add value 'booking_declined';
-
 alter type notification_kind add value 'booking_confirmed';
-
 alter type notification_kind add value 'booking_cancelled';
-
 alter type notification_kind add value 'booking_message_received';
 
 create or replace function notify_booking_invited()

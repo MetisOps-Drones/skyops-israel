@@ -1,10 +1,12 @@
 "use client";
 
-import { CheckCircle2, XCircle, Wind, ArrowUpToLine } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Wind, ArrowUpToLine, FlaskConical } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import { windSafety } from "@/components/map/WeatherPanel";
 import { useLocationClearance } from "@/hooks/useLocationClearance";
 import { useAipMaxAltitude } from "@/hooks/useAipMaxAltitude";
+import { useAirspaceZones } from "@/hooks/useAirspaceZones";
+import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { CoordinateShareButton } from "@/components/map/CoordinateShareButton";
 import { ftToM } from "@/lib/geo/aip";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,17 @@ export function AirspaceHUD({
   const clearance = useLocationClearance(coords);
   const aipMaxAltitude = useAipMaxAltitude(coords);
   const { data: weather } = useWeather(showWind ? coords : null);
+  const { isLoading: airspaceZonesLoading } = useAirspaceZones();
+  const { isLoading: aipZonesLoading } = useAipReferenceZones();
+
+  // Two independent zone sources feed this HUD (the real airspace_zones
+  // table, and the advisory aip_reference_zones layer used for the altitude
+  // pill) — showing "מותר לטיסה במיקומך" in green right next to "אסור לטיסה
+  // כאן" in red, because each pill only looked at its own source, was the
+  // actual bug. One combined verdict here; the altitude pill still explains
+  // the specific reason underneath it.
+  const isChecking = Boolean(coords) && (airspaceZonesLoading || aipZonesLoading);
+  const locationClear = Boolean(clearance?.clear) && !aipMaxAltitude?.blockedFromGround;
 
   const windKmh = weather?.wind_speed_ms !== null && weather?.wind_speed_ms !== undefined ? Math.round(weather.wind_speed_ms * 3.6) : null;
   const gustKmh = weather?.wind_gust_ms !== null && weather?.wind_gust_ms !== undefined ? Math.round(weather.wind_gust_ms * 3.6) : null;
@@ -34,7 +47,17 @@ export function AirspaceHUD({
       )}
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        {!coords ? null : clearance?.clear ? (
+        <span className="flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning">
+          <FlaskConical className="h-3 w-3" />
+          מצב הדגמה — 4 אזורי בדיקה בלבד
+        </span>
+
+        {!coords ? null : isChecking ? (
+          <span className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            בודק את המיקום...
+          </span>
+        ) : locationClear ? (
           <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-xs font-semibold text-success">
             <CheckCircle2 className="h-3 w-3" />
             מותר לטיסה במיקומך

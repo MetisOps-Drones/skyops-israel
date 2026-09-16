@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Plus, Loader2, FileWarning, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Plus, Loader2, FileWarning } from "lucide-react";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,14 +59,10 @@ function PurchaseAuthorizationDialog() {
           <DialogDescription>המערכת עדיין לא מחוברת לתשלום ולהנפקה ממשלתית אמיתיים</DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <p>
-            זהו כרגע מעקב פנימי בלבד — &ldquo;רכישה&rdquo; שומרת שאתם מתכוונים להשתמש בהרשאה זו, אך <b>אינה</b> מנפיקה אישור רשמי
-            ואינה שולחת דבר בפועל. יש להגיש בקשה אמיתית מול רת״א/שירות התשלומים הממשלתי בעצמכם עד שתחובר אינטגרציה
-            מלאה.
-          </p>
-        </div>
+        <DemoModeNotice>
+          זהו כרגע מעקב פנימי בלבד — &ldquo;רכישה&rdquo; שומרת שאתם מתכוונים להשתמש בהרשאה זו, אך <b>אינה</b> מנפיקה אישור רשמי
+          ואינה שולחת דבר בפועל. יש להגיש בקשה אמיתית מול רת״א/שירות התשלומים הממשלתי בעצמכם עד שתחובר אינטגרציה מלאה.
+        </DemoModeNotice>
 
         {isLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
         {!isLoading && catalog.length === 0 && (

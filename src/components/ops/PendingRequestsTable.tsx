@@ -19,6 +19,7 @@ import {
   useOverlappingFlightRequests,
   type FlightRequestWithRelations,
 } from "@/hooks/useFlightRequests";
+import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 
 type SortMode = "urgency" | "start_date";
 
@@ -120,7 +121,7 @@ export function PendingRequestsTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
-                    <Badge variant="outline">{request.status}</Badge>
+                    <Badge variant="outline">{FLIGHT_REQUEST_STATUS_LABELS[request.status]}</Badge>
                     <OverlapBadge requestId={request.id} />
                   </div>
                 </TableCell>

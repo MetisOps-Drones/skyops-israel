@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 47% 14%;
 
-    --primary: 220 47% 16%;
+    --primary: 221 65% 22%;
     --primary-foreground: 40 33% 96%;
 
     --secondary: 40 30% 94%;
@@ -36,11 +36,11 @@
 
     --border: 39 20% 85%;
     --input: 39 20% 85%;
-    --ring: 220 47% 16%;
+    --ring: 221 65% 22%;
 
     --brand-gold: 39 43% 51%;
-    --brand-gold-foreground: 220 47% 16%;
-    --brand-navy: 220 47% 16%;
+    --brand-gold-foreground: 221 65% 22%;
+    --brand-navy: 221 65% 22%;
     --brand-navy-foreground: 40 33% 96%;
 
     --radius: 0.65rem;

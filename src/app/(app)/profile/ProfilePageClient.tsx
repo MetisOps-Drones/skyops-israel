@@ -25,7 +25,10 @@ import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { SettingsMenu } from "@/components/profile/SettingsMenu";
 import { SpecialAuthorizationsCard } from "@/components/profile/SpecialAuthorizationsCard";
 import { PilotMarketplaceProfileCard } from "@/components/profile/PilotMarketplaceProfileCard";
+import { PilotPricingCard } from "@/components/profile/PilotPricingCard";
+import { PortfolioCard } from "@/components/profile/PortfolioCard";
 import { DroneRegistrationBadge } from "@/components/logs/DroneRegistrationBadge";
+import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 import { createClient } from "@/lib/supabase/client";
 import { droneSchema, type DroneInput } from "@/lib/validations/flight-log";
 import type { Tables } from "@/lib/types/database.types";
@@ -153,6 +156,8 @@ export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) 
       <SpecialAuthorizationsCard role={profile.role} />
 
       {profile.role === "pilot_pro" && <PilotMarketplaceProfileCard />}
+      {profile.role === "pilot_pro" && <PilotPricingCard />}
+      {profile.role === "pilot_pro" && <PortfolioCard />}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
@@ -228,6 +233,11 @@ export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) 
               </div>
             ))}
           </div>
+          {licenses.length > 0 && (
+            <DemoModeNotice compact className="mt-2">
+              הסטטוס מבוסס על התאריך שזוהה/הוזן — לא אימות ממשלתי מקוון מול רת&quot;א
+            </DemoModeNotice>
+          )}
         </CardContent>
       </Card>
     </div>

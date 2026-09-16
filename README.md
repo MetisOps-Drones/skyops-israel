@@ -31,6 +31,8 @@ Fill in:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` — from your Supabase
   project's API settings.
 - `NEXT_PUBLIC_MAPBOX_TOKEN` — a Mapbox access token.
+- `OPENWEATHERMAP_API_KEY` — a free [OpenWeatherMap](https://openweathermap.org/api) API key; without it, the map
+  screen's weather panel (`/api/weather`) returns a 500.
 - `CRON_SECRET` — any long random string; the daily license-expiry cron route checks this as a Bearer token.
 - `SMS_PROVIDER_*` — optional. Without these, SMS sends are logged to the server console instead (see
   `src/lib/notifications/sms.ts`).
