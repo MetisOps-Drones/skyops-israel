@@ -68,9 +68,10 @@ export function LocationInfoCard({
   // which meant isNearBuildingLocally silently defaulted to "not near" while
   // still loading and could flip the verdict after first paint.
   const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
-  // The building-footprint check alone (src/lib/geo/proximity-grid.ts) is an
-  // O(1) local bitmap lookup — genuinely fast and high-precision — so it
-  // doesn't need to wait on the slower aip_reference_zones fetch (185 zones'
+  // The building-footprint check alone (buildings_near_point RPC, 0075) is a
+  // GIST-indexed spatial query against the real buildings table — genuinely
+  // fast and high-precision — so it doesn't need to wait on the slower
+  // aip_reference_zones fetch (185 zones'
   // worth of polygon geometry) or the OSM-based proximity check. Once *just*
   // buildings resolves, show that read immediately instead of the generic
   // spinner; it upgrades into the full verdict the moment everything else
@@ -169,7 +170,7 @@ export function LocationInfoCard({
                 pilot who just wants a yes/no doesn't have to read a legal brief to get it.
                 While any of the checks feeding that answer are still in flight, this slot
                 shows a loading state instead — never a verdict that might immediately flip.
-                Exception: the building check alone (fast, O(1), see buildingsOnlyReady above)
+                Exception: the building check alone (fast, indexed, see buildingsOnlyReady above)
                 gets an immediate provisional read the moment *it* resolves, clearly marked as
                 still pending the airspace-zone check — it can only escalate from there, never
                 silently drop a restriction it already found. */}
@@ -271,8 +272,9 @@ export function LocationInfoCard({
             )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
-                (src/lib/geo/proximity-grid.ts), not OSM's landuse-polygon centroid — a
-                large "residential" way in OSM can read as 2+ km away from a point that's
+                (buildings_near_point RPC, 0075 — queries the same buildings table the map
+                tiles render from), not OSM's landuse-polygon centroid — a large
+                "residential" way in OSM can read as 2+ km away from a point that's
                 visibly ~200m from the nearest houses, because Overpass's `center` is the
                 polygon's centroid, not its nearest edge. */}
             {buildingProximity.isLoading ? (
