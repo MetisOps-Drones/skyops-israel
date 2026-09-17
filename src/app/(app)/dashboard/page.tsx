@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { PlaneTakeoff, ShieldAlert, Wrench, Clock, Plane, Radar } from "lucide-react";
+import { PlaneTakeoff, ShieldAlert, Wrench, Clock, Plane, Radar, Gauge } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { GreetingHero } from "@/components/dashboard/GreetingHero";
 import { AlertsList, type DashboardAlert } from "@/components/dashboard/AlertsList";
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
     { count: orgMembershipCount },
     { count: todayCoordinationsCount },
   ] = await Promise.all([
-    supabase.from("profiles").select("full_name, role").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name, role, org_id, plan_code").eq("id", user.id).single(),
     supabase.from("pilot_licenses").select("*").eq("user_id", user.id).order("expires_at"),
     supabase.from("drones").select("*").eq("user_id", user.id),
     supabase
@@ -74,6 +75,22 @@ export default async function DashboardPage() {
   ]);
 
   const needsFirstDrone = (drones?.length ?? 0) === 0 && (orgMembershipCount ?? 0) === 0;
+
+  const coordinationLimit = resolveCoordinationLimit({
+    role: profile?.role ?? null,
+    hasOrg: Boolean(profile?.org_id),
+    planCode: profile?.plan_code ?? null,
+  });
+  let coordinationsUsedThisPeriod = 0;
+  if (coordinationLimit) {
+    const { count } = await supabase
+      .from("flight_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .neq("status", "cancelled")
+      .gte("created_at", periodStart(coordinationLimit.period).toISOString());
+    coordinationsUsedThisPeriod = count ?? 0;
+  }
 
   const now = new Date();
   const upcomingLicense = (licenses ?? []).find((license) => new Date(license.expires_at) >= now);
@@ -209,6 +226,14 @@ export default async function DashboardPage() {
               icon={Wrench}
               tone={alerts.length > 0 ? "destructive" : "success"}
             />
+            {coordinationLimit && (
+              <StatCard
+                label={`תיאומים ${coordinationLimit.period === "week" ? "השבוע" : "החודש"}`}
+                value={`${coordinationsUsedThisPeriod}/${coordinationLimit.count}`}
+                icon={Gauge}
+                tone={coordinationsUsedThisPeriod >= coordinationLimit.count ? "destructive" : "default"}
+              />
+            )}
           </div>
 
           <MyCoordinationRequestsCard />

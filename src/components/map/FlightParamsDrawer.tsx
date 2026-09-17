@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import * as turf from "@turf/turf";
-import { Loader2, Radius, Waypoints, ShieldAlert, Lock } from "lucide-react";
+import { Loader2, Radius, Waypoints, ShieldAlert, Lock, Gauge } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,7 @@ import { ALTITUDE_BAND_METERS, type FlightAltitudeBand } from "@/lib/validations
 import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import { cn } from "@/lib/utils";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
+import { useCoordinationQuota } from "@/hooks/useCoordinationQuota";
 
 const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
   { value: "under_50m", label: "עד 50 מטר" },
@@ -76,6 +78,16 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
   const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
+
+  const { data: quota } = useCoordinationQuota();
+  const quotaPeriodLabel = quota?.limit?.period === "week" ? "השבוע" : "החודש";
+  const quotaExhausted = Boolean(quota?.limit) && quota!.used >= quota!.limit!.count;
+  // The "complex" request type is exactly the polygon/NOTAM shape — see the
+  // request_type mapping in handleSubmit below.
+  const complexExhausted =
+    shapeType === "polygon" &&
+    Boolean(quota?.limit) &&
+    quota!.complexUsed >= quota!.limit!.complexAllowed;
 
   const checkPoint = useMemo<[number, number] | null>(() => {
     if (shapeType === "circle") return center;
@@ -173,6 +185,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   const canSubmit =
     !blockedForSolo &&
+    !quotaExhausted &&
+    !complexExhausted &&
     !(isChecking && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
@@ -251,6 +265,20 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               בועת NOTAM (פוליגון)
             </button>
           </div>
+
+          {quota?.limit && (
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                quotaExhausted || complexExhausted ? "text-destructive" : "text-muted-foreground"
+              )}
+            >
+              <Gauge className="h-3.5 w-3.5 shrink-0" />
+              {quota.used} מתוך {quota.limit.count} תיאומים {quotaPeriodLabel} בתוכנית הנוכחית
+              {quota.limit.complexAllowed > 0 &&
+                ` (מתוכם ${quota.complexUsed}/${quota.limit.complexAllowed} בועות NOTAM)`}
+            </p>
+          )}
 
           {shapeType === "circle" && (
             <div className="flex flex-col gap-1.5">
@@ -479,6 +507,21 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               {matchingRegulations.map((reg) => (
                 <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
               ))}
+            </div>
+          )}
+
+          {(quotaExhausted || complexExhausted) && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <Lock className="h-4 w-4" />
+                {quotaExhausted ? `מיצית את מכסת התיאומים ${quotaPeriodLabel}` : "בועות NOTAM אינן כלולות בתוכנית הנוכחית"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <Link href="/profile" className="font-medium text-primary hover:underline">
+                  שדרוג התוכנית
+                </Link>{" "}
+                דרך &ldquo;הפרופיל שלי&rdquo; ← &ldquo;מנוי&rdquo; מעלה את המכסה.
+              </p>
             </div>
           )}
 

@@ -8,6 +8,7 @@ import type { Tables } from "@/lib/types/database.types";
 import { pointToWKT, multiPolygonToWKT } from "@/lib/geo/wkt";
 import { requiredInfrastructureDistanceM } from "@/lib/geo/flight-rules";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
+import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
 
 export interface CreateFlightRequestResult {
   success: boolean;
@@ -52,8 +53,54 @@ export async function createFlightRequest(
     return { success: false, error: "יש להתחבר מחדש" };
   }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, org_id, plan_code")
+    .eq("id", user.id)
+    .single();
   const isHobby = profile?.role === "pilot_hobby";
+
+  // The client-side check in FlightParamsDrawer (useCoordinationQuota) is
+  // advisory only — this is the one that actually can't be skipped by a
+  // stale client or a direct call to this action. Checked before the
+  // zone-intersection RPC below so an over-quota request fails fast rather
+  // than paying for that lookup first.
+  const coordinationLimit = resolveCoordinationLimit({
+    role: profile?.role ?? null,
+    hasOrg: Boolean(profile?.org_id),
+    planCode: profile?.plan_code ?? null,
+  });
+  if (coordinationLimit) {
+    const since = periodStart(coordinationLimit.period);
+    const { data: recentRequests, error: quotaError } = await supabase
+      .from("flight_requests")
+      .select("request_type")
+      .eq("user_id", user.id)
+      .neq("status", "cancelled")
+      .gte("created_at", since.toISOString());
+    if (quotaError) {
+      return { success: false, error: `בדיקת מכסת תיאומים נכשלה: ${quotaError.message}` };
+    }
+    const periodLabel = coordinationLimit.period === "week" ? "השבוע" : "החודש";
+    if ((recentRequests?.length ?? 0) >= coordinationLimit.count) {
+      return {
+        success: false,
+        error: `מיצית את מכסת ${coordinationLimit.count} התיאומים ${periodLabel} בתוכנית הנוכחית. ניתן לשדרג דרך "הפרופיל שלי" ← "מנוי".`,
+      };
+    }
+    if (data.request_type === "manual_notam_bubble") {
+      const complexUsed = (recentRequests ?? []).filter((r) => r.request_type === "manual_notam_bubble").length;
+      if (complexUsed >= coordinationLimit.complexAllowed) {
+        return {
+          success: false,
+          error:
+            coordinationLimit.complexAllowed === 0
+              ? 'תיאומי בועת NOTAM אינם כלולים בתוכנית הנוכחית. ניתן לשדרג דרך "הפרופיל שלי" ← "מנוי".'
+              : `מיצית את מכסת תיאומי בועת NOTAM (${coordinationLimit.complexAllowed}) ${periodLabel} בתוכנית הנוכחית.`,
+        };
+      }
+    }
+  }
 
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
