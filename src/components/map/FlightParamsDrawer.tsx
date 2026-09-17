@@ -105,13 +105,13 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
   // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
   // distance is to a landuse polygon's centroid, not its nearest edge, and
-  // can badly understate real proximity for a city-scale way. The real
-  // buildings table (queried via buildings_near_point, 0075 — the same
-  // table the map's building tiles render from) drives תקנה 32 regardless
+  // can badly understate real proximity for a city-scale way. The R2
+  // bitmap grid (/api/building-proximity — built from the same VIDA/Overture
+  // dataset the map's building tiles render from) drives תקנה 32 regardless
   // of what OSM found.
   const buildingProximity = useBuildingProximity(checkPoint, requiredDistanceM);
   const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
-  // The RPC call can still fail (DB hiccup, etc). That must never read as
+  // The grid fetch can still fail (R2 hiccup, etc). That must never read as
   // "confirmed no building nearby"; the server re-runs this same check
   // before actually auto-clearing anything (src/actions/flight-requests.ts),
   // but the UI still needs to say plainly that it couldn't verify, not show

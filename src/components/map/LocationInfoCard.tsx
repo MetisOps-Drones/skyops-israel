@@ -68,9 +68,9 @@ export function LocationInfoCard({
   // which meant isNearBuildingLocally silently defaulted to "not near" while
   // still loading and could flip the verdict after first paint.
   const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
-  // The building-footprint check alone (buildings_near_point RPC, 0075) is a
-  // GIST-indexed spatial query against the real buildings table — genuinely
-  // fast and high-precision — so it doesn't need to wait on the slower
+  // The building-footprint check alone (/api/building-proximity, backed by
+  // the R2 bitmap grid in proximity-grid.ts) is a flat O(1) bit lookup —
+  // genuinely fast — so it doesn't need to wait on the slower
   // aip_reference_zones fetch (185 zones'
   // worth of polygon geometry) or the OSM-based proximity check. Once *just*
   // buildings resolves, show that read immediately instead of the generic
@@ -272,8 +272,9 @@ export function LocationInfoCard({
             )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
-                (buildings_near_point RPC, 0075 — queries the same buildings table the map
-                tiles render from), not OSM's landuse-polygon centroid — a large
+                (/api/building-proximity — the R2 bitmap grid built from the same
+                VIDA/Overture dataset the map's building tiles render from), not OSM's
+                landuse-polygon centroid — a large
                 "residential" way in OSM can read as 2+ km away from a point that's
                 visibly ~200m from the nearest houses, because Overpass's `center` is the
                 polygon's centroid, not its nearest edge. */}
