@@ -5,6 +5,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { GreetingHero } from "@/components/dashboard/GreetingHero";
 import { AlertsList, type DashboardAlert } from "@/components/dashboard/AlertsList";
 import { LicenseUploadDialog } from "@/components/dashboard/LicenseUploadDialog";
+import { MyCoordinationRequestsCard } from "@/components/dashboard/MyCoordinationRequestsCard";
 import { IncomingContactRequestsCard } from "@/components/profile/IncomingContactRequestsCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -189,6 +190,8 @@ export default async function DashboardPage() {
           tone={alerts.length > 0 ? "destructive" : "success"}
         />
       </div>
+
+      <MyCoordinationRequestsCard />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AlertsList alerts={alerts} />

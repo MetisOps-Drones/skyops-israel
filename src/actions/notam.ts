@@ -124,7 +124,7 @@ export async function rejectFlightRequest(input: RejectFlightRequestInput): Prom
     const serviceClient = createServiceRoleClient();
     await serviceClient.from("notifications").insert({
       user_id: flightRequest.user_id,
-      kind: "notam_published",
+      kind: "flight_request_rejected",
       title: "בקשת הטיסה נדחתה",
       body: data.dispatcher_notes,
       metadata: { flight_request_id: data.flight_request_id },

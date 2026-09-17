@@ -17,6 +17,7 @@ import { FLIGHT_PURPOSE_LABELS } from "@/lib/constants/flight-purpose";
 import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
+import { CoordinationPanel } from "./CoordinationPanel";
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -35,8 +36,8 @@ export function RequestDetailDrawer({
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const rejectMutation = useRejectFlightRequest();
-  const { data: licenses = [] } = usePilotLicensesForDispatcher(request?.user_id ?? null);
-  const { data: overlaps = [] } = useOverlappingFlightRequests(request?.id ?? null);
+  const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
+  const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
 
   if (!request) return null;
 
@@ -101,7 +102,11 @@ export function RequestDetailDrawer({
             </p>
           </div>
 
-          {overlaps.length > 0 && (
+          <CoordinationPanel request={request} lng={lng} lat={lat} dmsCoordinates={dmsCoordinates} />
+
+          {overlapsLoading ? (
+            <p className="text-xs text-muted-foreground">בודק חפיפות עם בקשות אחרות...</p>
+          ) : overlaps.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -145,7 +150,11 @@ export function RequestDetailDrawer({
                   {license.license_type}: {LICENSE_STATUS_LABELS[license.status]}
                 </Badge>
               ))}
-              {licenses.length === 0 && <span className="text-xs text-muted-foreground">אין רישיונות רשומים</span>}
+              {licensesLoading ? (
+                <span className="text-xs text-muted-foreground">בודק רישיונות...</span>
+              ) : (
+                licenses.length === 0 && <span className="text-xs text-muted-foreground">אין רישיונות רשומים</span>
+              )}
             </div>
           </div>
 
