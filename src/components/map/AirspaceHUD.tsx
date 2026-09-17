@@ -39,6 +39,12 @@ export function AirspaceHUD({
   const gustKmh = weather?.wind_gust_ms !== null && weather?.wind_gust_ms !== undefined ? Math.round(weather.wind_gust_ms * 3.6) : null;
   const safety = weather ? windSafety(weather.wind_speed_ms, weather.precipitation) : "unknown";
 
+  // Every pill above depends on coords (directly, or via weather which is
+  // only fetched when coords is set) — without it (permission denied, still
+  // locating, etc.) there is nothing to show, and the bar itself was
+  // rendering anyway as an empty strip across the top of the map.
+  if (!coords) return null;
+
   return (
     <div
       className={cn(

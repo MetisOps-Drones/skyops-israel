@@ -72,26 +72,20 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   }
 
   const count = bubbles.length;
-
-  // Center bottom offset: 160px is comfortable on a normal window, but
-  // never more than 40% of the viewport height so it doesn't get pushed
-  // absurdly high (or past the top edge) on a very short one.
-  const centerBottom = Math.min(160, viewport.height * 0.4);
   const satelliteHalf = 24; // h-12 button, half its size
   const margin = 12;
-  // Largest radius that still leaves every satellite fully on-screen in
-  // every direction — the actual bug reported live: a fixed 104px radius
-  // around a button pinned 32px from the bottom edge left no room below it
-  // at all, so the bottom third of the ring rendered off-screen.
-  const radius = Math.max(
-    40,
-    Math.min(
-      96,
-      centerBottom - satelliteHalf - margin,
-      viewport.height - centerBottom - satelliteHalf - margin,
-      viewport.width / 2 - satelliteHalf - margin
-    )
-  );
+
+  // Closed: docked near the bottom edge, out of the way of the map like any
+  // other FAB. Open: the whole launcher moves to true screen center first —
+  // simpler and more robust than trying to fit a ring around a button
+  // pinned near an edge, which is what clipped bubbles off-screen before.
+  const closedTop = viewport.height - 60;
+  const openTop = viewport.height / 2;
+  const centerTop = ringOpen ? openTop : closedTop;
+
+  // Largest radius that fits from true center to the nearest edge in every
+  // direction — always symmetric now that the ring only ever opens centered.
+  const radius = Math.max(40, Math.min(96, viewport.height / 2 - satelliteHalf - margin, viewport.width / 2 - satelliteHalf - margin));
 
   return (
     <>
@@ -109,8 +103,12 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
           RTL site, start-1/2 resolves to right:50%, which combined with the
           physical -translate-x-1/2 silently shifts the whole ring away from
           true center instead of centering it (the actual cause of bubbles
-          clipping off the left edge on narrow screens). */}
-      <div className="fixed left-1/2 z-40 -translate-x-1/2" style={{ bottom: `${centerBottom}px` }}>
+          clipping off the left edge on narrow screens). top (not bottom) so
+          the closed-to-open move above is one animatable property. */}
+      <div
+        className="fixed left-1/2 z-40 -translate-x-1/2 -translate-y-1/2 transition-[top] duration-300 ease-out"
+        style={{ top: `${centerTop}px` }}
+      >
         <div className="relative h-14 w-14">
           {bubbles.map((bubble, i) => {
             // Full circle around the center bubble, starting straight up and going clockwise.
