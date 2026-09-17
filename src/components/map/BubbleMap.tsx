@@ -387,6 +387,37 @@ export function BubbleMap({
           </Source>
         )}
 
+        {/* Wide "this whole area is built-up" fill — buildings dissolved into
+            blobs by 100m connect-distance, so a cluster of houses reads as
+            one shape (a neighborhood/settlement) instead of hundreds of
+            individual footprints. Visible from a much lower zoom than the
+            buildings layer itself, which only makes sense once you're
+            already zoomed into a specific block. */}
+        {layerVisibility.neighborhoods && process.env.NEXT_PUBLIC_R2_PUBLIC_URL && (
+          <Source
+            id="neighborhoods"
+            type="vector"
+            tiles={[`${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/neighborhoods/{z}/{x}/{y}.pbf`]}
+            minzoom={11}
+            maxzoom={14}
+          >
+            <Layer
+              id="neighborhoods-fill"
+              type="fill"
+              source-layer="neighborhoods"
+              minzoom={11}
+              paint={{ "fill-color": "#8b8478", "fill-opacity": 0.35 }}
+            />
+            <Layer
+              id="neighborhoods-line"
+              type="line"
+              source-layer="neighborhoods"
+              minzoom={11}
+              paint={{ "line-color": "#6b645a", "line-width": 0.5, "line-opacity": 0.6 }}
+            />
+          </Source>
+        )}
+
         {layerVisibility.buildings && process.env.NEXT_PUBLIC_R2_PUBLIC_URL && (
           <Source
             id="buildings"

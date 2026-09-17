@@ -136,11 +136,18 @@ export function LayerControlPanel({
             היסטוריית תיאומים שלי
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
+            checked={visibility.neighborhoods}
+            onCheckedChange={() => toggle("neighborhoods")}
+            className="col-span-2 py-1.5 text-xs"
+          >
+            שכונות ואזורים בנויים
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
             checked={visibility.buildings}
             onCheckedChange={() => toggle("buildings")}
             className="col-span-2 py-1.5 text-xs"
           >
-            מבנים וישובים (נראה מרמת התקרבות גבוהה)
+            מבנים בודדים (נראה מרמת התקרבות גבוהה)
           </DropdownMenuCheckboxItem>
           {isAdmin && (
             <DropdownMenuCheckboxItem
