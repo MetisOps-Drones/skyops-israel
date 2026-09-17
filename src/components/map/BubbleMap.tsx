@@ -49,6 +49,8 @@ export function BubbleMap({
   baseStyle = DEFAULT_MAP_BASE_STYLE,
   highContrast = false,
   onInspectPoint,
+  selectedHistoryId = null,
+  onSelectedHistoryIdChange,
 }: {
   flyToTarget?: [number, number] | null;
   layerVisibility?: MapLayerVisibility;
@@ -57,6 +59,9 @@ export function BubbleMap({
   highContrast?: boolean;
   /** Called for a plain map click while not actively placing a coordination pin — drives LocationInfoCard. */
   onInspectPoint?: (point: [number, number]) => void;
+  /** Controlled from the parent so search results can open a request's popup directly, not just a marker click. */
+  selectedHistoryId?: string | null;
+  onSelectedHistoryIdChange?: (id: string | null) => void;
 } = {}) {
   const mapRef = useRef<MapRef | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
@@ -78,7 +83,7 @@ export function BubbleMap({
   const { data: airspaceZones = [] } = useAirspaceZones();
   const { data: aipZones = [] } = useAipReferenceZones();
   const { data: myFlightRequests = [] } = useMyFlightRequests();
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const setSelectedHistoryId = onSelectedHistoryIdChange ?? (() => {});
 
   const { data: role } = useMyGlobalRole();
   const isAdmin = role === "dispatcher_admin";
@@ -117,7 +122,16 @@ export function BubbleMap({
       .filter((h): h is NonNullable<typeof h> => h !== null);
   }, [myFlightRequests, layerVisibility.myHistory]);
 
-  const selectedHistory = historyPoints.find((h) => h.id === selectedHistoryId) ?? null;
+  // Looked up from myFlightRequests directly, not historyPoints — the popup
+  // must still open for a request picked from search even when the
+  // myHistory dot layer itself is toggled off (historyPoints is empty then).
+  const selectedHistory = useMemo(() => {
+    const r = myFlightRequests.find((req) => req.id === selectedHistoryId);
+    if (!r) return null;
+    const geom = r.center_point_geojson as unknown as GeoJSON.Point | null;
+    if (!geom || geom.type !== "Point") return null;
+    return { id: r.id, point: geom.coordinates as [number, number], status: r.status, startTime: r.start_time };
+  }, [myFlightRequests, selectedHistoryId]);
   const selectedHistoryCity = useReverseGeocode(selectedHistory?.point ?? null);
 
   /** Admin-only "control tower" layer: every active/pending request's actual footprint (buffered circle or drawn polygon), colored by status — not just a dot like the personal history layer. */
