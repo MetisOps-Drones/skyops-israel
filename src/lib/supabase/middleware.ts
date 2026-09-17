@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && (request.nextUrl.pathname === "/auth/login" || request.nextUrl.pathname === "/auth/signup")) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/map", request.url));
   }
 
   return response;

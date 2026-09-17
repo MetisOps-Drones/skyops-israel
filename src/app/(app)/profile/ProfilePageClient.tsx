@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plane, Plus, Loader2, IdCard } from "lucide-react";
+import { Plane, Plus, Loader2, IdCard, Building2, GraduationCap, BarChart3, ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,9 +30,45 @@ import { PilotPricingCard } from "@/components/profile/PilotPricingCard";
 import { PortfolioCard } from "@/components/profile/PortfolioCard";
 import { DroneRegistrationBadge } from "@/components/logs/DroneRegistrationBadge";
 import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
+import { useMyOrgContext } from "@/hooks/useOrgContext";
 import { createClient } from "@/lib/supabase/client";
 import { droneSchema, type DroneInput } from "@/lib/validations/flight-log";
 import type { Tables } from "@/lib/types/database.types";
+
+/** The "profile & settings" bubble is a small hub, not just this page — these are the sections that live one tap deeper rather than crowding this page itself. Visibility mirrors visibleNavItems in lib/constants/nav.ts. */
+function QuickLinksRow({
+  hasOrg,
+  canSeeAnalytics,
+}: {
+  hasOrg: boolean;
+  canSeeAnalytics: boolean;
+}) {
+  const links = [
+    { href: "/org", label: "הארגון שלי", icon: Building2, show: hasOrg },
+    { href: "/academy", label: "אקדמיה", icon: GraduationCap, show: true },
+    { href: "/analytics", label: "אנליטיקס", icon: BarChart3, show: canSeeAnalytics },
+  ].filter((l) => l.show);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {links.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-accent"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <l.icon className="h-4 w-4" />
+          </span>
+          <span className="flex-1 text-sm font-medium">{l.label}</span>
+          <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 const DRONE_STATUS_LABELS: Record<string, string> = {
   operational: "תקין",
@@ -146,10 +183,16 @@ function AddDroneDialog() {
 export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) {
   const { data: drones = [], isLoading: dronesLoading } = useDrones();
   const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
+  const { data: orgContext } = useMyOrgContext();
 
   return (
     <div className="flex flex-col gap-4">
       <ProfileHeader profile={profile} />
+
+      <QuickLinksRow
+        hasOrg={Boolean(orgContext?.orgId)}
+        canSeeAnalytics={Boolean(orgContext?.isFleetManager) || profile.role === "dispatcher_admin"}
+      />
 
       <SettingsMenu profile={profile} />
 

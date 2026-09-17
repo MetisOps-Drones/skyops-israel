@@ -15,7 +15,12 @@ import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { DEFAULT_MAP_BASE_STYLE, DEFAULT_MAP_LAYER_VISIBILITY, type MapBaseStyle, type MapLayerVisibility } from "@/lib/types/map-ui";
 import { cn } from "@/lib/utils";
 
-export function MapPageClient() {
+/**
+ * The map itself — mounted once by AppShell for the whole app, not tied to
+ * the /map route. Every other section opens as an overlay on top of this;
+ * the map never unmounts or reloads when navigating between them.
+ */
+export function MapHome() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<[number, number] | null>(null);
@@ -102,7 +107,7 @@ export function MapPageClient() {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className="absolute inset-0">
       <BubbleMap
         flyToTarget={flyToTarget}
         layerVisibility={layerVisibility}

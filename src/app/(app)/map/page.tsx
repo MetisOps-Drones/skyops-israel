@@ -1,12 +1,6 @@
-import { MapPageClient } from "./MapPageClient";
-
+// The map itself now lives in AppShell (MapHome), mounted once for every
+// route in the app — this route exists only as the one pathname AppShell
+// recognizes as "no overlay to show" (see overlayStyle in AppShell.tsx).
 export default function MapPage() {
-  // AppShell renders the map full-bleed (no TopNav/MobileBottomNav around
-  // it), so this no longer needs to subtract their heights like every
-  // other page's content area does — h-full alone fills the viewport.
-  return (
-    <div className="h-full w-full">
-      <MapPageClient />
-    </div>
-  );
+  return null;
 }

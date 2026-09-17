@@ -1,21 +1,28 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { TopNav } from "@/components/layout/TopNav";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { MapNavSheet } from "@/components/layout/MapNavSheet";
+import { usePathname, useRouter } from "next/navigation";
+import { MapHome } from "@/components/layout/MapHome";
+import { BubbleLauncher } from "@/components/layout/BubbleLauncher";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
 
 /**
- * The map page wants a full-bleed canvas — every pixel is the map, no
- * persistent Sidebar/TopNav/MobileBottomNav eating into it — so a pilot
- * standing in a field sees as much of the map as their screen allows.
- * Every other route keeps today's dashboard shell exactly as it was.
+ * The map is the app's permanent home screen. Every other route renders as
+ * an overlay on top of it instead of replacing it — MapHome stays mounted
+ * for the whole (app) group, so switching sections never reloads the map.
+ * "/map" itself is the one route with nothing to overlay (it IS the base
+ * layer); every other route gets wrapped, card-sized for the light
+ * profile/settings hub and full-screen for everything data-heavier.
  */
+function overlayStyle(pathname: string): "none" | "card" | "full" {
+  if (pathname === "/map") return "none";
+  if (pathname.startsWith("/profile")) return "card";
+  return "full";
+}
+
 export function AppShell({
   profile,
-  email,
   children,
 }: {
   profile: Tables<"profiles">;
@@ -23,25 +30,30 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isFullBleed = pathname === "/map";
-
-  if (isFullBleed) {
-    return (
-      <div className="relative h-screen overflow-hidden">
-        {children}
-        <MapNavSheet role={profile.role} />
-      </div>
-    );
-  }
+  const router = useRouter();
+  const style = overlayStyle(pathname);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar role={profile.role} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <TopNav profile={profile} email={email} />
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">{children}</main>
-      </div>
-      <MobileBottomNav role={profile.role} />
+    <div className="relative h-screen overflow-hidden">
+      <MapHome />
+      <BubbleLauncher role={profile.role} />
+
+      <Dialog
+        open={style !== "none"}
+        onOpenChange={(open) => {
+          if (!open) router.push("/map");
+        }}
+      >
+        <DialogContent
+          className={cn(
+            style === "full" &&
+              "inset-0 left-0 top-0 h-screen max-h-screen w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none p-0"
+          )}
+        >
+          <DialogTitle className="sr-only">תוכן העמוד</DialogTitle>
+          {children}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
