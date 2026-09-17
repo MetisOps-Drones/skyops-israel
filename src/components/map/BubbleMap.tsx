@@ -18,9 +18,13 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useAirspaceZones } from "@/hooks/useAirspaceZones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
-import { useMyFlightRequests, useAllFlightRequestsForAdmin, type AdminFlightRequest } from "@/hooks/useFlightRequests";
+import {
+  useMyFlightRequests,
+  useControlTowerFlightRequests,
+  type ControlTowerFlightRequest,
+} from "@/hooks/useFlightRequests";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
-import { useMyGlobalRole } from "@/hooks/useOrgContext";
+import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import {
   AIRSPACE_ZONE_COLORS,
   ISRAEL_MAP_CENTER,
@@ -87,7 +91,14 @@ export function BubbleMap({
 
   const { data: role } = useMyGlobalRole();
   const isAdmin = role === "dispatcher_admin";
-  const { data: allCoordinations = [] } = useAllFlightRequestsForAdmin(isAdmin && layerVisibility.allCoordinations);
+  const { data: orgContext } = useMyOrgContext();
+  // Platform-wide for an admin, org-scoped for a fleet manager — RLS (0011,
+  // 0077) decides which one each caller actually gets back, so the same
+  // query and the same map layer serve both roles.
+  const canSeeControlTower = isAdmin || orgContext?.isFleetManager === true;
+  const { data: allCoordinations = [] } = useControlTowerFlightRequests(
+    canSeeControlTower && layerVisibility.allCoordinations
+  );
   const [selectedCoordinationId, setSelectedCoordinationId] = useState<string | null>(null);
 
   const airspaceZonesGeojson = useMemo<GeoJSON.FeatureCollection>(

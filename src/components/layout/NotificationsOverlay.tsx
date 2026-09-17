@@ -8,14 +8,26 @@ import { useMarkNotificationRead, useNotifications } from "@/hooks/useNotificati
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
 
-/** Only booking-chat messages and new coordination requests have an obvious single destination; other kinds (license expiry, NOTAM, etc.) don't point at one page. */
+const BOOKING_NOTIFICATION_KINDS = new Set([
+  "booking_invited",
+  "booking_accepted",
+  "booking_declined",
+  "booking_confirmed",
+  "booking_cancelled",
+  "booking_message_received",
+]);
+
+/** Every booking-lifecycle kind carries booking_id in metadata (see supabase/migrations/0062_marketplace_bookings.sql) — this used to only cover booking_message_received, so a new job offer (booking_invited) or an org's booking getting accepted/declined/confirmed rendered as an unclickable notification with no way to reach it. contact_request_received has no dedicated page — /dashboard is where IncomingContactRequestsCard actually shows it. Other kinds (license expiry, NOTAM, etc.) don't point at one page. */
 function notificationHref(n: Tables<"notifications">): string | null {
-  if (n.kind === "booking_message_received") {
+  if (BOOKING_NOTIFICATION_KINDS.has(n.kind)) {
     const bookingId = (n.metadata as { booking_id?: string } | null)?.booking_id;
     return bookingId ? `/marketplace/bookings/${bookingId}` : null;
   }
   if (n.kind === "coordination_requested") {
     return "/ops";
+  }
+  if (n.kind === "contact_request_received") {
+    return "/dashboard";
   }
   return null;
 }

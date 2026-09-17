@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ShieldCheck, LayoutGrid, KeyRound, BadgeCheck, MessagesSquare, ChevronLeft } from "lucide-react";
+import { LayoutGrid, KeyRound, BadgeCheck, MessagesSquare, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
+// מוקד תיאום (/ops) isn't here — it's the dispatcher's actual day-to-day
+// workflow (live queue, NOTAM publishing), so it's its own top-level bubble
+// (BubbleLauncher.tsx) rather than one more tile behind this hub. These 4
+// are one-off setup/maintenance tasks, not a constant workflow.
 const ADMIN_SECTIONS = [
-  { href: "/ops", label: "מוקד תיאום", description: "תור בקשות טיסה ממתינות ופרסום NOTAM", icon: ShieldCheck },
   { href: "/admin/platform", label: "ניהול פלטפורמה", description: "הגדרות כלליות, אזורי מרחב אווירי ותשתית", icon: LayoutGrid },
   { href: "/admin/api", label: "API לשותפים", description: "מפתחות API ומקורות נתונים חלופיים לכל שכבה", icon: KeyRound },
   { href: "/admin/pilots", label: "אימות מטיסים", description: "בדיקת רישיונות ורישום כלי טיס", icon: BadgeCheck },
   { href: "/admin/marketplace", label: "ניטור מרקטפלייס", description: "מעקב אחר הזמנות עבודה ותקשורת בין מטיסים לארגונים", icon: MessagesSquare },
 ];
 
-/** The admin bubble's landing screen — a small hub of the 5 admin-only sections, mirroring the top-level bubble pattern one level deeper. */
+/** The admin bubble's landing screen — a small hub of the 4 remaining admin-only sections, mirroring the top-level bubble pattern one level deeper. */
 export default async function AdminHubPage() {
   const supabase = createClient();
   const {

@@ -205,7 +205,8 @@ function BusinessDetailsSection({
             <Label htmlFor="freelance">פנוי לעבודה עם ארגונים (מרקטפלייס)</Label>
             <p className="text-xs text-muted-foreground">
               ארגונים במרקטפלייס המטיסים יראו את הפרופיל שלך ויוכלו לבקש ליצור קשר — הפנייה מגיעה אליך לאישור, ואינך
-              יכול לגלוש במרקטפלייס בעצמך (זו תצוגה של חשבונות ארגון בלבד).
+              יכול לגלוש במרקטפלייס בעצמך (זו תצוגה של חשבונות ארגון בלבד). את התמחור ותיק העבודות שהם יראו עורכים
+              בהמשך העמוד הזה, בכרטיסי &ldquo;פרופיל מרקטפלייס&rdquo;, &ldquo;תמחור&rdquo; ו&ldquo;תיק עבודות&rdquo;.
             </p>
           </div>
           <Switch id="freelance" checked={freelanceAvailable} onCheckedChange={setFreelanceAvailable} />
@@ -250,8 +251,8 @@ function OrgRoleSection({ profile }: { profile: Profile }) {
         <Input id="title" placeholder="לדוגמה: מטיס ראשי, מנהל בטיחות" {...register("title")} />
       </div>
       <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-        בקרוב: אבטחה (כניסה דו-שלבית, ניהול התחברויות), העדפות התראה מתקדמות, והיסטוריית פעילות אישית. ניהול הארגון
-        עצמו (צוות, צי, הרשאות) נמצא ב״הארגון שלי״.
+        בקרוב: אבטחה (כניסה דו-שלבית, ניהול התחברויות), העדפות התראה מתקדמות, והיסטוריית פעילות אישית. ניהול הצוות
+        נמצא ב״הארגון שלי״, וניהול הצי (כלי טיס, תחזוקה ומלאי) תחת ״יומן טיסות״.
       </p>
       <Button type="submit" disabled={update.isPending} className="self-end">
         {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

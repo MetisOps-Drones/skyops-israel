@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Store, ClipboardCheck, ShieldCheck, UserCircle, Bell } from "lucide-react";
+import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell } from "lucide-react";
 import { MetisOpsLogo } from "./MetisOpsLogo";
 import { NotificationsOverlay } from "./NotificationsOverlay";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
+import { useMyOrgContext } from "@/hooks/useOrgContext";
 import type { UserRole } from "@/lib/types/database.types";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,13 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
   const router = useRouter();
   const unreadCount = useUnreadNotificationCount();
+  const { data: orgContext } = useMyOrgContext();
   const isAdmin = role === "dispatcher_admin";
+  // Flight logs are a paid feature (private_standard+, see plans.ts) that a
+  // pure hobby pilot on the free tier shouldn't see at all — matches the
+  // page-level guard in src/app/(app)/logs/page.tsx. A hobby pilot who's
+  // actually contracting for an org still needs it.
+  const canSeeLogs = role !== "pilot_hobby" || Boolean(orgContext?.orgId);
 
   // The ring's geometry has to fit whatever window it's actually shown in —
   // a fixed radius/offset looked right on a normal desktop window but sent
@@ -51,9 +58,14 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   }, []);
 
   const bubbles: BubbleItem[] = [
-    { key: "logs", label: "יומן טיסות", icon: BookOpen, href: "/logs" },
+    ...(canSeeLogs ? [{ key: "logs", label: "יומן טיסות", icon: BookOpen, href: "/logs" }] : []),
     { key: "marketplace", label: "מארקטפלייס", icon: Store, href: "/marketplace" },
     { key: "coordination", label: "תיאומים", icon: ClipboardCheck, href: "/dashboard" },
+    // /ops is the dispatcher's actual day-to-day workflow (live queue,
+    // NOTAM publishing) — split out from the other admin-only bubble so it
+    // isn't buried behind an extra hub screen the way one-off setup tasks
+    // (platform config, API keys, pilot verification) are.
+    ...(isAdmin ? [{ key: "ops", label: "מוקד תיאום", icon: Radar, href: "/ops" }] : []),
     ...(isAdmin ? [{ key: "admin", label: "ניהול אדמין", icon: ShieldCheck, href: "/admin" }] : []),
     { key: "profile", label: "פרופיל והגדרות", icon: UserCircle, href: "/profile" },
     {

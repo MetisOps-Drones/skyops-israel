@@ -1,7 +1,7 @@
 "use client";
 
 import { Layers3, Sun, ExternalLink, Palette, FileText, Satellite, Radar } from "lucide-react";
-import { useMyGlobalRole } from "@/hooks/useOrgContext";
+import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -45,7 +45,9 @@ export function LayerControlPanel({
   onHighContrastChange: (next: boolean) => void;
 }) {
   const { data: role } = useMyGlobalRole();
+  const { data: orgContext } = useMyOrgContext();
   const isAdmin = role === "dispatcher_admin";
+  const isFleetManager = orgContext?.isFleetManager === true;
 
   function toggle(key: keyof MapLayerVisibility) {
     onVisibilityChange({ ...visibility, [key]: !visibility[key] });
@@ -149,7 +151,7 @@ export function LayerControlPanel({
           >
             מבנים בודדים (נראה מרמת התקרבות גבוהה)
           </DropdownMenuCheckboxItem>
-          {isAdmin && (
+          {(isAdmin || isFleetManager) && (
             <DropdownMenuCheckboxItem
               checked={visibility.allCoordinations}
               onCheckedChange={() => toggle("allCoordinations")}
@@ -157,7 +159,7 @@ export function LayerControlPanel({
             >
               <span className="flex items-center gap-1.5">
                 <Radar className="h-3.5 w-3.5" />
-                כל התיאומים הפעילים בפלטפורמה (אדמין)
+                {isAdmin ? "כל התיאומים הפעילים בפלטפורמה (אדמין)" : "כל התיאומים הפעילים בארגון"}
               </span>
             </DropdownMenuCheckboxItem>
           )}
