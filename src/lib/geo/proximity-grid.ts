@@ -49,12 +49,25 @@ async function loadGrid(bufferM: ProximityBufferM): Promise<Buffer> {
   return packed;
 }
 
-/** Nearest-supported buffer distance at or above `meters` — the grids are pre-computed only for the app's fixed altitude bands (50/100/150m). */
-export function nearestSupportedBufferM(meters: number): ProximityBufferM {
+/**
+ * Nearest-supported buffer distance at or above `meters` — the grids are
+ * pre-computed only for the app's fixed altitude bands (50/100/150m).
+ * null when `meters` exceeds every precomputed grid (150m) — there's no
+ * larger grid to snap up to, so returning 150 here used to silently check
+ * a *smaller* radius than actually required (contradicting this function's
+ * own "at or above" contract), which could clear a building sitting
+ * between 150m and the real required distance. Not reachable through the
+ * app's own UI (altitude is always one of 50/100/150, and the server now
+ * also caps max_altitude_meters at the legal general ceiling), but
+ * /api/building-proximity accepts bufferM directly, so a direct call with
+ * a larger value is still possible — callers must treat null as "can't
+ * verify" and fail closed, not silently under-check.
+ */
+export function nearestSupportedBufferM(meters: number): ProximityBufferM | null {
   for (const b of SUPPORTED_BUFFERS_M) {
     if (meters <= b) return b;
   }
-  return 150;
+  return null;
 }
 
 /**

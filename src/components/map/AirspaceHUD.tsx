@@ -9,6 +9,7 @@ import { useAirspaceZones } from "@/hooks/useAirspaceZones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { CoordinateShareButton } from "@/components/map/CoordinateShareButton";
 import { ftToM } from "@/lib/geo/aip";
+import { checkFlightAuthorizationRequirement } from "@/lib/geo/flight-rules";
 import { cn } from "@/lib/utils";
 
 export function AirspaceHUD({
@@ -24,16 +25,23 @@ export function AirspaceHUD({
   const aipMaxAltitude = useAipMaxAltitude(coords);
   const { data: weather } = useWeather(showWind ? coords : null);
   const { isLoading: airspaceZonesLoading } = useAirspaceZones();
-  const { isLoading: aipZonesLoading } = useAipReferenceZones();
+  const { data: aipZones, isLoading: aipZonesLoading } = useAipReferenceZones();
 
-  // Two independent zone sources feed this HUD (the real airspace_zones
-  // table, and the advisory aip_reference_zones layer used for the altitude
-  // pill) — showing "מותר לטיסה במיקומך" in green right next to "אסור לטיסה
-  // כאן" in red, because each pill only looked at its own source, was the
-  // actual bug. One combined verdict here; the altitude pill still explains
-  // the specific reason underneath it.
+  // Three independent signals feed this HUD (the mock airspace_zones table,
+  // the advisory aip_reference_zones layer used for the altitude pill, and
+  // now checkFlightAuthorizationRequirement — the same real-AIP-data check
+  // LocationInfoCard and the server-side authorization action both use) —
+  // showing "מותר לטיסה במיקומך" in green while LocationInfoCard right below
+  // warned about a restricted/controlled zone at the identical point, because
+  // this pill never looked at that data at all, was the actual bug. Any
+  // non-"none" blockLevel here now counts as not-clear, same as the server's
+  // "never auto-clear" policy for that data.
   const isChecking = Boolean(coords) && (airspaceZonesLoading || aipZonesLoading);
-  const locationClear = Boolean(clearance?.clear) && !aipMaxAltitude?.blockedFromGround;
+  const authCheck = coords && aipZones ? checkFlightAuthorizationRequirement(coords, aipZones) : null;
+  const locationClear =
+    Boolean(clearance?.clear) &&
+    !aipMaxAltitude?.blockedFromGround &&
+    (authCheck?.blockLevel ?? "none") === "none";
 
   const windKmh = weather?.wind_speed_ms !== null && weather?.wind_speed_ms !== undefined ? Math.round(weather.wind_speed_ms * 3.6) : null;
   const gustKmh = weather?.wind_gust_ms !== null && weather?.wind_gust_ms !== undefined ? Math.round(weather.wind_gust_ms * 3.6) : null;

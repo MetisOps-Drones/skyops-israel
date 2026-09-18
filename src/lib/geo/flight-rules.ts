@@ -1,17 +1,19 @@
 import * as turf from "@turf/turf";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
-import type { ProximityFinding } from "@/app/api/proximity-check/route";
+import type { ProximityFinding } from "@/lib/geo/proximity-check";
 
 const AIRPORT_BUFFER_KM = 2;
 
 /**
  * CTR/ATZ/TMA/CTA — controlled airspace around an airport/airfield
- * ("אזור פיקוח, אזור פיקוח שדה או אזור שדה"). Both the hobby (מטיסן, תקנות
- * הטיס (הפעלת מטיסן) התשפ"ד 2024) and commercial (כטב"ם קטן, תקנות הטיס
- * (הפעלת כטב"ם קטן) התשפ"ד 2024) regulations prohibit this outright with
- * no exception clause at all — unlike the next category, there's no
- * director-approval escape hatch mentioned in either law. Nobody, org or
- * not, gets a coordination path here.
+ * ("אזור פיקוח, אזור פיקוח שדה או אזור שדה"). There's no self-service
+ * exemption for this (unlike the special-authorization catalog's 9
+ * numbered regulations) — but unlike PROHIBITED/DANGER below, it's not a
+ * hard block either: a request here still goes to a dispatcher, who
+ * verifies it against live NOTAM/ATC coordination before approving, the
+ * same way real controlled-airspace coordination works outside this app
+ * too. What must never happen is auto-clearing it — see
+ * actions/flight-requests.ts.
  */
 const CONTROLLED_AIRSPACE_KINDS = new Set(["CTR", "ATZ", "TMA", "CTA"]);
 

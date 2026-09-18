@@ -20,7 +20,15 @@ export async function GET(request: NextRequest) {
 
   const lat = Number(latParam);
   const lon = Number(lonParam);
-  const bufferM = nearestSupportedBufferM(Number(bufferParam));
+  const requestedM = Number(bufferParam);
+  const bufferM = nearestSupportedBufferM(requestedM);
+
+  // null = requestedM exceeds every precomputed grid (150m) — there's no
+  // larger radius to check, so this must fail closed (unavailable) rather
+  // than silently checking a smaller radius than what was actually asked for.
+  if (bufferM === null) {
+    return NextResponse.json({ available: false, isNearBuilding: false, bufferM: requestedM });
+  }
 
   try {
     const near = await isNearBuilding(lon, lat, bufferM);

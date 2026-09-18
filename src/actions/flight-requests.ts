@@ -6,9 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createFlightRequestSchema, type CreateFlightRequestInput } from "@/lib/validations/flight-request";
 import type { Tables } from "@/lib/types/database.types";
 import { pointToWKT, multiPolygonToWKT } from "@/lib/geo/wkt";
-import { requiredInfrastructureDistanceM } from "@/lib/geo/flight-rules";
+import {
+  requiredInfrastructureDistanceM,
+  checkFlightAuthorizationRequirement,
+  findingsRequiringAuthorization,
+} from "@/lib/geo/flight-rules";
+import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
+import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
+import { checkProximity } from "@/lib/geo/proximity-check";
 import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
+import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 
 export interface CreateFlightRequestResult {
   success: boolean;
@@ -19,21 +27,27 @@ export interface CreateFlightRequestResult {
 }
 
 /**
- * Authoritative server-side counterpart to the client-side check in
- * `src/hooks/useAirspaceCheck.ts`. Runs the real PostGIS `ST_Intersects`
- * query (`find_intersecting_zones`, defined in
- * supabase/migrations/0005_airspace_zones.sql) against the live
- * `airspace_zones` table rather than the bundled mock GeoJSON, so a stale
- * client can never talk its way into an auto-clearance the server disagrees
- * with. Also re-runs the building-proximity check server-side, via the same
- * R2 bitmap grid (proximity-grid.ts) the client uses — the client-side
- * warning in FlightParamsDrawer is advisory only, so without this a request
- * over a building could still auto-clear here as long as it missed the 4
- * demo airspace_zones rows. NOT the `buildings_near_point` RPC/table
- * (0075/0076): that table was never loaded with data (doesn't fit the free
- * tier — see proximity-grid.ts) and always answers "no building nearby". If
- * the grid fails to load, this fails closed (no auto-clear, sent to a
- * dispatcher) rather than assuming "no building".
+ * Authoritative server-side counterpart to every client-side check the map
+ * runs (useAirspaceCheck, checkFlightAuthorizationRequirement,
+ * useBuildingProximity, useProximityCheck) — re-verified here so a stale or
+ * tampered client can never talk its way into an auto-clearance the server
+ * would otherwise disagree with. Until this pass, that authoritative-ness
+ * was only true for the mock `airspace_zones` table and building
+ * proximity — the *real* AIP reference-zone data (aip_reference_zones, 179
+ * of 185 zones with precise geometry from the official AIP) was checked
+ * and shown to the pilot client-side only, meaning a genuinely
+ * prohibited/danger/controlled-airspace point could still auto-clear here
+ * as long as it missed the 4 airspace_zones demo rows. This now runs the
+ * same checkFlightAuthorizationRequirement the map uses, plus the flat
+ * legal altitude ceiling, plus the OSM-based proximity categories
+ * (schools, prisons, police, power stations, stadiums) that
+ * useProximityCheck flags client-side. Policy for anything the AIP layer
+ * flags: never auto-clear, always route to a dispatcher for a manual
+ * decision — except a zone that reaches the ground (no legal altitude to
+ * fly at, at all) and a prohibited/danger zone for a solo/non-org account
+ * (needs a case-by-case CAAI-director approval this app can't grant),
+ * which have no coordination path per the regulations and are rejected
+ * outright instead.
  */
 export async function createFlightRequest(
   input: CreateFlightRequestInput
@@ -102,6 +116,55 @@ export async function createFlightRequest(
     }
   }
 
+  const hasOrg = Boolean(profile?.org_id);
+  const centerPoint = data.center_point.coordinates as [number, number];
+
+  // Flat legal altitude ceiling — the client only ever offers 50/100/150m
+  // bands and restricts hobby to 50m, but nothing enforced that server-side
+  // until now, so a direct call to this action could request any altitude
+  // up to the schema's raw 2000m cap regardless of role.
+  const generalCeilingM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
+  if (data.max_altitude_meters > generalCeilingM) {
+    return {
+      success: false,
+      error: `תקרת הגובה החוקית הכללית עבורך היא ${generalCeilingM} מ' — לא ניתן לבקש תיאום מעל גובה זה.`,
+    };
+  }
+
+  // The real AIP reference-zone data (179/185 zones with precise official
+  // geometry) — checkFlightAuthorizationRequirement is the same function
+  // the map itself runs client-side to decide what to show a pilot; running
+  // it here too is what makes those warnings actually mean something for
+  // what gets auto-cleared, not just what gets displayed.
+  const { data: aipZonesRaw, error: aipError } = await supabase.from("aip_reference_zones").select("*");
+  if (aipError) {
+    return { success: false, error: `בדיקת אזורי AIP נכשלה: ${aipError.message}` };
+  }
+  const aipZones = (aipZonesRaw ?? []) as AipReferenceZone[];
+  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones);
+  const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
+
+  if (altitudeAtPoint.blockedFromGround) {
+    return {
+      success: false,
+      error: "תקרת הגובה החוקית בנקודה זו היא 0 מ' מהקרקע (מרחב אווירי חופף מהקרקע) — לא ניתן לבקש תיאום לנקודה זו, גם לחשבון ארגון.",
+    };
+  }
+
+  if (authCheck.blockLevel === "director_approval_only" && !hasOrg) {
+    return {
+      success: false,
+      error: 'אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת"א. תיאום כזה זמין רק לחשבונות ארגון.',
+    };
+  }
+
+  // Everything else the AIP layer flags (restricted zones, proximity to
+  // controlled airspace, or a prohibited/danger zone for an org account
+  // that can chase the director approval externally) must never
+  // auto-clear — always a dispatcher's manual call, the same way it's
+  // already presented as a warning rather than a block in the UI.
+  const aipRequiresDispatcher = authCheck.blockLevel !== "none";
+
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
       ? data.polygon
@@ -124,26 +187,62 @@ export async function createFlightRequest(
   let autoCleared = false;
   let dispatcherNotes: string | null = null;
 
-  if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {
+  if (aipRequiresDispatcher) {
+    const zoneNames = authCheck.reasons.map((r) => r.label).join("; ");
+    dispatcherNotes = `נשלח לבדיקת מוקדן: חפיפה/קרבה לאזור AIP — ${zoneNames || "ראו פרטי האזור בבקשה"}.`;
+  } else if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {
     const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, data.max_altitude_meters);
     const bufferM = nearestSupportedBufferM(requiredDistanceM);
-    const [lng, lat] = data.center_point.coordinates;
+    const [lng, lat] = centerPoint;
+
     let buildingCheckAvailable = true;
     let nearBuilding = true;
-    try {
-      nearBuilding = await isNearBuilding(lng, lat, bufferM);
-    } catch (err) {
+    if (bufferM === null) {
+      // requiredDistanceM exceeds every precomputed grid (150m) — no larger
+      // radius to check against, so this can't be verified as clear.
       buildingCheckAvailable = false;
-      console.error("isNearBuilding failed during flight request creation:", err);
+    } else {
+      try {
+        nearBuilding = await isNearBuilding(lng, lat, bufferM);
+      } catch (err) {
+        buildingCheckAvailable = false;
+        console.error("isNearBuilding failed during flight request creation:", err);
+      }
     }
 
-    if (buildingCheckAvailable && !nearBuilding) {
+    // The OSM-based categories (residential areas, schools, prisons, police,
+    // power stations, stadiums) that useProximityCheck/findingsRequiringAuthorization
+    // flag client-side — previously only advisory, never re-checked here, so
+    // a point missing a building in the grid but sitting next to e.g. a
+    // police station could still auto-clear. Overpass is a shared
+    // third-party service that can be slow/unreachable — treat "couldn't
+    // check" the same as "found something", not as "clear".
+    let osmCheckAvailable = true;
+    let osmNeedsAuthorization = false;
+    try {
+      const proximityResult = await checkProximity(lat, lng);
+      if (proximityResult.available) {
+        const relevant = findingsRequiringAuthorization(proximityResult.findings, isHobby, data.max_altitude_meters);
+        osmNeedsAuthorization = relevant.length > 0;
+      } else {
+        osmCheckAvailable = false;
+      }
+    } catch (err) {
+      osmCheckAvailable = false;
+      console.error("checkProximity failed during flight request creation:", err);
+    }
+
+    if (buildingCheckAvailable && !nearBuilding && osmCheckAvailable && !osmNeedsAuthorization) {
       autoCleared = true;
-      dispatcherNotes = "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה ידוע בטווח המרחק החוקי מהנקודה.";
+      dispatcherNotes = "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה/אתר רגיש ידוע בטווח המרחק החוקי מהנקודה.";
+    } else if (!buildingCheckAvailable) {
+      dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת קרבה למבנים לא הייתה זמינה כרגע, יש לאמת קרבה למבנים באופן ידני.";
+    } else if (nearBuilding) {
+      dispatcherNotes = "נשלח לבדיקת מוקדן: נמצא מבנה בטווח המרחק החוקי מהנקודה — נדרשת הרשאת הפעלה מיוחדת.";
+    } else if (!osmCheckAvailable) {
+      dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת קרבה לאתרים רגישים (בתי ספר, מתקני ציבור וכו') לא הייתה זמינה כרגע.";
     } else {
-      dispatcherNotes = buildingCheckAvailable
-        ? 'נשלח לבדיקת מוקדן: נמצא מבנה בטווח המרחק החוקי מהנקודה (תקנה 32) — נדרשת הרשאת הפעלה מיוחדת.'
-        : "נשלח לבדיקת מוקדן: בדיקת קרבה למבנים לא הייתה זמינה כרגע, יש לאמת קרבה למבנים באופן ידני.";
+      dispatcherNotes = "נשלח לבדיקת מוקדן: נמצא אתר רגיש (מגורים/מוסד ציבורי/תשתית) בטווח המרחק החוקי מהנקודה — נדרשת הרשאת הפעלה מיוחדת.";
     }
   }
 

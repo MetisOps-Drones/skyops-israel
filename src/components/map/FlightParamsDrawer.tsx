@@ -41,6 +41,8 @@ import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import { cn } from "@/lib/utils";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useCoordinationQuota } from "@/hooks/useCoordinationQuota";
+import { useMyLicenses, useHasValidInsurance } from "@/hooks/useLicenses";
+import { resolveLicenseRequirement } from "@/lib/validations/flight-request-requirements";
 
 const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
   { value: "under_50m", label: "עד 50 מטר" },
@@ -78,6 +80,22 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
   const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
+
+  const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
+  const { data: hasValidInsurance, isLoading: insuranceLoading } = useHasValidInsurance();
+  const selectedDrone = drones.find((d) => d.id === droneId) ?? null;
+  const requestType = shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble";
+  const licenseCheck = selectedDrone
+    ? resolveLicenseRequirement(licenses, selectedDrone.mtow_grams, requestType)
+    : null;
+  const licenseCheckLoading = Boolean(selectedDrone) && (licensesLoading || (licenseCheck?.needsInsurance && insuranceLoading));
+  // Same "never claim clear until we've actually checked" rule as the
+  // building/proximity checks below — only block once a drone is selected
+  // and the license/insurance query has actually resolved.
+  const licenseBlocked =
+    Boolean(selectedDrone) &&
+    !licenseCheckLoading &&
+    (!licenseCheck?.ok || (licenseCheck.needsInsurance && !hasValidInsurance));
 
   const { data: quota } = useCoordinationQuota();
   const quotaPeriodLabel = quota?.limit?.period === "week" ? "השבוע" : "החודש";
@@ -187,6 +205,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     !blockedForSolo &&
     !quotaExhausted &&
     !complexExhausted &&
+    !licenseBlocked &&
     !(isChecking && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
@@ -367,6 +386,25 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {licenseBlocked && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <Lock className="h-4 w-4" />
+                {!licenseCheck?.ok
+                  ? "אין רישיון בתוקף המתאים לכלי הטיס שנבחר"
+                  : "נדרש אישור ביטוח בתוקף להטסה מסחרית"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {!licenseCheck?.ok
+                  ? "לא נמצא רישיון טיס בתוקף שמכסה את משקל כלי הטיס שנבחר (ואת סוג הבקשה, עבור בועת NOTAM). הבקשה תיחסם בשרת גם אם תישלח."
+                  : "הרישיון שלך מכסה כלי טיס זה, אך נדרש גם אישור ביטוח בתוקף על מנת לשלוח בקשת טיסה מסחרית. הבקשה תיחסם בשרת גם אם תישלח."}
+              </p>
+              <Link href="/profile" className="text-xs font-medium text-primary hover:underline">
+                ניהול רישיונות ומסמכים בפרופיל
+              </Link>
             </div>
           )}
 
