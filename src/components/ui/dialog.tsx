@@ -40,7 +40,12 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute end-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+      {/* p-2.5 around a 16px icon (not just the icon itself as the hit
+          target): a bare 16x16px button measured live as the actual
+          clickable area on the map's new full-screen overlays, well under
+          any comfortable tap-target size and now hit far more often since
+          it's the primary way back to the map from every section. */}
+      <DialogPrimitive.Close className="absolute end-2 top-2 rounded-sm p-2.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">סגור</span>
       </DialogPrimitive.Close>
