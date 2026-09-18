@@ -12,13 +12,16 @@ import type { Tables } from "@/lib/types/database.types";
  * an overlay on top of it instead of replacing it — MapHome stays mounted
  * for the whole (app) group, so switching sections never reloads the map.
  * "/map" itself is the one route with nothing to overlay (it IS the base
- * layer); every other route gets wrapped, card-sized for the light
- * profile/settings hub and full-screen for everything data-heavier.
+ * layer); every other route gets wrapped — a small centered card for the
+ * light profile/settings hub, a large-but-not-full panel (map still visible
+ * around the edges) for everything data-heavier. Never true full-screen: a
+ * menu item should always feel like it opened a layer over the map, not
+ * navigated to a new page.
  */
-function overlayStyle(pathname: string): "none" | "card" | "full" {
+function overlayStyle(pathname: string): "none" | "card" | "panel" {
   if (pathname === "/map") return "none";
   if (pathname.startsWith("/profile")) return "card";
-  return "full";
+  return "panel";
 }
 
 export function AppShell({
@@ -57,13 +60,21 @@ export function AppShell({
         <DialogContent
           key={pathname}
           className={cn(
-            style === "full" &&
-              "inset-0 left-0 top-0 h-screen max-h-screen w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none p-0"
+            style === "panel" &&
+              "h-[88vh] max-h-[88vh] w-[92vw] max-w-5xl gap-0 overflow-y-auto overflow-x-hidden rounded-xl p-0"
           )}
         >
           <DialogTitle className="sr-only">תוכן העמוד</DialogTitle>
           <DialogDescription className="sr-only">תוכן העמוד שנבחר מהתפריט, מוצג כשכבה מעל המפה</DialogDescription>
-          {children}
+          {/* min-w-0: DialogContent is display:grid, so this is a grid item —
+              without an explicit min-width it defaults to "auto" (its
+              content's intrinsic width), which lets any unwrappable child
+              (e.g. a Badge with nowrap text inside a shrinking grid-cols-N
+              stat row) blow the whole page wider than the panel instead of
+              wrapping/shrinking to fit it. Confirmed live: without this, one
+              admin page's stat cards rendered ~200px past the panel's left
+              edge on a 375px viewport. */}
+          <div className="min-w-0">{children}</div>
         </DialogContent>
       </Dialog>
     </div>
