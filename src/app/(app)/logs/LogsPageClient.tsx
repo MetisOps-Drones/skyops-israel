@@ -7,7 +7,7 @@ import { MaintenanceBanner } from "@/components/logs/MaintenanceBanner";
 import { FlightLogTable } from "@/components/logs/FlightLogTable";
 import { LogEntryModal } from "@/components/logs/LogEntryModal";
 import { TelemetryUploader } from "@/components/logs/TelemetryUploader";
-import { BatteryTracker } from "@/components/logs/BatteryTracker";
+import { FleetHealthDashboard } from "@/components/logs/FleetHealthDashboard";
 import { ExportReportButton } from "@/components/logs/ExportReportButton";
 import { DroneFleetTable } from "@/components/logs/DroneFleetTable";
 import { MaintenanceLogPanel } from "@/components/logs/MaintenanceLogPanel";
@@ -88,7 +88,7 @@ export function LogsPageClient() {
           <TabsList>
             <TabsTrigger value="log">יומן טיסות</TabsTrigger>
             <TabsTrigger value="import">יבוא טלמטריה</TabsTrigger>
-            <TabsTrigger value="batteries">סוללות</TabsTrigger>
+            <TabsTrigger value="batteries">בריאות הצי</TabsTrigger>
             <TabsTrigger value="clients">לקוחות</TabsTrigger>
             <TabsTrigger value="advanced">ניהול מתקדם</TabsTrigger>
           </TabsList>
@@ -109,7 +109,7 @@ export function LogsPageClient() {
           </TabsContent>
 
           <TabsContent value="batteries">
-            <BatteryTracker />
+            <FleetHealthDashboard />
           </TabsContent>
 
           <TabsContent value="clients">
@@ -143,7 +143,7 @@ export function LogsPageClient() {
             <TabsTrigger value="log">יומן טיסות</TabsTrigger>
             <TabsTrigger value="import">יבוא טלמטריה</TabsTrigger>
             <TabsTrigger value="fleet">צי כלי טיס</TabsTrigger>
-            <TabsTrigger value="batteries">סוללות</TabsTrigger>
+            <TabsTrigger value="batteries">בריאות הצי</TabsTrigger>
             <TabsTrigger value="clients">לקוחות</TabsTrigger>
             <TabsTrigger value="maintenance">תחזוקה ומלאי</TabsTrigger>
             <TabsTrigger value="profitability">רווחיות</TabsTrigger>
@@ -176,7 +176,7 @@ export function LogsPageClient() {
           </TabsContent>
 
           <TabsContent value="batteries">
-            <BatteryTracker />
+            <FleetHealthDashboard />
           </TabsContent>
 
           <TabsContent value="clients">
