@@ -128,7 +128,9 @@ function AllBookingsTable() {
                 <TableCell>{b.org_name ?? "—"}</TableCell>
                 <TableCell>{b.pilot_full_name ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[b.status]}>{STATUS_LABEL[b.status]}</Badge>
+                  <Badge variant={STATUS_VARIANT[b.status]} className="max-w-[110px] truncate" title={STATUS_LABEL[b.status]}>
+                    {STATUS_LABEL[b.status]}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {b.status !== "invited" && b.status !== "declined" && (

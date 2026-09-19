@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell } from "lucide-react";
@@ -8,6 +8,7 @@ import { MetisOpsLogo } from "./MetisOpsLogo";
 import { NotificationsOverlay } from "./NotificationsOverlay";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { useMyOrgContext } from "@/hooks/useOrgContext";
+import { useBubbleLauncherStore } from "@/stores/useBubbleLauncherStore";
 import type { UserRole } from "@/lib/types/database.types";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +32,11 @@ interface BubbleItem {
 const DEFAULT_VIEWPORT = { width: 1024, height: 768 };
 
 export function BubbleLauncher({ role }: { role: UserRole }) {
-  const [ringOpen, setRingOpen] = useState(false);
+  const ringOpen = useBubbleLauncherStore((s) => s.ringOpen);
+  const setRingOpen = useBubbleLauncherStore((s) => s.setRingOpen);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const router = useRouter();
   const unreadCount = useUnreadNotificationCount();
   const { data: orgContext } = useMyOrgContext();
@@ -55,6 +58,12 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
     updateViewport();
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
+  }, []);
+
+  // Touch devices have no hover state to reveal a tooltip on, so the bubble
+  // label is shown permanently underneath instead of on :hover.
+  useEffect(() => {
+    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
   }, []);
 
   const bubbles: BubbleItem[] = [
@@ -82,6 +91,20 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
     if (bubble.action) bubble.action();
     else if (bubble.href) router.push(bubble.href);
   }
+
+  // BubbleLauncher is persistent chrome mounted on every route, so this runs
+  // once per session rather than per navigation — Next only prefetches a
+  // route automatically for a <Link> the IntersectionObserver has actually
+  // seen enter the viewport, which never happens for these off-screen,
+  // opacity-0 ring buttons. A plain router.push() button gets no
+  // prefetching at all, so every bubble click paid for a cold RSC fetch —
+  // this warms all of them up front instead.
+  useEffect(() => {
+    bubbles.forEach((bubble) => {
+      if (bubble.href) router.prefetch(bubble.href);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bubbles is rebuilt every render from stable inputs (role/canSeeLogs/isAdmin); re-running this on every render would defeat the point of prefetching once.
+  }, [canSeeLogs, isAdmin]);
 
   const count = bubbles.length;
   const satelliteHalf = 24; // h-12 button, half its size
@@ -130,41 +153,60 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
             const y = Math.sin(angleRad) * radius;
             const Icon = bubble.icon;
             return (
-              <button
-                key={bubble.key}
-                type="button"
-                onClick={() => handleBubbleClick(bubble)}
-                aria-label={bubble.label}
-                title={bubble.label}
-                tabIndex={ringOpen ? 0 : -1}
-                className={cn(
-                  "absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
-                  ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-                )}
-                style={{
-                  // Combines the button's own centering offset with its ring
-                  // position and open/closed scale into one transform —
-                  // mixing this with Tailwind's translate/scale utility
-                  // classes would silently drop whichever set it last.
-                  transform: ringOpen
-                    ? `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1)`
-                    : "translate(-50%, -50%) scale(0)",
-                  transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
-                }}
-              >
-                <Icon className="h-5 w-5" />
-                {Boolean(bubble.badge) && (
-                  <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                    {bubble.badge}
-                  </span>
-                )}
-              </button>
+              <Fragment key={bubble.key}>
+                <button
+                  type="button"
+                  onClick={() => handleBubbleClick(bubble)}
+                  aria-label={bubble.label}
+                  tabIndex={ringOpen ? 0 : -1}
+                  className={cn(
+                    "peer absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
+                    ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+                  )}
+                  style={{
+                    // Combines the button's own centering offset with its ring
+                    // position and open/closed scale into one transform —
+                    // mixing this with Tailwind's translate/scale utility
+                    // classes would silently drop whichever set it last.
+                    transform: ringOpen
+                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1)`
+                      : "translate(-50%, -50%) scale(0)",
+                    transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
+                  }}
+                >
+                  <Icon className="h-5 w-5" />
+                  {Boolean(bubble.badge) && (
+                    <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                      {bubble.badge}
+                    </span>
+                  )}
+                </button>
+                {/* Bubble name label — on hover for a mouse/trackpad (via the
+                    peer-hover: on the button above), permanently visible
+                    instead for a touch device, which has no hover state to
+                    reveal it with. */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "pointer-events-none absolute left-1/2 top-1/2 z-10 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-md transition-opacity duration-200",
+                    ringOpen ? (isTouchDevice ? "opacity-100" : "opacity-0 peer-hover:opacity-100") : "opacity-0"
+                  )}
+                  style={{
+                    transform: ringOpen
+                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 34}px))`
+                      : "translate(-50%, -50%)",
+                    transitionDelay: ringOpen && !isTouchDevice ? "0ms" : ringOpen ? `${i * 30}ms` : "0ms",
+                  }}
+                >
+                  {bubble.label}
+                </span>
+              </Fragment>
             );
           })}
 
           <button
             type="button"
-            onClick={() => setRingOpen((v) => !v)}
+            onClick={() => setRingOpen(!ringOpen)}
             aria-label="תפריט MetisOps"
             title="תפריט MetisOps"
             aria-expanded={ringOpen}

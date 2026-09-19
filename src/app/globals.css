@@ -103,6 +103,31 @@
   }
 }
 
+/* Thin scrollbars everywhere — the browser default (~16px) reads heavy
+   inside the app's overlay panels, which are already width-constrained. */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.4);
+}
+
 /* Mapbox GL overrides so controls read correctly in an RTL shell */
 .mapboxgl-map {
   direction: ltr;

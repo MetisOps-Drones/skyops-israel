@@ -1,9 +1,11 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { MapHome } from "@/components/layout/MapHome";
 import { BubbleLauncher } from "@/components/layout/BubbleLauncher";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useBubbleLauncherStore } from "@/stores/useBubbleLauncherStore";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
 
@@ -35,6 +37,12 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const style = overlayStyle(pathname);
+  const setRingOpen = useBubbleLauncherStore((s) => s.setRingOpen);
+
+  function handleBack() {
+    setRingOpen(true);
+    router.push("/map");
+  }
 
   return (
     <div className="relative h-screen overflow-hidden">
@@ -66,6 +74,20 @@ export function AppShell({
         >
           <DialogTitle className="sr-only">תוכן העמוד</DialogTitle>
           <DialogDescription className="sr-only">תוכן העמוד שנבחר מהתפריט, מוצג כשכבה מעל המפה</DialogDescription>
+          {/* Sits just start-of (i.e. before, in RTL further right of) the X
+              from DialogContent's own DialogPrimitive.Close — that one exits
+              to the plain map, this one reopens the bubble ring on the way
+              out so the pilot lands back on "all the open bubbles" instead
+              of having to re-tap the launcher from scratch. */}
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label="חזרה לתפריט הבועות"
+            title="חזרה לתפריט הבועות"
+            className="absolute end-12 top-2 z-10 rounded-sm p-2.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
           {/* min-w-0: DialogContent is display:grid, so this is a grid item —
               without an explicit min-width it defaults to "auto" (its
               content's intrinsic width), which lets any unwrappable child
