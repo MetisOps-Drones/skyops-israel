@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, ShieldCheck, ShieldOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -52,11 +52,15 @@ export function AdminPilotsPageClient() {
             )}
             {pilots.map((p) => (
               <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.full_name}</TableCell>
-                <TableCell dir="ltr" className="text-end">
+                <TableCell className="max-w-[70px] truncate font-medium" title={p.full_name ?? undefined}>
+                  {p.full_name}
+                </TableCell>
+                <TableCell dir="ltr" className="max-w-[85px] truncate text-end" title={p.phone ?? undefined}>
                   {p.phone ?? "—"}
                 </TableCell>
-                <TableCell>{p.professional_category ?? "—"}</TableCell>
+                <TableCell className="max-w-[70px] truncate" title={p.professional_category ?? undefined}>
+                  {p.professional_category ?? "—"}
+                </TableCell>
                 <TableCell>
                   {p.freelance_available ? <Badge variant="success">כן</Badge> : <Badge variant="secondary">לא</Badge>}
                 </TableCell>
@@ -72,12 +76,14 @@ export function AdminPilotsPageClient() {
                 </TableCell>
                 <TableCell>
                   <Button
-                    size="sm"
+                    size="icon"
                     variant={p.is_verified_pilot ? "outline" : "default"}
+                    className="h-7 w-7"
                     onClick={() => toggle(p.id, !p.is_verified_pilot)}
                     disabled={setVerified.isPending}
+                    title={p.is_verified_pilot ? "הסרת אימות" : "אימות"}
                   >
-                    {p.is_verified_pilot ? "הסרת אימות" : "אימות"}
+                    {p.is_verified_pilot ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                   </Button>
                 </TableCell>
               </TableRow>

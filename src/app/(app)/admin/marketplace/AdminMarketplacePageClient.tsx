@@ -30,9 +30,9 @@ function OverviewCards() {
             <p className="text-xs text-muted-foreground">סה״כ</p>
           </div>
           {overview.map((s) => (
-            <div key={s.status} className="rounded-lg border p-3 text-center">
+            <div key={s.status} className="min-w-0 rounded-lg border p-3 text-center">
               <p className="text-2xl font-bold">{s.booking_count}</p>
-              <Badge variant={STATUS_VARIANT[s.status]} className="mt-1">
+              <Badge variant={STATUS_VARIANT[s.status]} className="mt-1 max-w-full truncate" title={STATUS_LABEL[s.status]}>
                 {STATUS_LABEL[s.status]}
               </Badge>
             </div>
@@ -124,17 +124,17 @@ function AllBookingsTable() {
             )}
             {bookings.map((b) => (
               <TableRow key={b.id}>
-                <TableCell className="max-w-[90px] truncate font-medium" title={b.title}>
+                <TableCell className="max-w-[65px] truncate font-medium" title={b.title}>
                   {b.title}
                 </TableCell>
-                <TableCell className="max-w-[80px] truncate" title={b.org_name ?? undefined}>
+                <TableCell className="max-w-[60px] truncate" title={b.org_name ?? undefined}>
                   {b.org_name ?? "—"}
                 </TableCell>
-                <TableCell className="max-w-[100px] truncate" title={b.pilot_full_name ?? undefined}>
+                <TableCell className="max-w-[75px] truncate" title={b.pilot_full_name ?? undefined}>
                   {b.pilot_full_name ?? "—"}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[b.status]} className="max-w-[90px] truncate" title={STATUS_LABEL[b.status]}>
+                  <Badge variant={STATUS_VARIANT[b.status]} className="max-w-[70px] truncate" title={STATUS_LABEL[b.status]}>
                     {STATUS_LABEL[b.status]}
                   </Badge>
                 </TableCell>
