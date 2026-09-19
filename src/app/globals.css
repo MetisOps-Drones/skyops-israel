@@ -95,6 +95,12 @@
 
   html {
     scroll-behavior: smooth;
+    /* Every Tailwind text/spacing size is rem-based, so this one number
+       shrinks type AND spacing consistently across every page at once —
+       the deliberate lever for "make it all smaller everywhere" instead of
+       hunting down every individual text-* class. 87.5% of the 16px
+       browser default = a 14px root. */
+    font-size: 87.5%;
   }
 
   body {

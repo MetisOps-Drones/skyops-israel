@@ -124,20 +124,25 @@ function AllBookingsTable() {
             )}
             {bookings.map((b) => (
               <TableRow key={b.id}>
-                <TableCell className="font-medium">{b.title}</TableCell>
-                <TableCell>{b.org_name ?? "—"}</TableCell>
-                <TableCell>{b.pilot_full_name ?? "—"}</TableCell>
+                <TableCell className="max-w-[90px] truncate font-medium" title={b.title}>
+                  {b.title}
+                </TableCell>
+                <TableCell className="max-w-[80px] truncate" title={b.org_name ?? undefined}>
+                  {b.org_name ?? "—"}
+                </TableCell>
+                <TableCell className="max-w-[100px] truncate" title={b.pilot_full_name ?? undefined}>
+                  {b.pilot_full_name ?? "—"}
+                </TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[b.status]} className="max-w-[110px] truncate" title={STATUS_LABEL[b.status]}>
+                  <Badge variant={STATUS_VARIANT[b.status]} className="max-w-[90px] truncate" title={STATUS_LABEL[b.status]}>
                     {STATUS_LABEL[b.status]}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   {b.status !== "invited" && b.status !== "declined" && (
-                    <Button size="sm" variant="outline" asChild>
+                    <Button size="icon" variant="outline" className="h-7 w-7" asChild title="צפייה בצ׳אט">
                       <Link href={`/marketplace/bookings/${b.id}`}>
                         <MessageSquare className="h-3.5 w-3.5" />
-                        צפייה בצ׳אט
                       </Link>
                     </Button>
                   )}
