@@ -542,6 +542,8 @@ export type Database = {
           linked_license_id: string | null
           ocr_confidence: number | null
           ocr_extracted_expires_at: string | null
+          ocr_extracted_id_number: string | null
+          ocr_extracted_name: string | null
           ocr_status: Database["public"]["Enums"]["document_ocr_status"]
           storage_path: string
           uploaded_at: string
@@ -553,6 +555,8 @@ export type Database = {
           linked_license_id?: string | null
           ocr_confidence?: number | null
           ocr_extracted_expires_at?: string | null
+          ocr_extracted_id_number?: string | null
+          ocr_extracted_name?: string | null
           ocr_status?: Database["public"]["Enums"]["document_ocr_status"]
           storage_path: string
           uploaded_at?: string
@@ -564,6 +568,8 @@ export type Database = {
           linked_license_id?: string | null
           ocr_confidence?: number | null
           ocr_extracted_expires_at?: string | null
+          ocr_extracted_id_number?: string | null
+          ocr_extracted_name?: string | null
           ocr_status?: Database["public"]["Enums"]["document_ocr_status"]
           storage_path?: string
           uploaded_at?: string
@@ -628,6 +634,47 @@ export type Database = {
           {
             foreignKeyName: "drone_maintenance_log_logged_by_fkey"
             columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drone_platform_connections: {
+        Row: {
+          account_label: string | null
+          connected_at: string
+          id: string
+          last_synced_at: string | null
+          platform: Database["public"]["Enums"]["drone_platform"]
+          status: Database["public"]["Enums"]["drone_platform_connection_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_label?: string | null
+          connected_at?: string
+          id?: string
+          last_synced_at?: string | null
+          platform: Database["public"]["Enums"]["drone_platform"]
+          status?: Database["public"]["Enums"]["drone_platform_connection_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_label?: string | null
+          connected_at?: string
+          id?: string
+          last_synced_at?: string | null
+          platform?: Database["public"]["Enums"]["drone_platform"]
+          status?: Database["public"]["Enums"]["drone_platform_connection_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drone_platform_connections_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1082,6 +1129,67 @@ export type Database = {
           {
             foreignKeyName: "government_validation_requests_requested_by_fkey"
             columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      identity_verifications: {
+        Row: {
+          created_at: string
+          face_match_result: Database["public"]["Enums"]["identity_verification_result"]
+          face_similarity: number | null
+          id: string
+          id_card_document_id: string | null
+          id_number_text_match: boolean | null
+          license_document_id: string | null
+          method: string
+          name_text_match: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          face_match_result?: Database["public"]["Enums"]["identity_verification_result"]
+          face_similarity?: number | null
+          id?: string
+          id_card_document_id?: string | null
+          id_number_text_match?: boolean | null
+          license_document_id?: string | null
+          method?: string
+          name_text_match?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          face_match_result?: Database["public"]["Enums"]["identity_verification_result"]
+          face_similarity?: number | null
+          id?: string
+          id_card_document_id?: string | null
+          id_number_text_match?: boolean | null
+          license_document_id?: string | null
+          method?: string
+          name_text_match?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_verifications_id_card_document_id_fkey"
+            columns: ["id_card_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "identity_verifications_license_document_id_fkey"
+            columns: ["license_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "identity_verifications_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3124,7 +3232,10 @@ export type Database = {
         | "pilot_license"
         | "drone_registration"
         | "insurance_certificate"
+        | "id_card"
       document_ocr_status: "pending" | "processing" | "completed" | "failed"
+      drone_platform: "dji" | "autel"
+      drone_platform_connection_status: "connected" | "disconnected"
       drone_status:
         | "operational"
         | "maintenance_required"
@@ -3164,6 +3275,11 @@ export type Database = {
         | "verified"
         | "rejected"
         | "error"
+      identity_verification_result:
+        | "match"
+        | "no_match"
+        | "inconclusive"
+        | "not_run"
       inventory_item_category:
         | "propeller"
         | "battery"
@@ -3853,8 +3969,11 @@ export const Constants = {
         "pilot_license",
         "drone_registration",
         "insurance_certificate",
+        "id_card",
       ],
       document_ocr_status: ["pending", "processing", "completed", "failed"],
+      drone_platform: ["dji", "autel"],
+      drone_platform_connection_status: ["connected", "disconnected"],
       drone_status: [
         "operational",
         "maintenance_required",
@@ -3898,6 +4017,12 @@ export const Constants = {
         "verified",
         "rejected",
         "error",
+      ],
+      identity_verification_result: [
+        "match",
+        "no_match",
+        "inconclusive",
+        "not_run",
       ],
       inventory_item_category: [
         "propeller",

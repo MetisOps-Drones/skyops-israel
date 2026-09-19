@@ -7,6 +7,7 @@ import { MaintenanceBanner } from "@/components/logs/MaintenanceBanner";
 import { FlightLogTable } from "@/components/logs/FlightLogTable";
 import { LogEntryModal } from "@/components/logs/LogEntryModal";
 import { TelemetryUploader } from "@/components/logs/TelemetryUploader";
+import { DronePlatformSyncPanel } from "@/components/logs/DronePlatformSyncPanel";
 import { FleetHealthDashboard } from "@/components/logs/FleetHealthDashboard";
 import { ExportReportButton } from "@/components/logs/ExportReportButton";
 import { DroneFleetTable } from "@/components/logs/DroneFleetTable";
@@ -76,7 +77,10 @@ export function LogsPageClient() {
           </TabsContent>
 
           <TabsContent value="import">
-            <TelemetryUploader />
+            <div className="flex flex-col gap-4">
+              <DronePlatformSyncPanel />
+              <TelemetryUploader />
+            </div>
           </TabsContent>
 
           <TabsContent value="equipment">
@@ -105,7 +109,10 @@ export function LogsPageClient() {
           </TabsContent>
 
           <TabsContent value="import">
-            <TelemetryUploader />
+            <div className="flex flex-col gap-4">
+              <DronePlatformSyncPanel />
+              <TelemetryUploader />
+            </div>
           </TabsContent>
 
           <TabsContent value="batteries">
@@ -161,7 +168,10 @@ export function LogsPageClient() {
           </TabsContent>
 
           <TabsContent value="import">
-            <TelemetryUploader />
+            <div className="flex flex-col gap-4">
+              <DronePlatformSyncPanel />
+              <TelemetryUploader />
+            </div>
           </TabsContent>
 
           <TabsContent value="fleet">
