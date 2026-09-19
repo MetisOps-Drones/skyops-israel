@@ -22,6 +22,7 @@ import {
 import { useDrones, useCreateDrone } from "@/hooks/useDrones";
 import { useMyLicenses } from "@/hooks/useLicenses";
 import { LicenseUploadDialog } from "@/components/dashboard/LicenseUploadDialog";
+import { IdentityVerificationCard } from "@/components/profile/IdentityVerificationCard";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { SettingsMenu } from "@/components/profile/SettingsMenu";
 import { SpecialAuthorizationsCard } from "@/components/profile/SpecialAuthorizationsCard";
@@ -290,6 +291,8 @@ export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) 
               )}
             </CardContent>
           </Card>
+
+          <IdentityVerificationCard />
         </>
       )}
     </div>
