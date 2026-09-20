@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { UserRound, Bell, CreditCard, Briefcase, Building2, Loader2, ExternalLink } from "lucide-react";
+import { UserRound, Bell, CreditCard, Briefcase, Building2, Loader2, ExternalLink, LogOut } from "lucide-react";
+import { signOut } from "@/actions/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,6 +362,19 @@ export function SettingsMenu({ profile }: { profile: Profile }) {
             <OrgRoleSection profile={profile} />
           </Disclosure>
         )}
+
+        {/* There was previously no way to reach this at all — signOut()
+            existed as a server action with nothing in the UI calling it. */}
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-destructive/30 px-3 py-2.5 text-right text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+            <LogOut className="h-4 w-4" />
+          </span>
+          <span className="text-sm font-medium">התנתקות</span>
+        </button>
       </CardContent>
 
       <SubscriptionDialog profile={profile} open={subscriptionOpen} onOpenChange={setSubscriptionOpen} />
