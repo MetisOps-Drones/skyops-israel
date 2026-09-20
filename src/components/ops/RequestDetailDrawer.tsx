@@ -19,6 +19,7 @@ import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
+import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -212,6 +213,18 @@ export function RequestDetailDrawer({
               <Separator />
               <div className="flex flex-col gap-2">
                 <Button onClick={() => setNotamModalOpen(true)}>פרסום NOTAM</Button>
+                <div className="flex flex-wrap gap-1.5">
+                  {REJECT_REASON_TEMPLATES.map((template) => (
+                    <button
+                      key={template}
+                      type="button"
+                      onClick={() => setRejectReason(template)}
+                      className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+                    >
+                      {template}
+                    </button>
+                  ))}
+                </div>
                 <textarea
                   className="w-full rounded-md border border-input p-2 text-sm"
                   placeholder="סיבת דחייה..."

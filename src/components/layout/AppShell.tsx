@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { MapHome } from "@/components/layout/MapHome";
 import { BubbleLauncher } from "@/components/layout/BubbleLauncher";
+import { NewCoordinationRequestToast } from "@/components/layout/NewCoordinationRequestToast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useBubbleLauncherStore } from "@/stores/useBubbleLauncherStore";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ export function AppShell({
     <div className="relative h-screen overflow-hidden">
       <MapHome />
       <BubbleLauncher role={profile.role} />
+      {profile.role === "dispatcher_admin" && <NewCoordinationRequestToast />}
 
       <Dialog
         open={style !== "none"}
