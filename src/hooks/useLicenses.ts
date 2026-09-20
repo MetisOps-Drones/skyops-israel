@@ -9,9 +9,20 @@ export function useMyLicenses() {
     queryKey: ["pilot_licenses"],
     queryFn: async (): Promise<Tables<"pilot_licenses">[]> => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      // Explicit user_id filter, not just RLS: "Dispatcher admins read all
+      // licenses" is a separate permissive SELECT policy for the dispatcher
+      // review screens — for a dispatcher_admin account, an unfiltered
+      // select("*") here silently returned every pilot's license rows
+      // (RLS policies are OR'd), so "my licenses" was actually showing
+      // whichever row sorted first across the whole table.
       const { data, error } = await supabase
         .from("pilot_licenses")
         .select("*")
+        .eq("user_id", user.id)
         .order("expires_at", { ascending: true });
       if (error) throw error;
       return data;
@@ -25,9 +36,14 @@ export function useHasValidInsurance() {
     queryKey: ["documents", "insurance_certificate", "valid"],
     queryFn: async (): Promise<boolean> => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return false;
       const { count, error } = await supabase
         .from("documents")
         .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
         .eq("kind", "insurance_certificate")
         .not("ocr_extracted_expires_at", "is", null)
         .gte("ocr_extracted_expires_at", new Date().toISOString().slice(0, 10));

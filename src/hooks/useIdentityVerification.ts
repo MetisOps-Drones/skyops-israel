@@ -9,9 +9,17 @@ export function useMyDocumentsByKind(kind: Tables<"documents">["kind"]) {
     queryKey: ["documents", kind],
     queryFn: async (): Promise<Tables<"documents">[]> => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      // "Dispatcher admins read all documents" is a separate permissive
+      // SELECT policy — without this filter a dispatcher_admin's own
+      // documents list returned every pilot's uploaded documents.
       const { data, error } = await supabase
         .from("documents")
         .select("*")
+        .eq("user_id", user.id)
         .eq("kind", kind)
         .order("uploaded_at", { ascending: false });
       if (error) throw error;
@@ -25,9 +33,14 @@ export function useMyIdentityVerifications() {
     queryKey: ["identity_verifications"],
     queryFn: async (): Promise<Tables<"identity_verifications">[]> => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
       const { data, error } = await supabase
         .from("identity_verifications")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
