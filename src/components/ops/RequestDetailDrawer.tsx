@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 import { useRejectFlightRequest, useOverlappingFlightRequests } from "@/hooks/useFlightRequests";
+import { markFlightRequestViewedByDispatcher } from "@/actions/flight-requests";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import { AlertTriangle } from "lucide-react";
 import { usePilotLicensesForDispatcher } from "@/hooks/useLicenses";
@@ -38,6 +39,16 @@ export function RequestDetailDrawer({
   const rejectMutation = useRejectFlightRequest();
   const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
   const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
+
+  // Opening this drawer is the moment the pilot's 30-minute self-edit
+  // window closes (see flightRequestEditEligibility) — fire-and-forget,
+  // idempotent server-side (only ever sets the timestamp once), so this
+  // doesn't need to block the drawer opening or show its own loading state.
+  useEffect(() => {
+    if (request?.id) {
+      markFlightRequestViewedByDispatcher(request.id).catch(() => {});
+    }
+  }, [request?.id]);
 
   if (!request) return null;
 

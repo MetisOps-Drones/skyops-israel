@@ -29,6 +29,9 @@ function notificationHref(n: Tables<"notifications">): string | null {
   if (n.kind === "contact_request_received") {
     return "/dashboard";
   }
+  if (n.kind === "recommended_flight_window") {
+    return "/map";
+  }
   return null;
 }
 

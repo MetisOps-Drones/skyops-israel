@@ -12,6 +12,7 @@ import { MapSearchBox } from "@/components/map/MapSearchBox";
 import type { FlightRequestSearchResult } from "@/hooks/useMapSearch";
 import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
+import { checkRecommendedFlightWindows } from "@/actions/flight-window-recommendation";
 import { DEFAULT_MAP_BASE_STYLE, DEFAULT_MAP_LAYER_VISIBILITY, type MapBaseStyle, type MapLayerVisibility } from "@/lib/types/map-ui";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,34 @@ export function MapHome() {
       setDrawerOpen(true);
     }
   }, [drawMode]);
+
+  // "Recommended flight window" notifications (product-audit idea #1) —
+  // once a day, once live location resolves (or the watch gives up),
+  // checks the pilot's current spot plus their own usual coordination
+  // areas against the real forecast and notifies them if a genuinely safe
+  // window turns up. No new geolocation permission prompt: this reuses the
+  // same watch already running above for the airspace HUD, it doesn't
+  // start its own.
+  useEffect(() => {
+    if (currentLocation.loading) return;
+    const STORAGE_KEY = "metisops:flight-window-check-date";
+    const today = new Date().toISOString().slice(0, 10);
+    let lastChecked: string | null = null;
+    try {
+      lastChecked = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Private browsing / blocked storage — fall through and just check
+      // again this session rather than failing silently forever.
+    }
+    if (lastChecked === today) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, today);
+    } catch {
+      // Nothing to persist across reloads then — still fine to run once now.
+    }
+    checkRecommendedFlightWindows(currentLocation.coords).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed only on the loading transition, not on coords changing (watchPosition fires repeatedly) or this would re-check on every GPS update.
+  }, [currentLocation.loading]);
 
   function recenterToCurrentLocation() {
     if (!("geolocation" in navigator)) {

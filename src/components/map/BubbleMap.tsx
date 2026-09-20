@@ -70,6 +70,15 @@ export function BubbleMap({
   const mapRef = useRef<MapRef | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const [isSizingRadius, setIsSizingRadius] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A touch device has no hover state to reveal a coordination's details on
+  // — a long press stands in for it there, so a normal tap/pan while
+  // browsing the map never opens a card by accident.
+  useEffect(() => {
+    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
+  }, []);
 
   const {
     drawMode,
@@ -490,6 +499,11 @@ export function BubbleMap({
             latitude={m.point[1]}
             anchor="center"
             onClick={(e) => {
+              // Keyboard/accessibility fallback only — mouse users get the
+              // card from hover (below) before a click would ever land, and
+              // a touch tap here is deliberately NOT enough on its own (see
+              // the long-press handlers on the button) so panning the map
+              // with a finger never pops a card by accident.
               e.originalEvent.stopPropagation();
               setSelectedCoordinationId(m.id);
             }}
@@ -499,6 +513,24 @@ export function BubbleMap({
               aria-label={FLIGHT_REQUEST_STATUS_LABELS[m.status]}
               className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white shadow"
               style={{ backgroundColor: FLIGHT_REQUEST_STATUS_COLORS[m.status] }}
+              onMouseEnter={() => {
+                if (!isTouchDevice) setSelectedCoordinationId(m.id);
+              }}
+              onMouseLeave={() => {
+                if (!isTouchDevice) setSelectedCoordinationId((current) => (current === m.id ? null : current));
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                longPressTimer.current = setTimeout(() => setSelectedCoordinationId(m.id), 500);
+              }}
+              onTouchEnd={() => {
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              }}
+              onTouchMove={() => {
+                // Finger is panning the map, not holding still — a real
+                // long press never travels.
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              }}
             >
               <Radar className="h-3 w-3 text-white" />
             </button>

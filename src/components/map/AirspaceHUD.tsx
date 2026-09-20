@@ -2,7 +2,7 @@
 
 import { CheckCircle2, XCircle, Loader2, Wind, ArrowUpToLine } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
-import { windSafety } from "@/components/map/WeatherPanel";
+import { windSafety } from "@/lib/weather/windSafety";
 import { useLocationClearance } from "@/hooks/useLocationClearance";
 import { useAipMaxAltitude } from "@/hooks/useAipMaxAltitude";
 import { useAirspaceZones } from "@/hooks/useAirspaceZones";

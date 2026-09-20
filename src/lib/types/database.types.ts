@@ -991,6 +991,7 @@ export type Database = {
           drone_id: string | null
           emergency_contact_phone: string | null
           end_time: string
+          first_viewed_by_dispatcher_at: string | null
           flight_purpose: Database["public"]["Enums"]["flight_purpose"]
           id: string
           intersecting_zone_ids: string[]
@@ -1016,6 +1017,7 @@ export type Database = {
           drone_id?: string | null
           emergency_contact_phone?: string | null
           end_time: string
+          first_viewed_by_dispatcher_at?: string | null
           flight_purpose?: Database["public"]["Enums"]["flight_purpose"]
           id?: string
           intersecting_zone_ids?: string[]
@@ -1041,6 +1043,7 @@ export type Database = {
           drone_id?: string | null
           emergency_contact_phone?: string | null
           end_time?: string
+          first_viewed_by_dispatcher_at?: string | null
           flight_purpose?: Database["public"]["Enums"]["flight_purpose"]
           id?: string
           intersecting_zone_ids?: string[]
@@ -3313,6 +3316,7 @@ export type Database = {
         | "booking_message_received"
         | "coordination_requested"
         | "flight_request_rejected"
+        | "recommended_flight_window"
       org_membership_status: "pending" | "active" | "rejected" | "removed"
       special_authorization_status: "pending_payment" | "active" | "expired"
       user_role:
@@ -4059,6 +4063,7 @@ export const Constants = {
         "booking_message_received",
         "coordination_requested",
         "flight_request_rejected",
+        "recommended_flight_window",
       ],
       org_membership_status: ["pending", "active", "rejected", "removed"],
       special_authorization_status: ["pending_payment", "active", "expired"],
