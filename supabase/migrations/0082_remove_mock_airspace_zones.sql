@@ -1,0 +1,34 @@
+-- 0012 seeded airspace_zones with four made-up shapes for early
+-- development, its own header admitting as much: "Coordinates are
+-- approximate and for development use only — do not fly on these." All
+-- four turned out to be either duplicates of, or cruder than, real zones
+-- already in aip_reference_zones (185 rows, 179 with precise AIP-sourced
+-- geometry) that this app now actually enforces against
+-- (checkFlightAuthorizationRequirement) — keeping them only left stale,
+-- inaccurate shapes on the map and in the (functionally vestigial, given
+-- only 4 rows ever existed) find_intersecting_zones auto-clear check:
+--
+-- - "Ben Gurion CTR" (a crude 9km circle) — aip_reference_zones already has
+--   the real LLBG zone (kind TMA, precise geometry, real 3000-9000ft AIP
+--   altitude band).
+-- - "Palmachim Airbase Restricted Area" (a crude 12km circle) — exact
+--   duplicate of the real LLPL CTR zone (precise geometry).
+-- - "Tel Aviv Urban Zone" (a bounding box over all of central Tel Aviv) —
+--   not how the real regulation works at all; there's no blanket
+--   "restricted city" designation. The real restrictions in that exact
+--   area are 9 separate, precisely located PROHIBITED points already in
+--   aip_reference_zones (PM's office, police HQ, specific named sites,
+--   etc.), each with a legitimate small zone, not a rectangle over the
+--   whole city.
+-- - "North Firing Zone" (a bounding box over the Golan/Upper Galilee) —
+--   that area alone already has 8 real, distinct, precisely-typed AIP
+--   zones (two airport CTRs, two nature reserves, two danger areas, a
+--   restricted point, a prohibited point) — a single rectangle labeled
+--   "firing zone" both duplicated and mischaracterized what's actually
+--   there.
+--
+-- This migration only documents/replays a cleanup already applied directly
+-- to production on 2026-09-23 (all four rows matched
+-- source_notes ilike '%mock data%') — kept here so a fresh database build
+-- from migrations doesn't resurrect them.
+delete from airspace_zones where source_notes ilike '%mock data%';
