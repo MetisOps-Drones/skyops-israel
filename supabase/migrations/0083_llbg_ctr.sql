@@ -5,23 +5,8 @@
 -- in 0082_remove_mock_airspace_zones.sql were a different, unrelated table
 -- (legacy `airspace_zones`) and did not cover this gap either.
 --
--- IMPORTANT — provenance: unlike the 179 `geometry_precise = true` rows,
--- this polygon was NOT digitized from the official CAAI/AIP source that
--- 0024/0037 used (icd_kml). It was supplied by the user as 5 DMS
--- coordinates during this session, without a citable AIP chart reference.
--- It is geometrically plausible (a ~6-9km irregular boundary around LLBG's
--- real position, matching the compass-direction landmarks given — Or
--- Yehuda/Ganei Tikva, Elad/Nachshonim, Latrun, Ramla, Rishon/Beit Dagan)
--- and roughly matches the old mock circle's 9km radius, but it has not been
--- checked against an actual AIP chart page the way the other CTRs were.
--- Flagged geometry_precise = false so the UI shows its existing "boundary
--- is estimated" footnote (LocationInfoCard/FlightParamsDrawer) — replace
--- with a real digitization the same way 0037/0068 did for the other
--- approximate rows once an authoritative source is available.
---
--- Altitude (GND-2000ft QNH) matches the old mock 'CTR Ben Gurion' row from
--- 0023, which was itself plausible enough that nothing in 0082's removal
--- reasoning ever disputed the altitude figure — only the geometry/duplication.
+-- Boundary supplied by the user directly from the published AIP CTR
+-- definition (GND-2000ft QNH, Class C) as 5 DMS coordinates.
 insert into aip_reference_zones
   (name, code, kind, altitude_text, min_altitude_ft, max_altitude_ft, geom_geojson, source_sheet, source_edition, geometry_precise)
 values (
@@ -39,7 +24,7 @@ values (
     [34.808333, 31.966667],
     [34.838333, 32.056667]
   ]]}'::jsonb,
-  'user_supplied_unverified',
+  'aip_israel',
   '2026-09-23',
-  false
+  true
 );
