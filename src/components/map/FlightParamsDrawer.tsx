@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as turf from "@turf/turf";
 import { Loader2, Radius, Waypoints, ShieldAlert, Lock, Gauge } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Disclosure } from "@/components/ui/disclosure";
 import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
@@ -264,11 +265,12 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>פרטי בקשת טיסה</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] w-[92vw] max-w-md overflow-y-auto rounded-xl">
+        <DialogHeader>
+          <DialogTitle>פרטי בקשת טיסה</DialogTitle>
+          <DialogDescription className="sr-only">טופס הגשת בקשת תיאום טיסה לנקודה שנבחרה על המפה</DialogDescription>
+        </DialogHeader>
 
         <div className="mt-4 flex flex-col gap-5">
           <div className="grid grid-cols-2 gap-2">
@@ -495,78 +497,80 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                                 ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
                                 : "אזור זה דורש תיאום בכפוף לתנאים"}
               </div>
-              <ul className="list-inside list-disc text-xs text-muted-foreground">
-                {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
-                {buildingCheckUnavailable && (
-                  <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
+              <Disclosure label="למה? — פירוט מלא">
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
+                  {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
+                  {buildingCheckUnavailable && (
+                    <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
+                  )}
+                  {authCheck?.reasons.map((reason, i) => (
+                    <li key={`aip-${i}`}>
+                      {reason.label}
+                      {reason.zone && !reason.zone.geometry_precise && (
+                        <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
+                      )}
+                    </li>
+                  ))}
+                  {notamCheck?.notams.map((notam) => (
+                    <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
+                      {notam.id}: {notam.eText}
+                    </li>
+                  ))}
+                  {isNearBuildingLocally && (
+                    <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
+                  )}
+                  {relevantProximityFindings.map((f, i) => (
+                    <li key={`prox-${i}`}>
+                      {f.label}
+                      {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
+                    </li>
+                  ))}
+                </ul>
+                {zoneBlockLevel === "controlled_airspace" ? (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לשלוח בקשה — המוקדן יאמת מול NOTAM עדכני לפני אישור.
+                  </p>
+                ) : blockedForHobby ? (
+                  <p className="text-xs text-muted-foreground">
+                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
+                    ופנאי) אינו זכאי לה.
+                  </p>
+                ) : groundBlockedByAltitude ? (
+                  <p className="text-xs text-muted-foreground">
+                    תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין
+                    גובה טיסה חוקי לבקש עליו תיאום, גם לחשבון ארגון.
+                  </p>
+                ) : zoneRequiresDirectorApproval ? (
+                  <p className="text-xs text-muted-foreground">
+                    אזור אסור/מסוכן לטיסה — האישור הסופי מותנה באישור פרטני של מנהל רת&quot;א שהמוקדן יצטרך להשיג מול
+                    הרשות לפני אישור הבקשה.
+                  </p>
+                ) : zoneBlockLevel === "director_approval_only" ? (
+                  <p className="text-xs text-muted-foreground">
+                    אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת&quot;א. תיאום כזה זמין רק לחשבונות ארגון.
+                  </p>
+                ) : notamCheck?.inside ? (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
+                  </p>
+                ) : needsSpecialAuthorization ? (
+                  <p className="text-xs text-muted-foreground">
+                    ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
+                  </p>
+                ) : buildingCheckUnavailable ? (
+                  <p className="text-xs text-muted-foreground">
+                    לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
+                    אוטומטי.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
+                  </p>
                 )}
-                {authCheck?.reasons.map((reason, i) => (
-                  <li key={`aip-${i}`}>
-                    {reason.label}
-                    {reason.zone && !reason.zone.geometry_precise && (
-                      <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
-                    )}
-                  </li>
+                {matchingRegulations.map((reg) => (
+                  <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
                 ))}
-                {notamCheck?.notams.map((notam) => (
-                  <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
-                    {notam.id}: {notam.eText}
-                  </li>
-                ))}
-                {isNearBuildingLocally && (
-                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
-                )}
-                {relevantProximityFindings.map((f, i) => (
-                  <li key={`prox-${i}`}>
-                    {f.label}
-                    {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
-                  </li>
-                ))}
-              </ul>
-              {zoneBlockLevel === "controlled_airspace" ? (
-                <p className="text-xs text-muted-foreground">
-                  ניתן לשלוח בקשה — המוקדן יאמת מול NOTAM עדכני לפני אישור.
-                </p>
-              ) : blockedForHobby ? (
-                <p className="text-xs text-muted-foreground">
-                  התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                  ופנאי) אינו זכאי לה.
-                </p>
-              ) : groundBlockedByAltitude ? (
-                <p className="text-xs text-muted-foreground">
-                  תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין
-                  גובה טיסה חוקי לבקש עליו תיאום, גם לחשבון ארגון.
-                </p>
-              ) : zoneRequiresDirectorApproval ? (
-                <p className="text-xs text-muted-foreground">
-                  אזור אסור/מסוכן לטיסה — האישור הסופי מותנה באישור פרטני של מנהל רת&quot;א שהמוקדן יצטרך להשיג מול
-                  הרשות לפני אישור הבקשה.
-                </p>
-              ) : zoneBlockLevel === "director_approval_only" ? (
-                <p className="text-xs text-muted-foreground">
-                  אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת&quot;א. תיאום כזה זמין רק לחשבונות ארגון.
-                </p>
-              ) : notamCheck?.inside ? (
-                <p className="text-xs text-muted-foreground">
-                  ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
-                </p>
-              ) : needsSpecialAuthorization ? (
-                <p className="text-xs text-muted-foreground">
-                  ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
-                </p>
-              ) : buildingCheckUnavailable ? (
-                <p className="text-xs text-muted-foreground">
-                  לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
-                  אוטומטי.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
-                </p>
-              )}
-              {matchingRegulations.map((reg) => (
-                <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
-              ))}
+              </Disclosure>
             </div>
           )}
 
@@ -606,7 +610,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

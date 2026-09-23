@@ -1,13 +1,19 @@
 import type { AipZoneKind } from "@/lib/types/database.types";
 
+/**
+ * Plain-language names, not ICAO/AIP jargon — a hobby pilot with a מטיסן
+ * license, not an air-traffic controller, is the reader. Each one still
+ * keeps the official code in parentheses for anyone who wants to look it
+ * up, but the words themselves should make sense on a first read.
+ */
 export const AIP_ZONE_KIND_LABELS: Record<AipZoneKind, string> = {
-  CTR: "אזור בקרת טיסה (CTR)",
-  ATZ: "אזור תעבורת שדה (ATZ)",
-  TMA: "אזור בקרת טרמינל (TMA)",
-  CTA: "אזור בקרה (CTA)",
-  RESTRICTED: "שטח מוגבל (LLR)",
-  DANGER: "שטח סכנה (LLD)",
-  PROHIBITED: "שטח אסור (LLP)",
+  CTR: "מרחב פיקוח שדה תעופה (CTR)",
+  ATZ: "מרחב תעבורה של שדה תעופה קטן (ATZ)",
+  TMA: "מרחב פיקוח גבוה ליד שדה תעופה (TMA)",
+  CTA: "מרחב טיסה מבוקר למטוסים (CTA)",
+  RESTRICTED: "אזור עם הגבלות טיסה (LLR)",
+  DANGER: "אזור מסוכן לטיסה (LLD)",
+  PROHIBITED: "אזור אסור לטיסה לגמרי (LLP)",
 };
 
 /** Amber/purple family — distinct from AIRSPACE_ZONE_COLORS so the two layers never look interchangeable. */

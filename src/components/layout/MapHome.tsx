@@ -100,6 +100,17 @@ export function MapHome() {
     toast.message("הציבו סיכה על המפה כדי לתאם מרחב אווירי לטיסה");
   }
 
+  // FlightParamsDrawer's own Cancel/submit buttons already call reset()
+  // before closing — but closing any other way (the header X, Escape,
+  // clicking the overlay) skips that button entirely and only ever called
+  // this setter, leaving the pin/circle stuck on the map until the pilot
+  // happened to start a fresh placement. Resetting here instead, on every
+  // close regardless of how it happened, covers all of them at once.
+  function handleDrawerOpenChange(next: boolean) {
+    setDrawerOpen(next);
+    if (!next) reset();
+  }
+
   function handleInspectPoint(point: [number, number]) {
     setInfoCardPoint(point);
     setInfoCardOpen(true);
@@ -208,7 +219,7 @@ export function MapHome() {
         </button>
       </div>
 
-      <FlightParamsDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <FlightParamsDrawer open={drawerOpen} onOpenChange={handleDrawerOpenChange} />
 
       <LocationInfoCard
         point={infoCardPoint}

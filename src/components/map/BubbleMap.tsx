@@ -271,7 +271,11 @@ export function BubbleMap({
   }, [shapeType, drawMode]);
 
   const handleMouseMove = useCallback(
-    (event: MapLayerMouseEvent) => {
+    // Shared by onMouseMove and onTouchMove (react-map-gl types those two
+    // props with different event classes, but both carry lngLat) — a
+    // minimal structural type here instead of MapLayerMouseEvent specifically
+    // is what lets one handler serve both without a cast.
+    (event: { lngLat: { lng: number; lat: number } }) => {
       if (!isSizingRadius || !center) return;
       const distanceKm = turf.distance(center, [event.lngLat.lng, event.lngLat.lat], { units: "kilometers" });
       setRadiusMeters(Math.max(10, Math.round(distanceKm * 1000)));
@@ -381,6 +385,17 @@ export function BubbleMap({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onTouchStart={handleMouseDown}
+        onTouchMove={handleMouseMove}
+        onTouchEnd={handleMouseUp}
+        // Dragging to size the radius was competing with the map's own
+        // drag-to-pan the whole time — both listen to the same pointer
+        // gesture, and Mapbox's own pan handler was winning most of the
+        // time on touch (its primary gesture) and some of the time even
+        // with a mouse. Disabled for exactly the one interaction that
+        // needs the drag for something else instead.
+        dragPan={!(shapeType === "circle" && drawMode === "sizing_radius")}
+        touchZoomRotate={!(shapeType === "circle" && drawMode === "sizing_radius")}
         cursor={shapeType === "circle" && drawMode !== "done" ? "crosshair" : "default"}
       >
         <NavigationControl position="top-left" />
@@ -452,7 +467,7 @@ export function BubbleMap({
             <Layer
               id="live-notam-zones-line"
               type="line"
-              paint={{ "line-color": LIVE_NOTAM_COLOR, "line-width": 2 }}
+              paint={{ "line-color": LIVE_NOTAM_COLOR, "line-width": 1, "line-dasharray": [2, 1.5] }}
             />
             {/* Faded, always-on label identifying the shape as a NOTAM (not
                 just relying on color, which a colorblind pilot or a busy map
