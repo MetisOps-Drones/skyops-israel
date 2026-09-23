@@ -103,25 +103,6 @@ export function useSwitchActiveOrg() {
   });
 }
 
-/** Creates a brand-new organization with the caller as its fleet manager — the "direct upgrade to organization" paid tier on /profile. */
-export function useCreateOrganization() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (orgName: string) => {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc("create_organization_as_owner", { org_name: orgName });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my_org_context"] });
-      queryClient.invalidateQueries({ queryKey: ["my_global_role"] });
-      queryClient.invalidateQueries({ queryKey: ["organization_members"] });
-    },
-  });
-}
-
 /** Active roster of an org — everyone a fleet manager can currently see and remove. */
 export function useActiveOrgMembers(orgId: string | null) {
   return useQuery({

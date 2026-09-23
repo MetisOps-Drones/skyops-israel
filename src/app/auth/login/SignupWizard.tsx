@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { signUpWithPassword } from "@/actions/auth";
-import { createClient } from "@/lib/supabase/client";
+import { initiateCheckout } from "@/actions/billing";
 import { PROFESSIONAL_CATEGORIES } from "@/lib/constants/professional-categories";
 import { findPlan, recommendOrgPlan, type Plan } from "@/lib/constants/plans";
 import { cn } from "@/lib/utils";
@@ -150,7 +150,10 @@ export function SignupWizard() {
       formData.set("fullName", state.fullName);
       formData.set("email", state.email);
       formData.set("password", state.password);
-      formData.set("planCode", planCode);
+      // Only ever request a free-tier plan_code from the signup request itself — the server (0082)
+      // ignores anything else anyway, since this metadata is entirely client-controlled. A paid
+      // plan/org is granted afterwards through a confirmed Cardcom checkout, below.
+      formData.set("planCode", state.customerType === "hobby" ? "private_free" : "business_free");
       if (state.customerType === "professional") {
         formData.set("role", "pilot_pro");
         formData.set("professionalCategory", state.category);
@@ -158,7 +161,7 @@ export function SignupWizard() {
       } else if (state.customerType === "hobby") {
         formData.set("role", "pilot_hobby");
       }
-      // business: role left unset — create_organization_as_owner() below sets it to fleet_manager.
+      // business: role left unset — org creation (after payment, in the Cardcom webhook) sets it to fleet_manager.
 
       const result = await signUpWithPassword({}, formData);
       if (result.error) {
@@ -166,15 +169,26 @@ export function SignupWizard() {
         return;
       }
 
-      if (state.customerType === "business") {
-        const supabase = createClient();
-        const { error: orgError } = await supabase.rpc("create_organization_as_owner", { org_name: state.orgName.trim() });
-        if (orgError) {
-          toast.error(`החשבון נוצר, אך הקמת הארגון נכשלה: ${orgError.message}. ניתן להשלים דרך "הארגון שלי".`);
-        } else if (trial) {
-          const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-          await supabase.from("profiles").update({ trial_ends_at: trialEndsAt }).eq("id", (await supabase.auth.getUser()).data.user?.id ?? "");
+      const plan = findPlan(planCode);
+      const needsPayment = plan && plan.priceIls !== null && plan.priceIls > 0;
+
+      if (needsPayment) {
+        const checkoutResult = await initiateCheckout({
+          planCode,
+          orgName: state.customerType === "business" ? state.orgName.trim() : undefined,
+          switchToPro: state.customerType === "professional",
+          trialDays: trial ? 7 : undefined,
+        });
+        if (!checkoutResult.success || !checkoutResult.redirectUrl) {
+          toast.error(
+            `החשבון נוצר, אך פתיחת עמוד התשלום נכשלה: ${checkoutResult.error ?? ""}. ניתן להשלים דרך "הארגון שלי"/"התוכנית שלי".`
+          );
+          router.push("/map");
+          router.refresh();
+          return;
         }
+        window.location.href = checkoutResult.redirectUrl;
+        return;
       }
 
       toast.success("החשבון נוצר בהצלחה!");

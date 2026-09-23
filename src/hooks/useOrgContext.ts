@@ -85,7 +85,7 @@ export function useMyGlobalRole() {
   });
 }
 
-/** Free self-serve switch between the two solo account types (hobby <-> private business/freelancer). Never used for the organization tier — that's paid and goes through useCreateOrganization. */
+/** Free self-serve switch between the two solo account types (hobby <-> private business/freelancer). Never used for the organization tier — that's paid and goes through a Cardcom checkout (src/actions/billing.ts). */
 export function useSwitchToProAccount() {
   const queryClient = useQueryClient();
 

@@ -47,8 +47,9 @@ export function useMySpecialAuthorizations() {
 }
 
 /**
- * Demo purchase — same stand-in pattern as PaywallScreen/useCreateOrganization
- * until a real payment processor is wired in. Marks the row "active" directly
+ * Demo purchase — still the old stand-in pattern (unlike org/plan upgrades,
+ * see src/actions/billing.ts, which now go through a real Cardcom checkout).
+ * Marks the row "active" directly
  * instead of going through a checkout redirect, and there's no email
  * provider yet (see src/lib/notifications/sms.ts for the one provider
  * integration that does exist) so the "file arrives by email" step is not
