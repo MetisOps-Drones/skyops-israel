@@ -135,6 +135,43 @@ function extractIdNumberFromText(text: string): string | null {
   return match?.[1] ?? null;
 }
 
+/**
+ * Best-effort label-based name extraction from plain OCR text — not a real
+ * document-layout parser (see the module doc comment on extractIdentityFields
+ * for why), but Israeli ID cards and the CAAI pilot license both print the
+ * name behind a recognizable Hebrew/English label, so a handful of regexes
+ * covers the common cases without guessing: an unmatched document returns
+ * null exactly like extractIdNumberFromText does, rather than a wrong name.
+ */
+function extractNameFromText(text: string): string | null {
+  const normalized = text.replace(/\r/g, "");
+
+  // Israeli ID card prints שם פרטי (given) and שם משפחה (family) as separate
+  // labeled fields, in either order — either half alone is still useful
+  // downstream since namesRoughlyMatch does a substring comparison.
+  const givenMatch = normalized.match(/שם\s*פרטי[:\s]+([^\n]{2,40})/);
+  const familyMatch = normalized.match(/שם\s*משפחה[:\s]+([^\n]{2,40})/);
+  if (givenMatch || familyMatch) {
+    return [givenMatch?.[1], familyMatch?.[1]]
+      .filter((s): s is string => Boolean(s))
+      .map((s) => s.trim())
+      .join(" ");
+  }
+
+  // A single combined שם/שם מלא label (how the CAAI license itself prints
+  // it) — checked after the split-field patterns above so "שם משפחה:" never
+  // matches here as a bare "שם:" label.
+  const combinedMatch = normalized.match(/שם\s*(?:מלא)?\s*[:.]\s*([^\n]{2,60})/);
+  if (combinedMatch?.[1]) return combinedMatch[1].trim();
+
+  // English fallback, for a bilingual document or a provider that only
+  // transcribes the Latin-alphabet side.
+  const englishMatch = normalized.match(/(?:full\s*)?name\s*[:.]\s*([^\n]{2,60})/i);
+  if (englishMatch?.[1]) return englishMatch[1].trim();
+
+  return null;
+}
+
 /** Deterministic per-file placeholder for local/dev use — never a real extraction, so a mismatched pair of uploads correctly shows as "no match" while an identical pair shows as "match", exercising both demo paths honestly. */
 function synthesizeIdentityFields(seedText: string): { name: string; idNumber: string } {
   const cleaned = seedText.replace(/\.[a-z0-9]+$/i, "").replace(/[^a-zA-Z֐-׿]+/g, " ").trim();
@@ -156,7 +193,7 @@ export async function extractIdentityFields(file: Blob, fileName: string): Promi
   if (ocrApiKey && ocrEndpoint) {
     const rawText = await runProviderOcr(file, ocrEndpoint, ocrApiKey);
     return {
-      name: null, // Reliable name-line extraction needs a document-layout-aware provider (e.g. Textract AnalyzeID) — left for a real provider integration rather than guessing off plain OCR text.
+      name: extractNameFromText(rawText),
       idNumber: extractIdNumberFromText(rawText),
       rawText,
       method: "ocr",
