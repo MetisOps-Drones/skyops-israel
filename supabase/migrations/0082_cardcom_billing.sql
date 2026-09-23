@@ -57,6 +57,60 @@ create policy "Users read their own checkouts"
   on billing_checkouts for select
   using (profile_id = auth.uid());
 
+-- initiateCheckout (src/actions/billing.ts) runs with the caller's own
+-- session, not service_role, and needs to insert the pending row itself
+-- and then patch in cardcom_low_profile_id (or mark it failed) once
+-- Cardcom responds. Row-level access is intentionally permissive (own
+-- rows only) — the tamper guard below is what actually keeps this safe:
+-- without it, a user could set their own amount_ils to whatever Cardcom
+-- charge they actually intend to pay (or status straight to 'paid'),
+-- and the webhook's amount/status checks would trust the tampered row.
+create policy "Users create their own checkouts"
+  on billing_checkouts for insert
+  with check (
+    profile_id = auth.uid()
+    and status = 'pending'
+    and consumed_at is null
+    and cardcom_token is null
+  );
+
+create policy "Users update their own checkouts"
+  on billing_checkouts for update
+  using (profile_id = auth.uid())
+  with check (profile_id = auth.uid());
+
+create or replace function prevent_checkout_tamper()
+returns trigger
+language plpgsql
+as $$
+begin
+  if auth.role() = 'service_role' then
+    return new;
+  end if;
+  -- Only what initiateCheckout itself needs to set post-insert: recording
+  -- Cardcom's LowProfileId, or marking the checkout failed if Cardcom's
+  -- create-checkout call itself errored. Everything that actually decides
+  -- what gets granted (amount, plan, paid/consumed) stays webhook-only.
+  if new.amount_ils is distinct from old.amount_ils
+     or new.plan_code is distinct from old.plan_code
+     or new.profile_id is distinct from old.profile_id
+     or new.intended_org_name is distinct from old.intended_org_name
+     or new.switch_to_pro is distinct from old.switch_to_pro
+     or new.trial_ends_at is distinct from old.trial_ends_at
+     or new.consumed_at is distinct from old.consumed_at
+     or new.cardcom_token is distinct from old.cardcom_token
+     or new.cardcom_token_expiry is distinct from old.cardcom_token_expiry
+     or (new.status is distinct from old.status and new.status not in ('pending', 'failed')) then
+    raise exception 'רק תהליך האימות מול הסליקה רשאי לעדכן שדות אלו';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger billing_checkouts_prevent_tamper
+  before update on billing_checkouts
+  for each row execute function prevent_checkout_tamper();
+
 create table billing_subscriptions (
   id uuid primary key default uuid_generate_v4(),
   profile_id uuid references profiles (id) on delete cascade,

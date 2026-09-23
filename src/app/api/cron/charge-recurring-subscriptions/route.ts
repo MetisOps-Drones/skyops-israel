@@ -27,10 +27,15 @@ export async function GET(request: Request) {
   const supabase = createServiceRoleClient();
   const today = new Date().toISOString().slice(0, 10);
 
+  // Include 'past_due', not just 'active': a failed charge below moves a
+  // subscription to 'past_due' with next_billing_date pushed out 1 day for
+  // retry — querying "active" only would mean that row never gets picked up
+  // again by any future run, so it would neither retry nor ever reach
+  // MAX_FAILED_ATTEMPTS to actually cancel/downgrade it.
   const { data: dueSubscriptions, error } = await supabase
     .from("billing_subscriptions")
     .select("*, profiles:profile_id ( id, full_name ), organizations:org_id ( id, name )")
-    .eq("status", "active")
+    .in("status", ["active", "past_due"])
     .lte("next_billing_date", today);
 
   if (error) {
