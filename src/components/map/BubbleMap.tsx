@@ -31,7 +31,8 @@ import {
   ISRAEL_MAP_CENTER,
   ISRAEL_MAP_DEFAULT_ZOOM,
 } from "@/lib/constants/airspace-zones";
-import { AIP_ZONE_KIND_COLORS, LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
+import { AIP_ZONE_KIND_COLORS, AIP_ZONE_KIND_LABELS, LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
+import { formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import { FLIGHT_REQUEST_STATUS_COLORS, FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import {
   DEFAULT_MAP_BASE_STYLE,
@@ -41,6 +42,9 @@ import {
   type MapLayerVisibility,
 } from "@/lib/types/map-ui";
 import { MapPin, Radar } from "lucide-react";
+
+/** Hoisted to module scope so it's a stable reference across renders — react-map-gl re-subscribes its internal feature-state listeners when this array's identity changes. */
+const ZONE_INTERACTIVE_LAYER_IDS = ["aip-reference-zones-fill", "live-notam-zones-fill"];
 
 const MAPBOX_STYLE_URLS: Record<MapBaseStyle, string> = {
   colorful: "mapbox://styles/mapbox/outdoors-v12",
@@ -73,6 +77,22 @@ export function BubbleMap({
   const [isSizingRadius, setIsSizingRadius] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Small popup preview for an AIP/NOTAM zone — hover on desktop, long
+  // press on touch (same split as the coordination markers below), always
+  // additional to the full-detail LocationInfoCard a real click/tap still
+  // opens, never a replacement for it.
+  const [zonePopup, setZonePopup] = useState<{
+    lng: number;
+    lat: number;
+    properties: Record<string, unknown>;
+  } | null>(null);
+  const zoneLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sits outside React state on purpose: it must be readable synchronously
+  // inside the very next click handler (the touchend that follows a fired
+  // long press), before any state update from setZonePopup could have
+  // re-rendered and been read back.
+  const zoneLongPressFiredRef = useRef(false);
 
   // A touch device has no hover state to reveal a coordination's details on
   // — a long press stands in for it there, so a normal tap/pan while
@@ -223,7 +243,15 @@ export function BubbleMap({
         .map((zone) => ({
           type: "Feature",
           geometry: zone.geom_geojson as unknown as GeoJSON.Geometry,
-          properties: { id: zone.id, name: zone.name, color: AIP_ZONE_KIND_COLORS[zone.kind] },
+          properties: {
+            id: zone.id,
+            name: zone.name,
+            code: zone.code,
+            kind: zone.kind,
+            color: AIP_ZONE_KIND_COLORS[zone.kind],
+            minAltitudeFt: zone.min_altitude_ft,
+            maxAltitudeFt: zone.max_altitude_ft,
+          },
         })),
     }),
     [aipZones]
@@ -246,6 +274,14 @@ export function BubbleMap({
     (event: MapLayerMouseEvent) => {
       const point: [number, number] = [event.lngLat.lng, event.lngLat.lat];
 
+      // A long press just showed the small zone popup for this exact tap —
+      // the touchend that follows it must not also pop the full
+      // LocationInfoCard open, or a pilot gets both at once.
+      if (zoneLongPressFiredRef.current) {
+        zoneLongPressFiredRef.current = false;
+        return;
+      }
+
       // Plain browsing (not actively placing a coordination pin): every
       // click — on an AIP zone or open ground — inspects that point instead
       // of starting a request, so exploring the map never accidentally
@@ -264,26 +300,71 @@ export function BubbleMap({
     [shapeType, drawMode, setCenter, setDrawMode, onInspectPoint]
   );
 
-  const handleMouseDown = useCallback(() => {
-    if (shapeType === "circle" && drawMode === "sizing_radius") {
-      setIsSizingRadius(true);
-    }
-  }, [shapeType, drawMode]);
+  const handleMouseDown = useCallback(
+    // Minimal structural type, same reasoning as handleMouseMove below —
+    // shared by onMouseDown (a real MouseEvent-backed point) and
+    // onTouchStart (a TouchEvent-backed one); both carry `.point`.
+    (event: { point: { x: number; y: number } }) => {
+      if (shapeType === "circle" && drawMode === "sizing_radius") {
+        setIsSizingRadius(true);
+        return;
+      }
+      // Long-press-to-preview only matters while just browsing — mid-draw,
+      // the pin/radius flow already owns this gesture.
+      if (!isTouchDevice || drawMode !== "idle") return;
+      const point: [number, number] = [event.point.x, event.point.y];
+      zoneLongPressTimer.current = setTimeout(() => {
+        const map = mapRef.current?.getMap();
+        if (!map) return;
+        const features = map.queryRenderedFeatures(point, { layers: ZONE_INTERACTIVE_LAYER_IDS });
+        if (!features[0]) return;
+        zoneLongPressFiredRef.current = true;
+        const lngLat = map.unproject(point);
+        setZonePopup({ lng: lngLat.lng, lat: lngLat.lat, properties: features[0].properties ?? {} });
+      }, 500);
+    },
+    [shapeType, drawMode, isTouchDevice]
+  );
 
   const handleMouseMove = useCallback(
     // Shared by onMouseMove and onTouchMove (react-map-gl types those two
-    // props with different event classes, but both carry lngLat) — a
-    // minimal structural type here instead of MapLayerMouseEvent specifically
-    // is what lets one handler serve both without a cast.
-    (event: { lngLat: { lng: number; lat: number } }) => {
-      if (!isSizingRadius || !center) return;
-      const distanceKm = turf.distance(center, [event.lngLat.lng, event.lngLat.lat], { units: "kilometers" });
-      setRadiusMeters(Math.max(10, Math.round(distanceKm * 1000)));
+    // props with different event classes, but both carry lngLat/features) —
+    // a minimal structural type here instead of MapLayerMouseEvent
+    // specifically is what lets one handler serve both without a cast.
+    (event: {
+      lngLat: { lng: number; lat: number };
+      features?: Array<{ properties?: Record<string, unknown> | null }>;
+    }) => {
+      if (isSizingRadius && center) {
+        const distanceKm = turf.distance(center, [event.lngLat.lng, event.lngLat.lat], { units: "kilometers" });
+        setRadiusMeters(Math.max(10, Math.round(distanceKm * 1000)));
+        return;
+      }
+
+      // A finger that's moving is panning, not holding still — cancel
+      // whatever long press might be timing (same rule the coordination
+      // marker buttons already use).
+      if (isTouchDevice) {
+        if (zoneLongPressTimer.current) clearTimeout(zoneLongPressTimer.current);
+        return;
+      }
+
+      // Desktop hover preview for AIP/NOTAM zones — touch gets the same
+      // preview via the long press above instead. Only while just browsing;
+      // mid-draw this would fight for the same mousemove as radius sizing.
+      if (drawMode !== "idle") return;
+      const feature = event.features?.[0];
+      if (feature) {
+        setZonePopup({ lng: event.lngLat.lng, lat: event.lngLat.lat, properties: feature.properties ?? {} });
+      } else {
+        setZonePopup((current) => (current ? null : current));
+      }
     },
-    [isSizingRadius, center, setRadiusMeters]
+    [isSizingRadius, center, setRadiusMeters, isTouchDevice, drawMode]
   );
 
   const handleMouseUp = useCallback(() => {
+    if (zoneLongPressTimer.current) clearTimeout(zoneLongPressTimer.current);
     if (isSizingRadius) {
       setIsSizingRadius(false);
       setDrawMode("done");
@@ -397,6 +478,7 @@ export function BubbleMap({
         dragPan={!(shapeType === "circle" && drawMode === "sizing_radius")}
         touchZoomRotate={!(shapeType === "circle" && drawMode === "sizing_radius")}
         cursor={shapeType === "circle" && drawMode !== "done" ? "crosshair" : "default"}
+        interactiveLayerIds={ZONE_INTERACTIVE_LAYER_IDS}
       >
         <NavigationControl position="top-left" />
 
@@ -629,6 +711,50 @@ export function BubbleMap({
                 {new Date(selectedCoordination.start_time).toLocaleString("he-IL")} –{" "}
                 {new Date(selectedCoordination.end_time).toLocaleString("he-IL")}
               </p>
+            </div>
+          </Popup>
+        )}
+
+        {/* Small preview for an AIP/NOTAM zone — hover (desktop) or long
+            press (touch), see handleMouseMove/handleMouseDown above. Same
+            "just the essentials, near the tap point" card requested as a
+            lighter alternative to opening the full LocationInfoCard for
+            every zone glance. */}
+        {zonePopup && (
+          <Popup
+            longitude={zonePopup.lng}
+            latitude={zonePopup.lat}
+            anchor="bottom"
+            offset={12}
+            closeButton
+            closeOnClick={false}
+            onClose={() => setZonePopup(null)}
+          >
+            <div className="flex flex-col gap-0.5 text-xs" dir="rtl">
+              {"kind" in zonePopup.properties ? (
+                <>
+                  <p className="font-semibold">
+                    {String(zonePopup.properties.name ?? "")}
+                    {zonePopup.properties.code ? ` (${zonePopup.properties.code})` : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {AIP_ZONE_KIND_LABELS[zonePopup.properties.kind as keyof typeof AIP_ZONE_KIND_LABELS]}
+                  </p>
+                  <p className="font-medium">
+                    {formatAltitudeRangeMeters(
+                      (zonePopup.properties.minAltitudeFt as number | null) ?? null,
+                      (zonePopup.properties.maxAltitudeFt as number | null) ?? null
+                    )}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold" style={{ color: LIVE_NOTAM_COLOR }} dir="ltr">
+                    {String(zonePopup.properties.id ?? "נוטאם")}
+                  </p>
+                  <p className="max-w-[220px]">{String(zonePopup.properties.eText ?? "")}</p>
+                </>
+              )}
             </div>
           </Popup>
         )}
