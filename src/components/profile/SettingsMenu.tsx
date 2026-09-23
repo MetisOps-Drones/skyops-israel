@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { UserRound, Bell, CreditCard, Briefcase, Building2, Loader2, ExternalLink } from "lucide-react";
+import { UserRound, Bell, CreditCard, Briefcase, Building2, Loader2, ExternalLink, LogOut } from "lucide-react";
+import { signOut } from "@/actions/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,7 +206,8 @@ function BusinessDetailsSection({
             <Label htmlFor="freelance">פנוי לעבודה עם ארגונים (מרקטפלייס)</Label>
             <p className="text-xs text-muted-foreground">
               ארגונים במרקטפלייס המטיסים יראו את הפרופיל שלך ויוכלו לבקש ליצור קשר — הפנייה מגיעה אליך לאישור, ואינך
-              יכול לגלוש במרקטפלייס בעצמך (זו תצוגה של חשבונות ארגון בלבד).
+              יכול לגלוש במרקטפלייס בעצמך (זו תצוגה של חשבונות ארגון בלבד). את התמחור ותיק העבודות שהם יראו עורכים
+              בהמשך העמוד הזה, בכרטיסי &ldquo;פרופיל מרקטפלייס&rdquo;, &ldquo;תמחור&rdquo; ו&ldquo;תיק עבודות&rdquo;.
             </p>
           </div>
           <Switch id="freelance" checked={freelanceAvailable} onCheckedChange={setFreelanceAvailable} />
@@ -250,8 +252,8 @@ function OrgRoleSection({ profile }: { profile: Profile }) {
         <Input id="title" placeholder="לדוגמה: מטיס ראשי, מנהל בטיחות" {...register("title")} />
       </div>
       <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-        בקרוב: אבטחה (כניסה דו-שלבית, ניהול התחברויות), העדפות התראה מתקדמות, והיסטוריית פעילות אישית. ניהול הארגון
-        עצמו (צוות, צי, הרשאות) נמצא ב״הארגון שלי״.
+        בקרוב: אבטחה (כניסה דו-שלבית, ניהול התחברויות), העדפות התראה מתקדמות, והיסטוריית פעילות אישית. ניהול הצוות
+        נמצא ב״הארגון שלי״, וניהול הצי (כלי טיס, תחזוקה ומלאי) תחת ״יומן טיסות״.
       </p>
       <Button type="submit" disabled={update.isPending} className="self-end">
         {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -360,6 +362,19 @@ export function SettingsMenu({ profile }: { profile: Profile }) {
             <OrgRoleSection profile={profile} />
           </Disclosure>
         )}
+
+        {/* There was previously no way to reach this at all — signOut()
+            existed as a server action with nothing in the UI calling it. */}
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-destructive/30 px-3 py-2.5 text-right text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+            <LogOut className="h-4 w-4" />
+          </span>
+          <span className="text-sm font-medium">התנתקות</span>
+        </button>
       </CardContent>
 
       <SubscriptionDialog profile={profile} open={subscriptionOpen} onOpenChange={setSubscriptionOpen} />

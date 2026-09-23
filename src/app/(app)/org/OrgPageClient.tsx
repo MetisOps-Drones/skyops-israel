@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Check, X, Copy, Loader2, Building2, UserMinus } from "lucide-react";
+import { Check, X, Copy, Loader2, Building2, UserMinus, Plane, ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -406,12 +407,32 @@ function ActiveOrgCard() {
   );
 }
 
+/** This page only ever managed the team roster — fleet management (drones, maintenance, inventory) lives under the "יומן טיסות" bubble instead, a jump a fleet manager wouldn't guess from "הארגון שלי" alone. */
+function FleetManagementLink() {
+  return (
+    <Link
+      href="/logs"
+      className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-accent"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Plane className="h-4 w-4" />
+      </span>
+      <div className="flex-1">
+        <p className="text-sm font-medium">ניהול הצי</p>
+        <p className="text-xs text-muted-foreground">כלי טיס, תחזוקה ומלאי — תחת &ldquo;יומן טיסות&rdquo;</p>
+      </div>
+      <ChevronLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
 export function OrgPageClient() {
   const { data: ctx } = useMyOrgContext();
 
   return (
     <div className="flex flex-col gap-4">
       <ActiveOrgCard />
+      {ctx?.isFleetManager && ctx.orgId && <FleetManagementLink />}
       {ctx?.isFleetManager && ctx.orgId && <PendingRequestsCard orgId={ctx.orgId} />}
       {ctx?.isFleetManager && ctx.orgId && <ActiveMembersCard orgId={ctx.orgId} myUserId={ctx.userId} />}
       <JoinOrgCard />

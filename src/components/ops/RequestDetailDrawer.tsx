@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 import { useRejectFlightRequest, useOverlappingFlightRequests } from "@/hooks/useFlightRequests";
+import { markFlightRequestViewedByDispatcher } from "@/actions/flight-requests";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import { AlertTriangle } from "lucide-react";
 import { usePilotLicensesForDispatcher } from "@/hooks/useLicenses";
@@ -18,6 +19,7 @@ import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
+import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -38,6 +40,16 @@ export function RequestDetailDrawer({
   const rejectMutation = useRejectFlightRequest();
   const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
   const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
+
+  // Opening this drawer is the moment the pilot's 30-minute self-edit
+  // window closes (see flightRequestEditEligibility) — fire-and-forget,
+  // idempotent server-side (only ever sets the timestamp once), so this
+  // doesn't need to block the drawer opening or show its own loading state.
+  useEffect(() => {
+    if (request?.id) {
+      markFlightRequestViewedByDispatcher(request.id).catch(() => {});
+    }
+  }, [request?.id]);
 
   if (!request) return null;
 
@@ -201,6 +213,18 @@ export function RequestDetailDrawer({
               <Separator />
               <div className="flex flex-col gap-2">
                 <Button onClick={() => setNotamModalOpen(true)}>פרסום NOTAM</Button>
+                <div className="flex flex-wrap gap-1.5">
+                  {REJECT_REASON_TEMPLATES.map((template) => (
+                    <button
+                      key={template}
+                      type="button"
+                      onClick={() => setRejectReason(template)}
+                      className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+                    >
+                      {template}
+                    </button>
+                  ))}
+                </div>
                 <textarea
                   className="w-full rounded-md border border-input p-2 text-sm"
                   placeholder="סיבת דחייה..."

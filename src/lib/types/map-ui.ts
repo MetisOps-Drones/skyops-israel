@@ -18,8 +18,10 @@ export type MapLayerVisibility = {
   myHistory: boolean;
   /** Admin-only: every pilot/org's active or pending coordination footprint on the platform, not just the signed-in user's own. */
   allCoordinations: boolean;
-  /** Building footprints (VIDA/Overture-style global dataset), served as vector tiles from PostGIS — visual reference only, only rendered from minzoom 14. */
+  /** Individual building footprints, served as static R2-hosted vector tiles — visual reference only, only rendered from minzoom 14. */
   buildings: boolean;
+  /** Buildings dissolved into wide "built-up area" blobs (100m connect-distance) so a cluster of houses reads as a neighborhood — visible from a lower zoom than individual buildings. */
+  neighborhoods: boolean;
 };
 
 export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
@@ -29,6 +31,7 @@ export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
   windHazard: true,
   aipReference: true,
   buildings: true,
+  neighborhoods: true,
   // Opt-in, not on by default — a pilot's own past-request dots sitting on the map by default
   // reads as unexplained clutter (surfaced as literal user confusion: "why does this just show
   // up?"). Toggle lives in LayerControlPanel under "הבקשות שלי במפה".

@@ -178,7 +178,7 @@ export function SignupWizard() {
       }
 
       toast.success("החשבון נוצר בהצלחה!");
-      router.push("/dashboard");
+      router.push("/map");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "ההרשמה נכשלה");

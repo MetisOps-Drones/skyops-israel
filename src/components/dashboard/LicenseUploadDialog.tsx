@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { uploadPilotLicenseDocument } from "@/actions/documents";
 import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
+import { DocumentCameraCapture } from "@/components/shared/DocumentCameraCapture";
 
 const LICENSE_TYPE_LABELS: Record<string, string> = {
   hobby: "תחביב",
@@ -142,13 +143,18 @@ export function LicenseUploadDialog() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="file">קובץ (PDF/JPG/PNG)</Label>
+            <Label>סריקת הרישיון</Label>
+            <DocumentCameraCapture
+              facingMode="environment"
+              guideShape="card"
+              label="מקמו את הרישיון בתוך המסגרת וצלמו — או העלו תמונה/PDF קיימים"
+              onCapture={setFile}
+            />
+            <p className="text-xs text-muted-foreground">ניתן גם להעלות PDF קיים:</p>
             <Input
-              id="file"
               type="file"
-              accept="application/pdf,image/png,image/jpeg,image/webp"
+              accept="application/pdf"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
             />
           </div>
 

@@ -4,19 +4,10 @@ import { CloudRain, Cloud, Wind, Eye, AlertTriangle, Mountain, Loader2, WifiOff 
 import { Badge } from "@/components/ui/badge";
 import { useWeather } from "@/hooks/useWeather";
 import { ftToM } from "@/lib/geo/aip";
+import { windSafety } from "@/lib/weather/windSafety";
 import type { AltitudeCeilingIngredients } from "@/hooks/useAltitudeCeiling";
 
 type CloudBase = AltitudeCeilingIngredients["cloudBase"];
-
-const UNSAFE_WIND_MS = 12;
-const CAUTION_WIND_MS = 8;
-
-export function windSafety(windSpeedMs: number | null, precipitation: boolean) {
-  if (windSpeedMs === null) return "unknown" as const;
-  if (precipitation || windSpeedMs >= UNSAFE_WIND_MS) return "unsafe" as const;
-  if (windSpeedMs >= CAUTION_WIND_MS) return "caution" as const;
-  return "safe" as const;
-}
 
 export function WeatherPanel({ center, cloudBase }: { center: [number, number] | null; cloudBase?: CloudBase }) {
   const { data, isLoading, isError } = useWeather(center);

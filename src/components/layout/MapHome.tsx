@@ -8,13 +8,20 @@ import { FlightParamsDrawer } from "@/components/map/FlightParamsDrawer";
 import { AirspaceHUD } from "@/components/map/AirspaceHUD";
 import { LayerControlPanel } from "@/components/map/LayerControlPanel";
 import { LocationInfoCard } from "@/components/map/LocationInfoCard";
-import { AddressSearchBox } from "@/components/map/AddressSearchBox";
+import { MapSearchBox } from "@/components/map/MapSearchBox";
+import type { FlightRequestSearchResult } from "@/hooks/useMapSearch";
 import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
+import { checkRecommendedFlightWindows } from "@/actions/flight-window-recommendation";
 import { DEFAULT_MAP_BASE_STYLE, DEFAULT_MAP_LAYER_VISIBILITY, type MapBaseStyle, type MapLayerVisibility } from "@/lib/types/map-ui";
 import { cn } from "@/lib/utils";
 
-export function MapPageClient() {
+/**
+ * The map itself — mounted once by AppShell for the whole app, not tied to
+ * the /map route. Every other section opens as an overlay on top of this;
+ * the map never unmounts or reloads when navigating between them.
+ */
+export function MapHome() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<[number, number] | null>(null);
@@ -23,7 +30,8 @@ export function MapPageClient() {
   const [highContrast, setHighContrast] = useState(false);
   const [infoCardPoint, setInfoCardPoint] = useState<[number, number] | null>(null);
   const [infoCardOpen, setInfoCardOpen] = useState(false);
-  const { drawMode, reset, setShapeType, setCenter, setDrawMode } = useMapDrawStore();
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const { drawMode, reset, setShapeType, setCenter, setDrawMode, setDroneId } = useMapDrawStore();
 
   const currentLocation = useCurrentLocation(true);
 
@@ -34,6 +42,34 @@ export function MapPageClient() {
       setDrawerOpen(true);
     }
   }, [drawMode]);
+
+  // "Recommended flight window" notifications (product-audit idea #1) —
+  // once a day, once live location resolves (or the watch gives up),
+  // checks the pilot's current spot plus their own usual coordination
+  // areas against the real forecast and notifies them if a genuinely safe
+  // window turns up. No new geolocation permission prompt: this reuses the
+  // same watch already running above for the airspace HUD, it doesn't
+  // start its own.
+  useEffect(() => {
+    if (currentLocation.loading) return;
+    const STORAGE_KEY = "metisops:flight-window-check-date";
+    const today = new Date().toISOString().slice(0, 10);
+    let lastChecked: string | null = null;
+    try {
+      lastChecked = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Private browsing / blocked storage — fall through and just check
+      // again this session rather than failing silently forever.
+    }
+    if (lastChecked === today) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, today);
+    } catch {
+      // Nothing to persist across reloads then — still fine to run once now.
+    }
+    checkRecommendedFlightWindows(currentLocation.coords).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed only on the loading transition, not on coords changing (watchPosition fires repeatedly) or this would re-check on every GPS update.
+  }, [currentLocation.loading]);
 
   function recenterToCurrentLocation() {
     if (!("geolocation" in navigator)) {
@@ -75,6 +111,22 @@ export function MapPageClient() {
     setInfoCardOpen(true);
   }
 
+  function handleSelectDrone(droneId: string, label: string) {
+    // reset() clears the whole draw store (including droneId), so it must
+    // run before setDroneId, not after — the ordering here directly
+    // determines whether the pre-selected drone survives.
+    reset();
+    setShapeType("circle");
+    setDrawMode("placing_pin");
+    setDroneId(droneId);
+    toast.message(`הרחפן "${label}" נבחר — הציבו סיכה על המפה כדי להתחיל בקשת טיסה`);
+  }
+
+  function handleSelectFlightRequest(result: FlightRequestSearchResult) {
+    setFlyToTarget(result.point);
+    setSelectedHistoryId(result.id);
+  }
+
   function handleRequestCoordinationFromCard(point: [number, number]) {
     reset();
     setShapeType("circle");
@@ -84,13 +136,15 @@ export function MapPageClient() {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className="absolute inset-0">
       <BubbleMap
         flyToTarget={flyToTarget}
         layerVisibility={layerVisibility}
         baseStyle={baseStyle}
         highContrast={highContrast}
         onInspectPoint={handleInspectPoint}
+        selectedHistoryId={selectedHistoryId}
+        onSelectedHistoryIdChange={setSelectedHistoryId}
       />
 
       <AirspaceHUD
@@ -108,7 +162,12 @@ export function MapPageClient() {
           highContrast={highContrast}
           onHighContrastChange={setHighContrast}
         />
-        <AddressSearchBox onSelect={handleAddressSelect} highContrast={highContrast} />
+        <MapSearchBox
+          onSelectPlace={handleAddressSelect}
+          onSelectDrone={handleSelectDrone}
+          onSelectFlightRequest={handleSelectFlightRequest}
+          highContrast={highContrast}
+        />
       </div>
 
       <div className="absolute bottom-4 end-4 z-10 flex flex-col items-end gap-3">

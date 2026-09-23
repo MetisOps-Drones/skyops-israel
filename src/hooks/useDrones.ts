@@ -10,7 +10,20 @@ export function useDrones() {
     queryKey: ["drones"],
     queryFn: async (): Promise<Tables<"drones">[]> => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("drones").select("*").order("nickname");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
+      // Mirrors the RLS scope a non-admin pilot already gets ("own drones"
+      // OR "org fleet") — made explicit because "Dispatcher admins read all
+      // drones" is a separate permissive SELECT policy, and an unfiltered
+      // select("*") for a dispatcher_admin returned every pilot's and every
+      // org's drones instead of just this pilot's own equipment.
+      const ownerFilter = profile?.org_id
+        ? `user_id.eq.${user.id},org_id.eq.${profile.org_id}`
+        : `user_id.eq.${user.id}`;
+      const { data, error } = await supabase.from("drones").select("*").or(ownerFilter).order("nickname");
       if (error) throw error;
       return data;
     },

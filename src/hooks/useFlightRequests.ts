@@ -52,24 +52,27 @@ export function usePendingCoordinationRequests() {
 
 const ADMIN_MAP_STATUSES = ["pending_dispatcher", "submitted_to_iaf", "notam_published", "auto_cleared"] as const;
 
-export type AdminFlightRequest = Tables<"flight_requests"> & {
+export type ControlTowerFlightRequest = Tables<"flight_requests"> & {
   profiles: (Pick<Tables<"profiles">, "id" | "full_name" | "org_id"> & {
     organizations: Pick<Tables<"organizations">, "name"> | null;
   }) | null;
 };
 
 /**
- * Admin-only "control tower" view: every pilot/org's active or pending
- * coordination on the platform, not filtered to the signed-in user — the map
- * layer this drives is how an admin sees the whole airspace picture at once
- * instead of one dispatcher-queue row at a time. RLS already grants
- * dispatcher_admin unrestricted access to flight_requests (0011), so this is
- * a plain query, not a security-definer RPC.
+ * "Control tower" view: every active/pending coordination the signed-in
+ * user is allowed to see beyond their own, not filtered to just the
+ * requester — the map layer this drives is how a dispatcher_admin sees the
+ * whole platform's airspace picture at once, or a fleet_manager sees their
+ * whole team's, instead of one row at a time. This is a plain query, not a
+ * security-definer RPC — RLS itself decides the actual scope per caller
+ * (dispatcher_admin gets everything, an org member gets their own org via
+ * 0011/0077), so the same query naturally returns different result sets for
+ * different callers without the client needing to know which case it is.
  */
-export function useAllFlightRequestsForAdmin(enabled: boolean) {
+export function useControlTowerFlightRequests(enabled: boolean) {
   return useQuery({
-    queryKey: ["flight_requests", "all_admin"],
-    queryFn: async (): Promise<AdminFlightRequest[]> => {
+    queryKey: ["flight_requests", "control_tower"],
+    queryFn: async (): Promise<ControlTowerFlightRequest[]> => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("flight_requests")
@@ -79,7 +82,7 @@ export function useAllFlightRequestsForAdmin(enabled: boolean) {
         .in("status", ADMIN_MAP_STATUSES)
         .order("start_time", { ascending: true });
       if (error) throw error;
-      return data as unknown as AdminFlightRequest[];
+      return data as unknown as ControlTowerFlightRequest[];
     },
     enabled,
     refetchInterval: 30_000,

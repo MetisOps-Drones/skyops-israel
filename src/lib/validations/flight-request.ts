@@ -66,6 +66,10 @@ export const createFlightRequestSchema = z
 
 export type CreateFlightRequestInput = z.infer<typeof createFlightRequestSchema>;
 
+/** Same shape as a fresh submission — editing re-runs every check a create does (see updateFlightRequest), so there's nothing an edit should validate more loosely. */
+export const updateFlightRequestSchema = createFlightRequestSchema;
+export type UpdateFlightRequestInput = z.infer<typeof updateFlightRequestSchema>;
+
 export const publishNotamSchema = z.object({
   flight_request_id: z.string().uuid(),
   notam_code: z

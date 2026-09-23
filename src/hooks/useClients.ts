@@ -4,13 +4,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/types/database.types";
 
-/** RLS returns the caller's own clients plus any their active org shares — no manual filtering needed. */
 export function useClients() {
   return useQuery({
     queryKey: ["clients"],
     queryFn: async (): Promise<Tables<"clients">[]> => {
       const supabase = createClient();
-      const { data, error } = await supabase.from("clients").select("*").order("name");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
+      // Mirrors the RLS scope a non-admin pilot already gets ("own clients"
+      // OR "org shared") — made explicit because "Dispatcher admins read all
+      // clients" is a separate permissive SELECT policy, and an unfiltered
+      // select("*") for a dispatcher_admin returned every pilot's clients
+      // instead of just this pilot's own.
+      const ownerFilter = profile?.org_id
+        ? `owner_id.eq.${user.id},org_id.eq.${profile.org_id}`
+        : `owner_id.eq.${user.id}`;
+      const { data, error } = await supabase.from("clients").select("*").or(ownerFilter).order("name");
       if (error) throw error;
       return data;
     },

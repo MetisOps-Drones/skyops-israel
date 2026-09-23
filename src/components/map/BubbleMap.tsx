@@ -18,9 +18,13 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useAirspaceZones } from "@/hooks/useAirspaceZones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
-import { useMyFlightRequests, useAllFlightRequestsForAdmin, type AdminFlightRequest } from "@/hooks/useFlightRequests";
+import {
+  useMyFlightRequests,
+  useControlTowerFlightRequests,
+  type ControlTowerFlightRequest,
+} from "@/hooks/useFlightRequests";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
-import { useMyGlobalRole } from "@/hooks/useOrgContext";
+import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import {
   AIRSPACE_ZONE_COLORS,
   ISRAEL_MAP_CENTER,
@@ -49,6 +53,8 @@ export function BubbleMap({
   baseStyle = DEFAULT_MAP_BASE_STYLE,
   highContrast = false,
   onInspectPoint,
+  selectedHistoryId = null,
+  onSelectedHistoryIdChange,
 }: {
   flyToTarget?: [number, number] | null;
   layerVisibility?: MapLayerVisibility;
@@ -57,10 +63,22 @@ export function BubbleMap({
   highContrast?: boolean;
   /** Called for a plain map click while not actively placing a coordination pin — drives LocationInfoCard. */
   onInspectPoint?: (point: [number, number]) => void;
+  /** Controlled from the parent so search results can open a request's popup directly, not just a marker click. */
+  selectedHistoryId?: string | null;
+  onSelectedHistoryIdChange?: (id: string | null) => void;
 } = {}) {
   const mapRef = useRef<MapRef | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const [isSizingRadius, setIsSizingRadius] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A touch device has no hover state to reveal a coordination's details on
+  // — a long press stands in for it there, so a normal tap/pan while
+  // browsing the map never opens a card by accident.
+  useEffect(() => {
+    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
+  }, []);
 
   const {
     drawMode,
@@ -78,11 +96,18 @@ export function BubbleMap({
   const { data: airspaceZones = [] } = useAirspaceZones();
   const { data: aipZones = [] } = useAipReferenceZones();
   const { data: myFlightRequests = [] } = useMyFlightRequests();
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const setSelectedHistoryId = onSelectedHistoryIdChange ?? (() => {});
 
   const { data: role } = useMyGlobalRole();
   const isAdmin = role === "dispatcher_admin";
-  const { data: allCoordinations = [] } = useAllFlightRequestsForAdmin(isAdmin && layerVisibility.allCoordinations);
+  const { data: orgContext } = useMyOrgContext();
+  // Platform-wide for an admin, org-scoped for a fleet manager — RLS (0011,
+  // 0077) decides which one each caller actually gets back, so the same
+  // query and the same map layer serve both roles.
+  const canSeeControlTower = isAdmin || orgContext?.isFleetManager === true;
+  const { data: allCoordinations = [] } = useControlTowerFlightRequests(
+    canSeeControlTower && layerVisibility.allCoordinations
+  );
   const [selectedCoordinationId, setSelectedCoordinationId] = useState<string | null>(null);
 
   const airspaceZonesGeojson = useMemo<GeoJSON.FeatureCollection>(
@@ -117,7 +142,16 @@ export function BubbleMap({
       .filter((h): h is NonNullable<typeof h> => h !== null);
   }, [myFlightRequests, layerVisibility.myHistory]);
 
-  const selectedHistory = historyPoints.find((h) => h.id === selectedHistoryId) ?? null;
+  // Looked up from myFlightRequests directly, not historyPoints — the popup
+  // must still open for a request picked from search even when the
+  // myHistory dot layer itself is toggled off (historyPoints is empty then).
+  const selectedHistory = useMemo(() => {
+    const r = myFlightRequests.find((req) => req.id === selectedHistoryId);
+    if (!r) return null;
+    const geom = r.center_point_geojson as unknown as GeoJSON.Point | null;
+    if (!geom || geom.type !== "Point") return null;
+    return { id: r.id, point: geom.coordinates as [number, number], status: r.status, startTime: r.start_time };
+  }, [myFlightRequests, selectedHistoryId]);
   const selectedHistoryCity = useReverseGeocode(selectedHistory?.point ?? null);
 
   /** Admin-only "control tower" layer: every active/pending request's actual footprint (buffered circle or drawn polygon), colored by status — not just a dot like the personal history layer. */
@@ -387,6 +421,37 @@ export function BubbleMap({
           </Source>
         )}
 
+        {/* Wide "this whole area is built-up" fill — buildings dissolved into
+            blobs by 100m connect-distance, so a cluster of houses reads as
+            one shape (a neighborhood/settlement) instead of hundreds of
+            individual footprints. Visible from a much lower zoom than the
+            buildings layer itself, which only makes sense once you're
+            already zoomed into a specific block. */}
+        {layerVisibility.neighborhoods && process.env.NEXT_PUBLIC_R2_PUBLIC_URL && (
+          <Source
+            id="neighborhoods"
+            type="vector"
+            tiles={[`${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/neighborhoods/{z}/{x}/{y}.pbf`]}
+            minzoom={11}
+            maxzoom={14}
+          >
+            <Layer
+              id="neighborhoods-fill"
+              type="fill"
+              source-layer="neighborhoods"
+              minzoom={11}
+              paint={{ "fill-color": "#8b8478", "fill-opacity": 0.35 }}
+            />
+            <Layer
+              id="neighborhoods-line"
+              type="line"
+              source-layer="neighborhoods"
+              minzoom={11}
+              paint={{ "line-color": "#6b645a", "line-width": 0.5, "line-opacity": 0.6 }}
+            />
+          </Source>
+        )}
+
         {layerVisibility.buildings && process.env.NEXT_PUBLIC_R2_PUBLIC_URL && (
           <Source
             id="buildings"
@@ -434,6 +499,11 @@ export function BubbleMap({
             latitude={m.point[1]}
             anchor="center"
             onClick={(e) => {
+              // Keyboard/accessibility fallback only — mouse users get the
+              // card from hover (below) before a click would ever land, and
+              // a touch tap here is deliberately NOT enough on its own (see
+              // the long-press handlers on the button) so panning the map
+              // with a finger never pops a card by accident.
               e.originalEvent.stopPropagation();
               setSelectedCoordinationId(m.id);
             }}
@@ -443,6 +513,24 @@ export function BubbleMap({
               aria-label={FLIGHT_REQUEST_STATUS_LABELS[m.status]}
               className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white shadow"
               style={{ backgroundColor: FLIGHT_REQUEST_STATUS_COLORS[m.status] }}
+              onMouseEnter={() => {
+                if (!isTouchDevice) setSelectedCoordinationId(m.id);
+              }}
+              onMouseLeave={() => {
+                if (!isTouchDevice) setSelectedCoordinationId((current) => (current === m.id ? null : current));
+              }}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                longPressTimer.current = setTimeout(() => setSelectedCoordinationId(m.id), 500);
+              }}
+              onTouchEnd={() => {
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              }}
+              onTouchMove={() => {
+                // Finger is panning the map, not holding still — a real
+                // long press never travels.
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+              }}
             >
               <Radar className="h-3 w-3 text-white" />
             </button>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { extractExpirationDate } from "@/lib/ocr/extractExpiration";
+import { extractExpirationDate, extractIdentityFields } from "@/lib/ocr/extractExpiration";
 import { validateAgainstGovernmentRegistry } from "@/lib/government-validation";
 
 const uploadSchema = z.object({
@@ -67,6 +67,7 @@ export async function uploadPilotLicenseDocument(formData: FormData): Promise<Up
   }
 
   const ocrResult = await extractExpirationDate(file, file.name);
+  const identityFields = await extractIdentityFields(file, file.name);
   const expiresAt = data.expiresAtOverride ? new Date(data.expiresAtOverride) : ocrResult.expiresAt;
 
   if (!expiresAt) {
@@ -109,6 +110,8 @@ export async function uploadPilotLicenseDocument(formData: FormData): Promise<Up
     ocr_status: "completed",
     ocr_extracted_expires_at: expiresAt.toISOString().slice(0, 10),
     ocr_confidence: ocrResult.confidence,
+    ocr_extracted_name: identityFields.name,
+    ocr_extracted_id_number: identityFields.idNumber,
   });
 
   // Opens a government-validation trail for the license number — see

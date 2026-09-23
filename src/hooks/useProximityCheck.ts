@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { ProximityFinding } from "@/app/api/proximity-check/route";
+import type { ProximityFinding } from "@/lib/geo/proximity-check";
 
 export type ProximityCheckResult = {
   available: boolean;

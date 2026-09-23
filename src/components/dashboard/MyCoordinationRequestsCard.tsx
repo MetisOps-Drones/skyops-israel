@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMyFlightRequests } from "@/hooks/useFlightRequests";
+import { flightRequestEditEligibility } from "@/lib/validations/flight-request-edit-window";
+import { EditFlightRequestDialog } from "./EditFlightRequestDialog";
 import { FLIGHT_REQUEST_TYPE_LABELS } from "@/lib/constants/flight-request-type";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 
@@ -48,32 +50,40 @@ export function MyCoordinationRequestsCard() {
               <TableHead>סוג בקשה</TableHead>
               <TableHead>מועד שליחה</TableHead>
               <TableHead>סטטוס</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   טוען...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && openRequests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   אין כרגע בקשות תיאום פתוחות
                 </TableCell>
               </TableRow>
             )}
-            {openRequests.map((request) => (
-              <TableRow key={request.id}>
-                <TableCell>{FLIGHT_REQUEST_TYPE_LABELS[request.request_type]}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{formatSubmittedAt(request.created_at)}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{FLIGHT_REQUEST_STATUS_LABELS[request.status]}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {openRequests.map((request) => {
+              // NOTAM-bubble (polygon) requests aren't editable here — see
+              // EditFlightRequestDialog's own doc comment for why.
+              const canEdit =
+                request.request_type === "basic_auto_100m" && flightRequestEditEligibility(request).editable;
+              return (
+                <TableRow key={request.id}>
+                  <TableCell>{FLIGHT_REQUEST_TYPE_LABELS[request.request_type]}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatSubmittedAt(request.created_at)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{FLIGHT_REQUEST_STATUS_LABELS[request.status]}</Badge>
+                  </TableCell>
+                  <TableCell>{canEdit && <EditFlightRequestDialog request={request} />}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </CardContent>

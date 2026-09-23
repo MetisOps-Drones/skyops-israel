@@ -277,8 +277,13 @@ export function useCreateBooking() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("יש להתחבר מחדש");
-      const { error } = await supabase.from("marketplace_bookings").insert({ ...input, created_by: user.id });
+      const { data, error } = await supabase
+        .from("marketplace_bookings")
+        .insert({ ...input, created_by: user.id })
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketplace_bookings"] });

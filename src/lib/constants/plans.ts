@@ -16,6 +16,14 @@
 
 export type PlanCategory = "private" | "business" | "org";
 
+export interface CoordinationLimit {
+  /** Total flight requests allowed per period, both types combined. */
+  count: number;
+  period: "week" | "month";
+  /** How many of `count` may be a manual NOTAM/polygon request ("בועת NOTAM") — 0 means none allowed. */
+  complexAllowed: number;
+}
+
 export interface Plan {
   code: string;
   category: PlanCategory;
@@ -31,6 +39,8 @@ export interface Plan {
   highlight?: string;
   /** Eligible to join the freelancer marketplace (business category, standard tier and up). */
   marketplaceEligible?: boolean;
+  /** The exact numbers behind each plan's "עד X תיאומים" feature text — null = unlimited (org tier only; see resolveCoordinationLimit in coordination-quota.ts for why it never actually looks this up per org). Enforced server-side in actions/flight-requests.ts and shown client-side via useCoordinationQuota. */
+  coordinationLimit: CoordinationLimit | null;
 }
 
 export const PRIVATE_PLANS: Plan[] = [
@@ -42,6 +52,7 @@ export const PRIVATE_PLANS: Plan[] = [
     billingPeriod: null,
     features: ["עד תיאום אחד בשבוע (ללא NOTAM)", "גישה למערכת הלימוד לרישיון מטיסן"],
     overageNote: "כל תיאום נוסף: ₪19",
+    coordinationLimit: { count: 1, period: "week", complexAllowed: 0 },
   },
   {
     code: "private_standard",
@@ -51,6 +62,7 @@ export const PRIVATE_PLANS: Plan[] = [
     billingPeriod: "חודש",
     inheritsFrom: "private_free",
     features: ["עד 3 תיאומים בשבוע (במקום 1)", "יומן טיסות"],
+    coordinationLimit: { count: 3, period: "week", complexAllowed: 0 },
   },
 ];
 
@@ -67,6 +79,7 @@ export const BUSINESS_PLANS: Plan[] = [
       "רישום רחפן אחד ליומן טיסות",
     ],
     overageNote: "כל תיאום נוסף: ₪29",
+    coordinationLimit: { count: 1, period: "week", complexAllowed: 0 },
   },
   {
     code: "business_standard",
@@ -81,6 +94,7 @@ export const BUSINESS_PLANS: Plan[] = [
       "זכאות להצטרף למרקטפלייס המטיסים",
     ],
     marketplaceEligible: true,
+    coordinationLimit: { count: 7, period: "month", complexAllowed: 0 },
   },
   {
     code: "business_pro",
@@ -92,9 +106,12 @@ export const BUSINESS_PLANS: Plan[] = [
     features: ["עד 12 תיאומים בחודש (כולל עד תיאום מורכב אחד)", "אנליטיקת AI (בקרוב)"],
     highlight: "מומלץ",
     marketplaceEligible: true,
+    coordinationLimit: { count: 12, period: "month", complexAllowed: 1 },
   },
 ];
 
+// coordinationLimit is null on every org tier — matches ORG_COMMON_FEATURES'
+// "תיאומים ללא הגבלה, כולל NOTAM" below, true for all org sizes alike.
 export const ORG_PLANS: Plan[] = [
   {
     code: "org_micro",
@@ -103,6 +120,7 @@ export const ORG_PLANS: Plan[] = [
     priceIls: 449,
     billingPeriod: "חודש",
     features: ["1-3 עובדים", "עד 3 רחפנים בצי", "גישה למרקטפלייס המטיסים"],
+    coordinationLimit: null,
   },
   {
     code: "org_small",
@@ -111,6 +129,7 @@ export const ORG_PLANS: Plan[] = [
     priceIls: 899,
     billingPeriod: "חודש",
     features: ["3-10 עובדים", "עד 5 רחפנים בצי"],
+    coordinationLimit: null,
   },
   {
     code: "org_medium",
@@ -120,6 +139,7 @@ export const ORG_PLANS: Plan[] = [
     billingPeriod: "חודש",
     features: ["10-20 עובדים", "עד 7 רחפנים בצי"],
     highlight: "מומלץ",
+    coordinationLimit: null,
   },
   {
     code: "org_unlimited",
@@ -128,6 +148,7 @@ export const ORG_PLANS: Plan[] = [
     priceIls: null,
     billingPeriod: null,
     features: ["מעל 20 עובדים", "צי רחפנים ללא הגבלה"],
+    coordinationLimit: null,
   },
 ];
 

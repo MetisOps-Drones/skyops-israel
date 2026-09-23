@@ -96,20 +96,30 @@ export function useCoordinationAuthorityLookup(lng: number | null, lat: number |
   });
 }
 
-/** The external-coordination tracking row for one flight request — null until the dispatcher first touches its status/notes. */
+export type FlightRequestCoordinationWithUpdater = FlightRequestCoordination & {
+  profiles: Pick<Tables<"profiles">, "full_name"> | null;
+};
+
+/**
+ * The external-coordination tracking row for one flight request — null
+ * until the dispatcher first touches its status/notes. updated_by/updated_at
+ * were already captured on every write (see the upsert below) but never
+ * surfaced in CoordinationPanel — this join is what lets "who contacted
+ * whom and when" actually show up there instead of just existing in the DB.
+ */
 export function useFlightRequestCoordination(flightRequestId: string | null) {
   return useQuery({
     queryKey: ["flight_request_coordination", flightRequestId],
-    queryFn: async (): Promise<FlightRequestCoordination | null> => {
+    queryFn: async (): Promise<FlightRequestCoordinationWithUpdater | null> => {
       if (!flightRequestId) return null;
       const supabase = createClient();
       const { data, error } = await supabase
         .from("flight_request_coordination")
-        .select("*")
+        .select("*, profiles!flight_request_coordination_updated_by_fkey ( full_name )")
         .eq("flight_request_id", flightRequestId)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as unknown as FlightRequestCoordinationWithUpdater | null;
     },
     enabled: Boolean(flightRequestId),
   });

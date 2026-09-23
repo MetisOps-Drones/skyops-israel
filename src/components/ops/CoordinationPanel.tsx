@@ -139,6 +139,12 @@ export function CoordinationPanel({
           <p className="text-xs font-medium text-muted-foreground">סטטוס התיאום החיצוני</p>
           <Badge variant={COORDINATION_STATUS_VARIANT[status]}>{COORDINATION_STATUS_LABEL[status]}</Badge>
         </div>
+        {coordination?.updated_at && (
+          <p className="text-[11px] text-muted-foreground">
+            עודכן לאחרונה{coordination.profiles?.full_name ? ` ע"י ${coordination.profiles.full_name}` : ""} ·{" "}
+            {new Date(coordination.updated_at).toLocaleString("he-IL")}
+          </p>
+        )}
         <Select value={status} onValueChange={(v) => handleSave(v as CoordinationContactStatus)}>
           <SelectTrigger>
             <SelectValue />

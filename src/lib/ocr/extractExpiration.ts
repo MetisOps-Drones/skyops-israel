@@ -117,3 +117,52 @@ export async function extractExpirationDate(
     method: "simulated",
   };
 }
+
+export interface IdentityFieldsResult {
+  /** Printed full name, as best extracted — null when OCR couldn't find one (never guessed). */
+  name: string | null;
+  /** 9-digit Israeli ת"ז / printed license ID number. */
+  idNumber: string | null;
+  rawText: string;
+  method: "ocr" | "simulated";
+}
+
+/** Israeli ת"ז is 9 digits; license documents print the same number as the holder's ID. */
+const ID_NUMBER_PATTERN = /\b(\d{9})\b/;
+
+function extractIdNumberFromText(text: string): string | null {
+  const match = text.match(ID_NUMBER_PATTERN);
+  return match?.[1] ?? null;
+}
+
+/** Deterministic per-file placeholder for local/dev use — never a real extraction, so a mismatched pair of uploads correctly shows as "no match" while an identical pair shows as "match", exercising both demo paths honestly. */
+function synthesizeIdentityFields(seedText: string): { name: string; idNumber: string } {
+  const cleaned = seedText.replace(/\.[a-z0-9]+$/i, "").replace(/[^a-zA-Z֐-׿]+/g, " ").trim();
+  const seed = Array.from(seedText).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const idNumber = String(100000000 + (seed % 900000000));
+  return { name: cleaned || "לא זוהה שם", idNumber };
+}
+
+/**
+ * Extracts the printed name + ID number from a license or ID-card document,
+ * for the license-vs-ID cross-check in identity-verification.ts. Same
+ * real/simulated split as extractExpirationDate — see that function's doc
+ * comment for the provider contract.
+ */
+export async function extractIdentityFields(file: Blob, fileName: string): Promise<IdentityFieldsResult> {
+  const ocrApiKey = process.env.OCR_API_KEY;
+  const ocrEndpoint = process.env.OCR_API_ENDPOINT;
+
+  if (ocrApiKey && ocrEndpoint) {
+    const rawText = await runProviderOcr(file, ocrEndpoint, ocrApiKey);
+    return {
+      name: null, // Reliable name-line extraction needs a document-layout-aware provider (e.g. Textract AnalyzeID) — left for a real provider integration rather than guessing off plain OCR text.
+      idNumber: extractIdNumberFromText(rawText),
+      rawText,
+      method: "ocr",
+    };
+  }
+
+  const { name, idNumber } = synthesizeIdentityFields(fileName);
+  return { name, idNumber, rawText: fileName, method: "simulated" };
+}

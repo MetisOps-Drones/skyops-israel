@@ -27,7 +27,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (signInState.success) {
-      router.push("/dashboard");
+      router.push("/map");
       router.refresh();
     }
   }, [signInState.success, router]);

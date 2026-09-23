@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import * as turf from "@turf/turf";
-import { Loader2, Radius, Waypoints, ShieldAlert, Lock } from "lucide-react";
+import { Loader2, Radius, Waypoints, ShieldAlert, Lock, Gauge } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -39,6 +40,9 @@ import { ALTITUDE_BAND_METERS, type FlightAltitudeBand } from "@/lib/validations
 import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import { cn } from "@/lib/utils";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
+import { useCoordinationQuota } from "@/hooks/useCoordinationQuota";
+import { useMyLicenses, useHasValidInsurance } from "@/hooks/useLicenses";
+import { resolveLicenseRequirement } from "@/lib/validations/flight-request-requirements";
 
 const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
   { value: "under_50m", label: "עד 50 מטר" },
@@ -77,6 +81,32 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const hasOrg = Boolean(orgContext?.orgId);
   const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
 
+  const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
+  const { data: hasValidInsurance, isLoading: insuranceLoading } = useHasValidInsurance();
+  const selectedDrone = drones.find((d) => d.id === droneId) ?? null;
+  const requestType = shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble";
+  const licenseCheck = selectedDrone
+    ? resolveLicenseRequirement(licenses, selectedDrone.mtow_grams, requestType)
+    : null;
+  const licenseCheckLoading = Boolean(selectedDrone) && (licensesLoading || (licenseCheck?.needsInsurance && insuranceLoading));
+  // Same "never claim clear until we've actually checked" rule as the
+  // building/proximity checks below — only block once a drone is selected
+  // and the license/insurance query has actually resolved.
+  const licenseBlocked =
+    Boolean(selectedDrone) &&
+    !licenseCheckLoading &&
+    (!licenseCheck?.ok || (licenseCheck.needsInsurance && !hasValidInsurance));
+
+  const { data: quota } = useCoordinationQuota();
+  const quotaPeriodLabel = quota?.limit?.period === "week" ? "השבוע" : "החודש";
+  const quotaExhausted = Boolean(quota?.limit) && quota!.used >= quota!.limit!.count;
+  // The "complex" request type is exactly the polygon/NOTAM shape — see the
+  // request_type mapping in handleSubmit below.
+  const complexExhausted =
+    shapeType === "polygon" &&
+    Boolean(quota?.limit) &&
+    quota!.complexUsed >= quota!.limit!.complexAllowed;
+
   const checkPoint = useMemo<[number, number] | null>(() => {
     if (shapeType === "circle") return center;
     if (shapeType === "polygon" && polygon) {
@@ -105,13 +135,13 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
   // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
   // distance is to a landuse polygon's centroid, not its nearest edge, and
-  // can badly understate real proximity for a city-scale way. The real
-  // buildings table (queried via buildings_near_point, 0075 — the same
-  // table the map's building tiles render from) drives תקנה 32 regardless
+  // can badly understate real proximity for a city-scale way. The R2
+  // bitmap grid (/api/building-proximity — built from the same VIDA/Overture
+  // dataset the map's building tiles render from) drives תקנה 32 regardless
   // of what OSM found.
   const buildingProximity = useBuildingProximity(checkPoint, requiredDistanceM);
   const isNearBuildingLocally = buildingProximity.data?.isNearBuilding ?? false;
-  // The RPC call can still fail (DB hiccup, etc). That must never read as
+  // The grid fetch can still fail (R2 hiccup, etc). That must never read as
   // "confirmed no building nearby"; the server re-runs this same check
   // before actually auto-clearing anything (src/actions/flight-requests.ts),
   // but the UI still needs to say plainly that it couldn't verify, not show
@@ -173,6 +203,9 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   const canSubmit =
     !blockedForSolo &&
+    !quotaExhausted &&
+    !complexExhausted &&
+    !licenseBlocked &&
     !(isChecking && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
@@ -251,6 +284,20 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               בועת NOTAM (פוליגון)
             </button>
           </div>
+
+          {quota?.limit && (
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                quotaExhausted || complexExhausted ? "text-destructive" : "text-muted-foreground"
+              )}
+            >
+              <Gauge className="h-3.5 w-3.5 shrink-0" />
+              {quota.used} מתוך {quota.limit.count} תיאומים {quotaPeriodLabel} בתוכנית הנוכחית
+              {quota.limit.complexAllowed > 0 &&
+                ` (מתוכם ${quota.complexUsed}/${quota.limit.complexAllowed} בועות NOTAM)`}
+            </p>
+          )}
 
           {shapeType === "circle" && (
             <div className="flex flex-col gap-1.5">
@@ -339,6 +386,25 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {licenseBlocked && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <Lock className="h-4 w-4" />
+                {!licenseCheck?.ok
+                  ? "אין רישיון בתוקף המתאים לכלי הטיס שנבחר"
+                  : "נדרש אישור ביטוח בתוקף להטסה מסחרית"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {!licenseCheck?.ok
+                  ? "לא נמצא רישיון טיס בתוקף שמכסה את משקל כלי הטיס שנבחר (ואת סוג הבקשה, עבור בועת NOTAM). הבקשה תיחסם בשרת גם אם תישלח."
+                  : "הרישיון שלך מכסה כלי טיס זה, אך נדרש גם אישור ביטוח בתוקף על מנת לשלוח בקשת טיסה מסחרית. הבקשה תיחסם בשרת גם אם תישלח."}
+              </p>
+              <Link href="/profile" className="text-xs font-medium text-primary hover:underline">
+                ניהול רישיונות ומסמכים בפרופיל
+              </Link>
             </div>
           )}
 
@@ -479,6 +545,21 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               {matchingRegulations.map((reg) => (
                 <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
               ))}
+            </div>
+          )}
+
+          {(quotaExhausted || complexExhausted) && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <Lock className="h-4 w-4" />
+                {quotaExhausted ? `מיצית את מכסת התיאומים ${quotaPeriodLabel}` : "בועות NOTAM אינן כלולות בתוכנית הנוכחית"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <Link href="/profile" className="font-medium text-primary hover:underline">
+                  שדרוג התוכנית
+                </Link>{" "}
+                דרך &ldquo;הפרופיל שלי&rdquo; ← &ldquo;מנוי&rdquo; מעלה את המכסה.
+              </p>
             </div>
           )}
 

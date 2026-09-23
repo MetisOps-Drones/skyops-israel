@@ -95,12 +95,44 @@
 
   html {
     scroll-behavior: smooth;
+    /* Every Tailwind text/spacing size is rem-based, so this one number
+       shrinks type AND spacing consistently across every page at once —
+       the deliberate lever for "make it all smaller everywhere" instead of
+       hunting down every individual text-* class. 87.5% wasn't enough —
+       still forcing scroll on content that shouldn't need it. 75% of the
+       16px browser default = a 12px root. */
+    font-size: 75%;
   }
 
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Thin scrollbars everywhere — the browser default (~16px) reads heavy
+   inside the app's overlay panels, which are already width-constrained. */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.4);
 }
 
 /* Mapbox GL overrides so controls read correctly in an RTL shell */

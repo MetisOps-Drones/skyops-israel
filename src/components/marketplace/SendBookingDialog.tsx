@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export function SendBookingDialog({ pilotId, orgId, name }: { pilotId: string; o
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const createBooking = useCreateBooking();
+  const router = useRouter();
 
   function reset() {
     setTitle("");
@@ -56,7 +58,7 @@ export function SendBookingDialog({ pilotId, orgId, name }: { pilotId: string; o
       return;
     }
     try {
-      await createBooking.mutateAsync({
+      const booking = await createBooking.mutateAsync({
         org_id: orgId,
         pilot_id: pilotId,
         title: title.trim(),
@@ -72,6 +74,9 @@ export function SendBookingDialog({ pilotId, orgId, name }: { pilotId: string; o
       toast.success("ההזמנה נשלחה למטיס/ה");
       setOpen(false);
       reset();
+      // Otherwise there was nowhere to actually track the booking's status
+      // afterward — /marketplace/bookings isn't reachable from any bubble.
+      router.push(`/marketplace/bookings/${booking.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "שליחת ההזמנה נכשלה");
     }

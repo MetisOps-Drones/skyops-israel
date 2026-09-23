@@ -14,9 +14,18 @@ export function useFlightLogs() {
     queryKey: ["flight_logs"],
     queryFn: async (): Promise<FlightLogWithDrone[]> => {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return [];
+      // Explicit user_id filter: "Dispatcher admins read all flight logs" is
+      // a separate permissive SELECT policy for admin views — without this,
+      // a dispatcher_admin's own logbook silently returned every pilot's
+      // flight logs instead of just their own.
       const { data, error } = await supabase
         .from("flight_logs")
         .select("*, drones ( id, nickname, model ), clients ( id, name )")
+        .eq("user_id", user.id)
         .order("start_time", { ascending: false });
       if (error) throw error;
       return data as unknown as FlightLogWithDrone[];

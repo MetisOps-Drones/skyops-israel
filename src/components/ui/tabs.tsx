@@ -13,7 +13,12 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      // Stays on one line — no wrap, no scroll. With 6-7 triggers this used
+      // to silently overflow past the panel's clipped edge; the fix is
+      // TabsTrigger being small enough to actually fit, not wrapping onto a
+      // second row (wrapping was tried and explicitly rejected — shrink the
+      // text instead).
+      "flex h-auto w-full items-center justify-start gap-0.5 rounded-lg bg-muted p-0.5 text-muted-foreground",
       className
     )}
     {...props}
@@ -28,7 +33,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+      "inline-flex min-w-0 flex-1 items-center justify-center truncate rounded-md px-1.5 py-1 text-[11px] font-medium leading-tight ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
       className
     )}
     {...props}

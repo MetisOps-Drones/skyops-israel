@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { PlaneTakeoff, ShieldAlert, Wrench, Clock, Plane } from "lucide-react";
+import { PlaneTakeoff, ShieldAlert, Wrench, Clock, Plane, Radar, Gauge } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { GreetingHero } from "@/components/dashboard/GreetingHero";
 import { AlertsList, type DashboardAlert } from "@/components/dashboard/AlertsList";
@@ -54,7 +55,7 @@ export default async function DashboardPage() {
     { count: orgMembershipCount },
     { count: todayCoordinationsCount },
   ] = await Promise.all([
-    supabase.from("profiles").select("full_name, role").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name, role, org_id, plan_code").eq("id", user.id).single(),
     supabase.from("pilot_licenses").select("*").eq("user_id", user.id).order("expires_at"),
     supabase.from("drones").select("*").eq("user_id", user.id),
     supabase
@@ -74,6 +75,22 @@ export default async function DashboardPage() {
   ]);
 
   const needsFirstDrone = (drones?.length ?? 0) === 0 && (orgMembershipCount ?? 0) === 0;
+
+  const coordinationLimit = resolveCoordinationLimit({
+    role: profile?.role ?? null,
+    hasOrg: Boolean(profile?.org_id),
+    planCode: profile?.plan_code ?? null,
+  });
+  let coordinationsUsedThisPeriod = 0;
+  if (coordinationLimit) {
+    const { count } = await supabase
+      .from("flight_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .neq("status", "cancelled")
+      .gte("created_at", periodStart(coordinationLimit.period).toISOString());
+    coordinationsUsedThisPeriod = count ?? 0;
+  }
 
   const now = new Date();
   const upcomingLicense = (licenses ?? []).find((license) => new Date(license.expires_at) >= now);
@@ -159,93 +176,123 @@ export default async function DashboardPage() {
 
       {profile?.role === "pilot_pro" && <IncomingContactRequestsCard />}
 
-      {needsFirstDrone && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4">
-          <div className="flex items-start gap-3">
-            <Plane className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-            <div>
-              <p className="text-sm font-semibold">עדיין לא רשמת רחפן</p>
-              <p className="text-sm text-muted-foreground">יש לרשום לפחות רחפן אחד כדי שתוכל/י לתאם טיסות.</p>
-            </div>
+      {profile?.role === "dispatcher_admin" ? (
+        // Everything below this point is pilot-personal (own drones,
+        // license, flight hours) — for staff running the platform it would
+        // only ever render as empty/zeroed cards, since an admin account
+        // doesn't itself own drones or file flight requests. /ops (their
+        // own bubble now) is where the actual coordination queue lives.
+        <Link
+          href="/ops"
+          className="flex items-center gap-3 rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Radar className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <p className="font-medium">מוקד תיאום</p>
+            <p className="text-xs text-muted-foreground">תור בקשות טיסה ממתינות ופרסום NOTAM</p>
           </div>
-          <Button asChild size="sm">
-            <Link href="/profile">רישום רחפן</Link>
-          </Button>
-        </div>
+        </Link>
+      ) : (
+        <>
+          {needsFirstDrone && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4">
+              <div className="flex items-start gap-3">
+                <Plane className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+                <div>
+                  <p className="text-sm font-semibold">עדיין לא רשמת רחפן</p>
+                  <p className="text-sm text-muted-foreground">יש לרשום לפחות רחפן אחד כדי שתוכל/י לתאם טיסות.</p>
+                </div>
+              </div>
+              <Button asChild size="sm">
+                <Link href="/profile">רישום רחפן</Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="כלי טיס פעילים" value={drones?.length ?? 0} icon={PlaneTakeoff} />
+            <StatCard label="שעות טיסה מצטברות" value={Math.round(totalFlightHours * 10) / 10} icon={Clock} />
+            <StatCard
+              label="בקשות ממתינות"
+              value={myRequests?.length ?? 0}
+              icon={ShieldAlert}
+              tone={myRequests && myRequests.length > 0 ? "warning" : "default"}
+            />
+            <StatCard
+              label="התראות פעילות"
+              value={alerts.length}
+              icon={Wrench}
+              tone={alerts.length > 0 ? "destructive" : "success"}
+            />
+            {coordinationLimit && (
+              <StatCard
+                label={`תיאומים ${coordinationLimit.period === "week" ? "השבוע" : "החודש"}`}
+                value={`${coordinationsUsedThisPeriod}/${coordinationLimit.count}`}
+                icon={Gauge}
+                tone={coordinationsUsedThisPeriod >= coordinationLimit.count ? "destructive" : "default"}
+              />
+            )}
+          </div>
+
+          <MyCoordinationRequestsCard />
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AlertsList alerts={alerts} />
+
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>רישיונות</CardTitle>
+                <LicenseUploadDialog />
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>סוג</TableHead>
+                      <TableHead>מספר</TableHead>
+                      <TableHead>תוקף</TableHead>
+                      <TableHead>סטטוס</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(licenses ?? []).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          טרם הועלו רישיונות
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {(licenses ?? []).map((license) => (
+                      <TableRow key={license.id}>
+                        <TableCell>{license.license_type}</TableCell>
+                        <TableCell dir="ltr" className="text-end">
+                          {license.license_number}
+                        </TableCell>
+                        <TableCell>{new Date(license.expires_at).toLocaleDateString("he-IL")}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              license.status === "expired"
+                                ? "destructive"
+                                : license.status === "expiring_soon"
+                                  ? "warning"
+                                  : "success"
+                            }
+                          >
+                            {LICENSE_STATUS_LABELS[license.status]}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="כלי טיס פעילים" value={drones?.length ?? 0} icon={PlaneTakeoff} />
-        <StatCard label="שעות טיסה מצטברות" value={Math.round(totalFlightHours * 10) / 10} icon={Clock} />
-        <StatCard
-          label="בקשות ממתינות"
-          value={myRequests?.length ?? 0}
-          icon={ShieldAlert}
-          tone={myRequests && myRequests.length > 0 ? "warning" : "default"}
-        />
-        <StatCard
-          label="התראות פעילות"
-          value={alerts.length}
-          icon={Wrench}
-          tone={alerts.length > 0 ? "destructive" : "success"}
-        />
-      </div>
-
-      <MyCoordinationRequestsCard />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AlertsList alerts={alerts} />
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>רישיונות</CardTitle>
-            <LicenseUploadDialog />
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>סוג</TableHead>
-                  <TableHead>מספר</TableHead>
-                  <TableHead>תוקף</TableHead>
-                  <TableHead>סטטוס</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(licenses ?? []).length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      טרם הועלו רישיונות
-                    </TableCell>
-                  </TableRow>
-                )}
-                {(licenses ?? []).map((license) => (
-                  <TableRow key={license.id}>
-                    <TableCell>{license.license_type}</TableCell>
-                    <TableCell dir="ltr" className="text-end">
-                      {license.license_number}
-                    </TableCell>
-                    <TableCell>{new Date(license.expires_at).toLocaleDateString("he-IL")}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          license.status === "expired"
-                            ? "destructive"
-                            : license.status === "expiring_soon"
-                              ? "warning"
-                              : "success"
-                        }
-                      >
-                        {LICENSE_STATUS_LABELS[license.status]}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
