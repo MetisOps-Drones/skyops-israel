@@ -71,10 +71,15 @@ export function LayerControlPanel({
               <button
                 key={opt.value}
                 type="button"
+                disabled={highContrast}
                 onClick={() => onBaseStyleChange(opt.value)}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-md border py-1.5 text-[11px]",
-                  active ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground"
+                  highContrast
+                    ? "cursor-not-allowed border-input text-muted-foreground opacity-40"
+                    : active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-input text-muted-foreground"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -83,6 +88,16 @@ export function LayerControlPanel({
             );
           })}
         </div>
+        {/* highContrast always renders the "colorful" style regardless of
+            baseStyle (BubbleMap.tsx) — without this note, picking satellite
+            then turning on high-contrast silently swaps the visible map out
+            from under a still-highlighted "תצ"א" button, which reads as a
+            bug rather than the accessibility override it actually is. */}
+        {highContrast && (
+          <p className="mt-1 px-1 text-[11px] text-muted-foreground">
+            מצב ניגודיות גבוהה פעיל — הבחירה כאן מושבתת זמנית, המפה מוצגת בסגנון הצבעוני לקריאות מרבית בשמש.
+          </p>
+        )}
 
         <DropdownMenuSeparator />
 
