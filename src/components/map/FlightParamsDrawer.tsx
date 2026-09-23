@@ -384,6 +384,22 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {drones.length === 0 && !hasOrg ? (
             <DroneQuickRegisterCard />
+          ) : drones.length === 0 ? (
+            // An org pilot/fleet manager with zero org drones — registering
+            // one inline here (like DroneQuickRegisterCard does for a solo
+            // pilot) would bypass fleet management, which lives under
+            // "יומן טיסות" (see OrgPageClient.tsx's own note on this same
+            // split). A bare empty <Select> with nothing to pick and no
+            // explanation read as broken, not as "nothing registered yet".
+            <div className="rounded-lg border border-dashed p-4 text-sm">
+              <p className="font-medium">לארגון שלך עדיין אין כלי טיס רשום</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                יש לרשום כלי טיס תחת ניהול הצי לפני שאפשר לבקש תיאום.
+              </p>
+              <Link href="/logs" className="mt-2 inline-block text-xs font-medium text-primary hover:underline">
+                מעבר לניהול הצי
+              </Link>
+            </div>
           ) : (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="drone">כלי טיס</Label>
