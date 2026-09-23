@@ -235,7 +235,7 @@ export function BubbleMap({
       features: liveNotams.map((notam) =>
         turf.circle([notam.position.lon, notam.position.lat], notam.position.radiusNm * 1.852, {
           units: "kilometers",
-          properties: { id: notam.id, eText: notam.eText },
+          properties: { id: notam.id, eText: notam.eText, label: `נוטאם · ${notam.id}` },
         })
       ),
     }),
@@ -453,6 +453,28 @@ export function BubbleMap({
               id="live-notam-zones-line"
               type="line"
               paint={{ "line-color": LIVE_NOTAM_COLOR, "line-width": 2 }}
+            />
+            {/* Faded, always-on label identifying the shape as a NOTAM (not
+                just relying on color, which a colorblind pilot or a busy map
+                with several overlapping layers can't reliably tell apart) —
+                low opacity on purpose, this is a caption, not the primary
+                signal (the fill/line color + click-to-inspect are). */}
+            <Layer
+              id="live-notam-zones-label"
+              type="symbol"
+              minzoom={8}
+              layout={{
+                "text-field": ["get", "label"],
+                "text-size": ["interpolate", ["linear"], ["zoom"], 8, 9, 14, 12],
+                "text-allow-overlap": false,
+                "symbol-placement": "point",
+              }}
+              paint={{
+                "text-color": LIVE_NOTAM_COLOR,
+                "text-opacity": 0.55,
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.2,
+              }}
             />
           </Source>
         )}
