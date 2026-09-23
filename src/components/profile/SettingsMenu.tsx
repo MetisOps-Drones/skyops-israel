@@ -269,7 +269,7 @@ function SubscriptionDialog({ profile, open, onOpenChange }: { profile: Profile;
       <DialogContent className="max-w-2xl sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>מנוי וסוג חשבון</DialogTitle>
-          <DialogDescription>מחירים משוערים להתחלה — עדיין ללא ספק סליקה מחובר</DialogDescription>
+          <DialogDescription>שדרוג לתוכנית בתשלום מעביר לעמוד סליקה מאובטח של Cardcom</DialogDescription>
         </DialogHeader>
         <PlanCatalog profile={profile} />
       </DialogContent>
