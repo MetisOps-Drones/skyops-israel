@@ -55,8 +55,8 @@ export async function GET(request: Request) {
 
     const result = await chargeToken({
       token: sub.cardcom_token,
+      cardExpiryMmYyyy: sub.cardcom_token_expiry,
       amountIls: Number(sub.amount_ils),
-      productName: `SkyOps Israel — ${plan?.name ?? sub.plan_code} (חידוש חודשי)`,
       document: { name: buyerName, productDescription: `חידוש מנוי חודשי — ${plan?.name ?? sub.plan_code}` },
     });
 
