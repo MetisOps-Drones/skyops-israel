@@ -94,31 +94,18 @@ export function LayerControlPanel({
         <div className="mt-1.5 flex flex-col gap-2.5">
           <Disclosure label="מרחב אווירי וחוקיות" defaultOpen>
             <div className="grid grid-cols-2 gap-1">
-              <DropdownMenuCheckboxItem
-                checked={visibility.nfz}
-                onCheckedChange={() => toggle("nfz")}
-                className="py-1.5 text-xs"
-              >
-                <TermTooltip term="NFZ">אזורים אסורים</TermTooltip>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={visibility.natureReserves}
-                onCheckedChange={() => toggle("natureReserves")}
-                className="py-1.5 text-xs"
-              >
-                <TermTooltip term="שמורת טבע">שמורות טבע</TermTooltip>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={visibility.infrastructure}
-                onCheckedChange={() => toggle("infrastructure")}
-                className="py-1.5 text-xs"
-              >
-                <TermTooltip term="CTR">תשתיות/CTR</TermTooltip>
-              </DropdownMenuCheckboxItem>
+              {/* nfz/natureReserves/infrastructure (the legacy airspace_zones
+                  table) intentionally have no toggle here — that table is
+                  empty (see 0082_remove_mock_airspace_zones.sql; its 4 rows
+                  were fabricated dev-only placeholders, not real data), so
+                  those checkboxes had nothing to ever show or hide. A
+                  toggle that can never produce a visible change reads as
+                  broken, not as "off". aipReference (real AIP zones) is the
+                  layer that actually carries this information now. */}
               <DropdownMenuCheckboxItem
                 checked={visibility.aipReference}
                 onCheckedChange={() => toggle("aipReference")}
-                className="py-1.5 text-xs"
+                className="col-span-2 py-1.5 text-xs"
               >
                 <TermTooltip term="AIP">מרחב אווירי (קבוע)</TermTooltip>
               </DropdownMenuCheckboxItem>

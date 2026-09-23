@@ -213,6 +213,23 @@ export function LocationInfoCard({
                   </p>
                 </div>
               </div>
+            ) : groundBlockedByAltitude ? (
+              // Checked before every zone/NOTAM branch below on purpose: a 0m
+              // legal ceiling from the ground is an unconditional block that
+              // no zone type or NOTAM review can change — showing "requires
+              // manual review" or "you can submit" above this at the same
+              // time as "cannot request" further down (in the action section)
+              // read as directly contradicting each other, which is exactly
+              // what a real pilot flagged after seeing both on screen at once.
+              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-base font-semibold">לא ניתן לבקש תיאום לנקודה זו</p>
+                  <p className="mt-0.5 text-sm">
+                    תקרת הגובה החוקית כאן היא 0 מ&apos; מהקרקע — אין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון.
+                  </p>
+                </div>
+              </div>
             ) : zoneBlockLevel === "controlled_airspace" ? (
               <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />

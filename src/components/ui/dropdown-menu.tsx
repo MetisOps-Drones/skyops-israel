@@ -83,7 +83,7 @@ DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
->(({ className, children, checked, ...props }, ref) => (
+>(({ className, children, checked, onSelect, ...props }, ref) => (
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
@@ -91,6 +91,14 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       className
     )}
     checked={checked}
+    // Radix closes the whole menu on select by default — right for a
+    // one-shot action item, wrong for a checkbox meant to be toggled
+    // several times in a row (a layer panel, a filter list). Checking one
+    // box shouldn't force reopening the menu to check the next one.
+    onSelect={(event) => {
+      event.preventDefault();
+      onSelect?.(event);
+    }}
     {...props}
   >
     <span className="absolute start-2 flex h-3.5 w-3.5 items-center justify-center">
