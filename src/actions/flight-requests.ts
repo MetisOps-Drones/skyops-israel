@@ -18,6 +18,8 @@ import {
   findingsRequiringAuthorization,
 } from "@/lib/geo/flight-rules";
 import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
+import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
+import { fetchLiveNotams } from "@/lib/notams/live-feed";
 import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { checkProximity } from "@/lib/geo/proximity-check";
@@ -81,7 +83,22 @@ async function evaluateFlightRequestSafety(
     return { error: 'אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת"א. תיאום כזה זמין רק לחשבונות ארגון.' };
   }
 
-  const aipRequiresDispatcher = authCheck.blockLevel !== "none";
+  // Never trust a client-supplied "no active NOTAM" claim — fetched fresh
+  // here regardless of what the client's own check (FlightParamsDrawer)
+  // showed, same "authoritative, re-verified" policy as the AIP check
+  // above. A fetch failure fails toward "requires dispatcher review", never
+  // toward auto-clear — see src/lib/notams/live-feed.ts for the source.
+  let notamCheck: { inside: boolean; notams: { id: string }[] } = { inside: false, notams: [] };
+  let notamCheckFailed = false;
+  try {
+    const liveNotams = await fetchLiveNotams();
+    notamCheck = checkLiveNotamOverlap(centerPoint, liveNotams);
+  } catch (err) {
+    notamCheckFailed = true;
+    console.error("fetchLiveNotams failed during flight request evaluation:", err);
+  }
+
+  const aipRequiresDispatcher = authCheck.blockLevel !== "none" || notamCheck.inside || notamCheckFailed;
 
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
@@ -105,7 +122,12 @@ async function evaluateFlightRequestSafety(
   let autoCleared = false;
   let dispatcherNotes: string | null = null;
 
-  if (aipRequiresDispatcher) {
+  if (notamCheck.inside) {
+    const notamIds = notamCheck.notams.map((n) => n.id).join(", ");
+    dispatcherNotes = `נשלח לבדיקת מוקדן: נוטאם פעיל חופף לנקודה — ${notamIds}.`;
+  } else if (notamCheckFailed) {
+    dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת נוטאמים פעילים לא הייתה זמינה כרגע.";
+  } else if (authCheck.blockLevel !== "none") {
     const zoneNames = authCheck.reasons.map((r) => r.label).join("; ");
     dispatcherNotes = `נשלח לבדיקת מוקדן: חפיפה/קרבה לאזור AIP — ${zoneNames || "ראו פרטי האזור בבקשה"}.`;
   } else if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {

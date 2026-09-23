@@ -8,6 +8,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { WeatherPanel } from "@/components/map/WeatherPanel";
 import { TermTooltip } from "@/components/map/TermTooltip";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useBuildingProximity } from "@/hooks/useBuildingProximity";
@@ -20,6 +21,7 @@ import {
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
 } from "@/lib/geo/flight-rules";
+import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import {
   computeFullAltitudeCeiling,
@@ -41,6 +43,7 @@ export function LocationInfoCard({
   onRequestCoordination: (point: [number, number]) => void;
 }) {
   const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
+  const { data: liveNotams = [], isLoading: liveNotamsLoading } = useLiveNotamZones();
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const proximity = useProximityCheck(point);
@@ -67,7 +70,8 @@ export function LocationInfoCard({
   // too — it wasn't before (FlightParamsDrawer already got this right),
   // which meant isNearBuildingLocally silently defaulted to "not near" while
   // still loading and could flip the verdict after first paint.
-  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
+  const isChecking =
+    aipZonesLoading || liveNotamsLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
   // The building-footprint check alone (/api/building-proximity, backed by
   // the R2 bitmap grid in proximity-grid.ts) is a flat O(1) bit lookup —
   // genuinely fast — so it doesn't need to wait on the slower
@@ -80,6 +84,7 @@ export function LocationInfoCard({
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
+  const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
   const fullCeiling = altitudeResult
     ? computeFullAltitudeCeiling(
@@ -141,10 +146,15 @@ export function LocationInfoCard({
   // the "request coordination" button could stay active for a point that can never be approved.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
   const requiresAttention =
-    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
+    zoneBlockLevel !== "none" ||
+    Boolean(notamCheck?.inside) ||
+    needsSpecialAuthorization ||
+    groundBlockedByAltitude ||
+    buildingCheckUnavailable;
   const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   const hasDetails = Boolean(
     (aipCheck && aipCheck.reasons.length > 0) ||
+      notamCheck?.inside ||
       proximityFindings.length > 0 ||
       needsSpecialAuthorization ||
       buildingProximity.data?.available
@@ -239,6 +249,18 @@ export function LocationInfoCard({
                       מה כן אפשר: לשדרג לחשבון ארגון ←
                     </Link>
                   )}
+                </div>
+              </div>
+            ) : notamCheck?.inside ? (
+              <div className="flex items-start gap-3 rounded-xl p-4" style={{ backgroundColor: "rgb(234 88 12 / 0.1)", color: "#ea580c" }}>
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-base font-semibold">
+                    נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית
+                  </p>
+                  <p className="mt-0.5 text-sm">
+                    ניתן להגיש בקשת תיאום — המוקדן יבדוק את הנוטאם לפני אישור.
+                  </p>
                 </div>
               </div>
             ) : requiresAttention ? (
@@ -370,6 +392,28 @@ export function LocationInfoCard({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {notamCheck && notamCheck.inside && (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <p className="text-sm font-medium">נוטאמים פעילים חופפים</p>
+                      <p className="text-xs text-muted-foreground">
+                        מקור: <a href="https://ext.iaa.gov.il/aeroinfo/AeroInfo.aspx?msgType=Notam" target="_blank" rel="noopener noreferrer" className="underline">רשות שדות התעופה</a>, לא רשמי — לא תחליף לבריפינג טרום-טיסה
+                      </p>
+                    </div>
+                    {notamCheck.notams.map((notam) => (
+                      <div key={notam.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "rgb(234 88 12 / 0.4)" }}>
+                        <p className="font-medium" dir="ltr">
+                          {notam.id}
+                        </p>
+                        <p className="mt-1 text-xs">{notam.eText}</p>
+                        <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                          {new Date(notam.fromDate).toLocaleString("he-IL")} – {new Date(notam.toDate).toLocaleString("he-IL")}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 )}
 

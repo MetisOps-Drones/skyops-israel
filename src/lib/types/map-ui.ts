@@ -14,6 +14,8 @@ export type MapLayerVisibility = {
   windHazard: boolean;
   /** The advisory AIP-reference overlay (useAipReferenceZones) — approximate, not authoritative. */
   aipReference: boolean;
+  /** Live Israeli NOTAMs (useLiveNotamZones) — real-time, unlike aipReference above. */
+  liveNotams: boolean;
   /** The signed-in pilot's own past coordination requests, shown as small status-colored dots. */
   myHistory: boolean;
   /** Admin-only: every pilot/org's active or pending coordination footprint on the platform, not just the signed-in user's own. */
@@ -30,6 +32,7 @@ export const DEFAULT_MAP_LAYER_VISIBILITY: MapLayerVisibility = {
   infrastructure: true,
   windHazard: true,
   aipReference: true,
+  liveNotams: true,
   buildings: true,
   neighborhoods: true,
   // Opt-in, not on by default — a pilot's own past-request dots sitting on the map by default

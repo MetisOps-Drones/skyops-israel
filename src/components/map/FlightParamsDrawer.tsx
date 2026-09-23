@@ -21,6 +21,7 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import {
@@ -29,6 +30,7 @@ import {
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
 } from "@/lib/geo/flight-rules";
+import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
 import { ClearanceBadge } from "./ClearanceBadge";
@@ -77,6 +79,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
+  const { data: liveNotams = [], isLoading: liveNotamsLoading } = useLiveNotamZones();
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
   const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
@@ -123,6 +126,10 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
     [checkPoint, aipZones]
+  );
+  const notamCheck = useMemo(
+    () => (checkPoint ? checkLiveNotamOverlap(checkPoint, liveNotams) : null),
+    [checkPoint, liveNotams]
   );
   const proximity = useProximityCheck(checkPoint);
   const proximityFindings = proximity.data?.findings ?? [];
@@ -174,13 +181,17 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // from the ground even when the zone itself would otherwise allow a coordination request.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
   const requiresAttention =
-    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
+    zoneBlockLevel !== "none" ||
+    Boolean(notamCheck?.inside) ||
+    needsSpecialAuthorization ||
+    groundBlockedByAltitude ||
+    buildingCheckUnavailable;
   const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
   // Same reasoning as LocationInfoCard: requiresAttention is derived from
   // aipZones/proximity/buildingProximity, all async — while any is still
   // loading, don't show (or let a hobby pilot act on) a premature "fine to
   // submit" state.
-  const isChecking = aipZonesLoading || proximity.isLoading || buildingProximity.isLoading;
+  const isChecking = aipZonesLoading || liveNotamsLoading || proximity.isLoading || buildingProximity.isLoading;
   // Same fast-path as LocationInfoCard: the building-footprint check alone
   // is a GIST-indexed spatial query, so once *it* resolves (even while
   // aipZones/proximity are still loading) show that read immediately
@@ -476,11 +487,13 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                         ? "קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית"
                         : zoneRequiresDirectorApproval
                           ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
-                          : needsSpecialAuthorization
-                            ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                            : buildingCheckUnavailable
-                              ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
-                              : "אזור זה דורש תיאום בכפוף לתנאים"}
+                          : notamCheck?.inside
+                            ? "נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית"
+                            : needsSpecialAuthorization
+                              ? "אזור זה דורש הרשאת הפעלה מיוחדת"
+                              : buildingCheckUnavailable
+                                ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
+                                : "אזור זה דורש תיאום בכפוף לתנאים"}
               </div>
               <ul className="list-inside list-disc text-xs text-muted-foreground">
                 {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
@@ -493,6 +506,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     {reason.zone && !reason.zone.geometry_precise && (
                       <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
                     )}
+                  </li>
+                ))}
+                {notamCheck?.notams.map((notam) => (
+                  <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
+                    {notam.id}: {notam.eText}
                   </li>
                 ))}
                 {isNearBuildingLocally && (
@@ -527,6 +545,10 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               ) : zoneBlockLevel === "director_approval_only" ? (
                 <p className="text-xs text-muted-foreground">
                   אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת&quot;א. תיאום כזה זמין רק לחשבונות ארגון.
+                </p>
+              ) : notamCheck?.inside ? (
+                <p className="text-xs text-muted-foreground">
+                  ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
                 </p>
               ) : needsSpecialAuthorization ? (
                 <p className="text-xs text-muted-foreground">
@@ -564,8 +586,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה. האחריות לביצוע הטיסה על פי כל דין
-            מוטלת על המטיס.
+            נוטאמים פעילים נבדקים מול פיד לא-רשמי של רשות שדות התעופה, לא תחליף לבדיקה רשמית לפני טיסה. האחריות
+            לביצוע הטיסה על פי כל דין מוטלת על המטיס.
           </p>
 
           <div className="flex gap-2">

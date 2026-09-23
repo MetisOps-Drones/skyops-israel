@@ -18,6 +18,7 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useAirspaceZones } from "@/hooks/useAirspaceZones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import {
   useMyFlightRequests,
   useControlTowerFlightRequests,
@@ -30,7 +31,7 @@ import {
   ISRAEL_MAP_CENTER,
   ISRAEL_MAP_DEFAULT_ZOOM,
 } from "@/lib/constants/airspace-zones";
-import { AIP_ZONE_KIND_COLORS } from "@/lib/constants/aip-reference-zones";
+import { AIP_ZONE_KIND_COLORS, LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
 import { FLIGHT_REQUEST_STATUS_COLORS, FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import {
   DEFAULT_MAP_BASE_STYLE,
@@ -95,6 +96,7 @@ export function BubbleMap({
   const spatialCheck = useAirspaceCheck();
   const { data: airspaceZones = [] } = useAirspaceZones();
   const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: liveNotams = [] } = useLiveNotamZones();
   const { data: myFlightRequests = [] } = useMyFlightRequests();
   const setSelectedHistoryId = onSelectedHistoryIdChange ?? (() => {});
 
@@ -225,6 +227,19 @@ export function BubbleMap({
         })),
     }),
     [aipZones]
+  );
+
+  const liveNotamsGeojson = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: "FeatureCollection",
+      features: liveNotams.map((notam) =>
+        turf.circle([notam.position.lon, notam.position.lat], notam.position.radiusNm * 1.852, {
+          units: "kilometers",
+          properties: { id: notam.id, eText: notam.eText },
+        })
+      ),
+    }),
+    [liveNotams]
   );
 
   const handleMapClick = useCallback(
@@ -417,6 +432,27 @@ export function BubbleMap({
                 "text-halo-color": "#ffffff",
                 "text-halo-width": 1.4,
               }}
+            />
+          </Source>
+        )}
+
+        {/* Live Israeli NOTAMs (github.com/arielf-idra/notam-isr) — always a
+            circle (center + radius), never a real polygon; see
+            src/lib/notams/live-feed.ts. Visual only here, like the AIP layer
+            above — the actual E) text reads through LocationInfoCard when a
+            pilot clicks/taps a point (handleMapClick → onInspectPoint), not
+            a dedicated popup on the shape itself. */}
+        {layerVisibility.liveNotams && (
+          <Source id="live-notam-zones" type="geojson" data={liveNotamsGeojson}>
+            <Layer
+              id="live-notam-zones-fill"
+              type="fill"
+              paint={{ "fill-color": LIVE_NOTAM_COLOR, "fill-opacity": 0.22 }}
+            />
+            <Layer
+              id="live-notam-zones-line"
+              type="line"
+              paint={{ "line-color": LIVE_NOTAM_COLOR, "line-width": 2 }}
             />
           </Source>
         )}

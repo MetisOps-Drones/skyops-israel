@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TermTooltip } from "@/components/map/TermTooltip";
 import { AIRSPACE_ZONE_COLORS, AIRSPACE_ZONE_LABELS } from "@/lib/constants/airspace-zones";
+import { LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
 import type { AviationGlossaryTerm } from "@/lib/constants/aviation-glossary";
 import { cn } from "@/lib/utils";
 import type { MapBaseStyle, MapLayerVisibility } from "@/lib/types/map-ui";
@@ -128,7 +129,15 @@ export function LayerControlPanel({
             onCheckedChange={() => toggle("aipReference")}
             className="col-span-2 py-1.5 text-xs"
           >
-            <TermTooltip term="AIP">שכבת מרחב אווירי (ייעוץ, ללא NOTAM בזמן אמת)</TermTooltip>
+            <TermTooltip term="AIP">שכבת מרחב אווירי (ייעוץ, קבוע)</TermTooltip>
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={visibility.liveNotams}
+            onCheckedChange={() => toggle("liveNotams")}
+            className="col-span-2 py-1.5 text-xs font-medium"
+            style={{ color: LIVE_NOTAM_COLOR }}
+          >
+            נוטאמים פעילים (זמן אמת, כל 10 דק&apos;)
           </DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={visibility.myHistory}

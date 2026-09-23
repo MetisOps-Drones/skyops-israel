@@ -20,3 +20,6 @@ export const AIP_ZONE_KIND_COLORS: Record<AipZoneKind, string> = {
   DANGER: "#b91c1c",
   PROHIBITED: "#78350f",
 };
+
+/** Bright, distinct from both zone color families above — a live NOTAM is time-sensitive and current, not a standing classification. */
+export const LIVE_NOTAM_COLOR = "#ea580c";
