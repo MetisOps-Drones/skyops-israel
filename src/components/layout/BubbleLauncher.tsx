@@ -36,7 +36,6 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   const setRingOpen = useBubbleLauncherStore((s) => s.setRingOpen);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const router = useRouter();
   const unreadCount = useUnreadNotificationCount();
   const { data: orgContext } = useMyOrgContext();
@@ -58,12 +57,6 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
     updateViewport();
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
-  }, []);
-
-  // Touch devices have no hover state to reveal a tooltip on, so the bubble
-  // label is shown permanently underneath instead of on :hover.
-  useEffect(() => {
-    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
   }, []);
 
   const bubbles: BubbleItem[] = [
@@ -160,7 +153,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                   aria-label={bubble.label}
                   tabIndex={ringOpen ? 0 : -1}
                   className={cn(
-                    "peer absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
+                    "absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
                     ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                   )}
                   style={{
@@ -181,21 +174,20 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                     </span>
                   )}
                 </button>
-                {/* Bubble name label — on hover for a mouse/trackpad (via the
-                    peer-hover: on the button above), permanently visible
-                    instead for a touch device, which has no hover state to
-                    reveal it with. */}
+                {/* Bubble name label — always visible whenever the ring is
+                    open, not just on hover, so it reads the same on touch
+                    and with a mouse. */}
                 <span
                   aria-hidden="true"
                   className={cn(
                     "pointer-events-none absolute left-1/2 top-1/2 z-10 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-md transition-opacity duration-200",
-                    ringOpen ? (isTouchDevice ? "opacity-100" : "opacity-0 peer-hover:opacity-100") : "opacity-0"
+                    ringOpen ? "opacity-100" : "opacity-0"
                   )}
                   style={{
                     transform: ringOpen
                       ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 34}px))`
                       : "translate(-50%, -50%)",
-                    transitionDelay: ringOpen && !isTouchDevice ? "0ms" : ringOpen ? `${i * 30}ms` : "0ms",
+                    transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
                 >
                   {bubble.label}
