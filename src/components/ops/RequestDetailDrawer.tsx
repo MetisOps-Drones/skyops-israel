@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,7 +11,7 @@ import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 import { useRejectFlightRequest, useOverlappingFlightRequests } from "@/hooks/useFlightRequests";
 import { markFlightRequestViewedByDispatcher } from "@/actions/flight-requests";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Radio } from "lucide-react";
 import { usePilotLicensesForDispatcher } from "@/hooks/useLicenses";
 import { formatCoordinatesForSubmission } from "@/lib/geo/spatial";
 import { FLIGHT_PURPOSE_LABELS } from "@/lib/constants/flight-purpose";
@@ -20,6 +20,11 @@ import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
 import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
+import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
+import { checkFlightAuthorizationRequirement } from "@/lib/geo/flight-rules";
+import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
+import { AIP_ZONE_KIND_LABELS, AIP_ZONE_KIND_DISPATCHER_REQUIREMENT } from "@/lib/constants/aip-reference-zones";
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   active: "בתוקף",
@@ -40,6 +45,8 @@ export function RequestDetailDrawer({
   const rejectMutation = useRejectFlightRequest();
   const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
   const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
+  const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: liveNotams = [] } = useLiveNotamZones();
 
   // Opening this drawer is the moment the pilot's 30-minute self-edit
   // window closes (see flightRequestEditEligibility) — fire-and-forget,
@@ -50,6 +57,23 @@ export function RequestDetailDrawer({
       markFlightRequestViewedByDispatcher(request.id).catch(() => {});
     }
   }, [request?.id]);
+
+  const requestPoint = request?.center_point_geojson as unknown as GeoJSON.Point | undefined;
+  const requestLng = requestPoint?.coordinates[0] ?? 0;
+  const requestLat = requestPoint?.coordinates[1] ?? 0;
+
+  // Same authoritative check the map/server run (flight-rules.ts,
+  // live-notams.ts) — re-derived here rather than reading dispatcher_notes,
+  // since that field is a flat human-readable string with no per-zone kind
+  // to key the requirement text off of.
+  const authCheck = useMemo(
+    () => checkFlightAuthorizationRequirement([requestLng, requestLat], aipZones),
+    [requestLng, requestLat, aipZones]
+  );
+  const notamCheck = useMemo(
+    () => checkLiveNotamOverlap([requestLng, requestLat], liveNotams),
+    [requestLng, requestLat, liveNotams]
+  );
 
   if (!request) return null;
 
@@ -113,6 +137,36 @@ export function RequestDetailDrawer({
               {dmsCoordinates}
             </p>
           </div>
+
+          {(notamCheck.inside || authCheck.reasons.length > 0) && (
+            <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warning">
+                <Radio className="h-4 w-4 shrink-0" />
+                מרחב אווירי בנקודה — לבדוק לפני אישור
+              </div>
+              {notamCheck.inside && (
+                <div className="rounded-md border bg-background p-2 text-xs">
+                  <p className="font-medium">נוטאם פעיל חופף לנקודה</p>
+                  {notamCheck.notams.map((n) => (
+                    <p key={n.id} className="mt-0.5 text-muted-foreground">
+                      {n.id}: {n.eText}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {authCheck.reasons.map((reason, i) => (
+                <div key={i} className="rounded-md border bg-background p-2 text-xs">
+                  <p className="font-medium">
+                    {reason.label}
+                    {reason.zone && ` — ${AIP_ZONE_KIND_LABELS[reason.zone.kind]}`}
+                  </p>
+                  {reason.zone && (
+                    <p className="mt-1 text-muted-foreground">{AIP_ZONE_KIND_DISPATCHER_REQUIREMENT[reason.zone.kind]}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <CoordinationPanel request={request} lng={lng} lat={lat} dmsCoordinates={dmsCoordinates} />
 

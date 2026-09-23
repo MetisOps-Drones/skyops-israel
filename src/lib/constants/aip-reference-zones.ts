@@ -29,3 +29,25 @@ export const AIP_ZONE_KIND_COLORS: Record<AipZoneKind, string> = {
 
 /** Bright, distinct from both zone color families above — a live NOTAM is time-sensitive and current, not a standing classification. */
 export const LIVE_NOTAM_COLOR = "#ea580c";
+
+/**
+ * Dispatcher-facing (not pilot-facing) legal requirement per zone kind —
+ * what the *dispatcher* must verify/obtain before approving a request that
+ * overlaps this kind of zone, not just "why it's flagged". Sourced from the
+ * same regulatory basis as flight-rules.ts's blockLevelForKind, made
+ * concrete: CTR is Class C controlled airspace around an active airport —
+ * no drone entry without the tower's own explicit clearance, obtained by
+ * the dispatcher coordinating directly with ATC and (for LLBG specifically)
+ * security control, not just a standing in-app approval. RESTRICTED/DANGER/
+ * PROHIBITED text mirrors the identical regulation clause both CAAI laws
+ * use for those categories.
+ */
+export const AIP_ZONE_KIND_DISPATCHER_REQUIREMENT: Record<AipZoneKind, string> = {
+  CTR: 'מרחב פיקוח בדרגה C סביב שדה תעופה פעיל — אסורה כניסת רחפן ללא מרשה מפורש ומוקדם ממגדל הפיקוח של השדה. יש לתאם "בועה" ישירות מול המגדל (ובנתב"ג — גם מול גורמי הביטחון) לפני אישור; לחשבון פרטי (מטיסן) אין כלל מסלול הפעלה בתוך ה-CTR דרך המערכת.',
+  ATZ: 'מרחב תעבורה של שדה קטן — יש לתאם מול מפעיל השדה/מגדל (אם קיים) לפני אישור, באותו אופן כמו CTR בקנה מידה קטן יותר.',
+  TMA: "מרחב פיקוח גבוה ליד שדה תעופה — ודא שגובה הטיסה המבוקש אינו חוצה את רצפת המרחב המבוקר בנקודה זו; אם כן, נדרש תיאום נוסף מול הגורם השולט.",
+  CTA: "מרחב טיסה מבוקר למטוסים — כנ\"ל: ודא שגובה הטיסה המבוקש אינו חוצה את רצפת המרחב בנקודה זו לפני אישור.",
+  RESTRICTED: "אזור מוגבל (LLR) — טיסה מותרת רק לפי התנאים שנקבעו לאזור זה או באישור הגורם השולט בו. יש לבדוק את התנאים הספציפיים לפני אישור, לא רק את החפיפה הגאומטרית.",
+  DANGER: 'אזור מסוכן לטיסה (LLD) — אסורה טיסה ללא אישור פרטני של מנהל רת"א (לא תיאום עצמאי דרך המערכת). זמין רק לחשבון ארגון, ורק לאחר קבלת האישור הפרטני בפועל מחוץ למערכת.',
+  PROHIBITED: 'אזור אסור לטיסה לגמרי (LLP) — אסורה טיסה ללא אישור פרטני של מנהל רת"א (לא תיאום עצמאי דרך המערכת). זמין רק לחשבון ארגון, ורק לאחר קבלת האישור הפרטני בפועל מחוץ למערכת.',
+};
