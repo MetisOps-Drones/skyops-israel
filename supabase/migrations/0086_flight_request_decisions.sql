@@ -14,7 +14,7 @@
 -- status (already used for a pilot's own pre-decision self-cancel) so a
 -- cancelled-after-publish request is distinguishable in the UI by having
 -- both a notam_code AND status='cancelled'.
-create table flight_request_decisions (
+create table if not exists flight_request_decisions (
   id uuid primary key default gen_random_uuid(),
   flight_request_id uuid not null references flight_requests (id) on delete cascade,
   action text not null check (action in ('published', 'rejected', 'cancelled')),
@@ -24,7 +24,7 @@ create table flight_request_decisions (
   decided_at timestamptz not null default timezone('utc', now())
 );
 
-create index flight_request_decisions_request_id_idx on flight_request_decisions (flight_request_id, decided_at);
+create index if not exists flight_request_decisions_request_id_idx on flight_request_decisions (flight_request_id, decided_at);
 
 alter table flight_request_decisions enable row level security;
 
@@ -32,6 +32,7 @@ alter table flight_request_decisions enable row level security;
 -- CoordinationPanel/CoordinationAuthoritiesCard -- never surfaced to the
 -- pilot/org side (they already get the outcome via the existing
 -- notifications insert at decision time).
+drop policy if exists "Dispatcher admins manage decision history" on flight_request_decisions;
 create policy "Dispatcher admins manage decision history"
   on flight_request_decisions for all
   using (is_dispatcher_admin())
