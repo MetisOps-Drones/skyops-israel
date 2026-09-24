@@ -115,7 +115,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   }, [canSeeLogs, isAdmin]);
 
   const count = bubbles.length;
-  const satelliteHalf = 24; // h-12 button, half its size
+  const satelliteHalf = 28; // h-14 button, half its size
   const margin = 12;
 
   // Closed: docked near the bottom edge, out of the way of the map like any
@@ -157,7 +157,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
         className="fixed left-1/2 z-40 -translate-x-1/2 -translate-y-1/2 transition-[top] duration-300 ease-out"
         style={{ top: centerTop }}
       >
-        <div className="relative h-14 w-14">
+        <div className="relative h-16 w-16">
           {bubbles.map((bubble, i) => {
             // Full circle around the center bubble, starting straight up and going clockwise.
             const angleDeg = -90 + (360 * i) / count;
@@ -173,7 +173,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                   aria-label={bubble.label}
                   tabIndex={ringOpen ? 0 : -1}
                   className={cn(
-                    "absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
+                    "absolute left-1/2 top-1/2 z-10 flex h-14 w-14 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
                     ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                   )}
                   style={{
@@ -187,7 +187,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                     transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-6 w-6" />
                   {Boolean(bubble.badge) && (
                     <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                       {bubble.badge}
@@ -205,7 +205,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                   )}
                   style={{
                     transform: ringOpen
-                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 34}px))`
+                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 38}px))`
                       : "translate(-50%, -50%)",
                     transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
@@ -223,11 +223,11 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
             title="תפריט MetisOps"
             aria-expanded={ringOpen}
             className={cn(
-              "relative z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300",
+              "relative z-20 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300",
               ringOpen && "rotate-90"
             )}
           >
-            <MetisOpsLogo className="h-7 w-7" />
+            <MetisOpsLogo className="h-8 w-8" />
             {!ringOpen && unreadCount > 0 && (
               <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {unreadCount}

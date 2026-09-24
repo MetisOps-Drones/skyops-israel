@@ -54,11 +54,11 @@ export function LayerControlPanel({
           aria-label="שכבות ומקרא מפה"
           title="שכבות ומקרא מפה"
           className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-colors hover:bg-accent",
+            "flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-colors hover:bg-accent",
             highContrast ? "border-2 border-foreground" : "border border-input"
           )}
         >
-          <Layers3 className="h-4 w-4" />
+          <Layers3 className="h-5 w-5" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80 p-3">
