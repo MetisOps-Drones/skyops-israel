@@ -53,6 +53,27 @@ export function useHasValidInsurance() {
   });
 }
 
+/** Dispatcher-facing counterpart to useHasValidInsurance — same query, explicit pilotUserId instead of the signed-in user, gated by the same "dispatcher admins read all documents" RLS policy as usePilotLicensesForDispatcher below. */
+export function useHasValidInsuranceForDispatcher(pilotUserId: string | null) {
+  return useQuery({
+    queryKey: ["documents", "insurance_certificate", "valid", "dispatcher-view", pilotUserId],
+    queryFn: async (): Promise<boolean> => {
+      if (!pilotUserId) return false;
+      const supabase = createClient();
+      const { count, error } = await supabase
+        .from("documents")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", pilotUserId)
+        .eq("kind", "insurance_certificate")
+        .not("ocr_extracted_expires_at", "is", null)
+        .gte("ocr_extracted_expires_at", new Date().toISOString().slice(0, 10));
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    enabled: Boolean(pilotUserId),
+  });
+}
+
 /** Dispatcher-facing (Module B): read another pilot's licenses. RLS's "Dispatcher admins read all licenses" policy gates this. */
 export function usePilotLicensesForDispatcher(pilotUserId: string | null) {
   return useQuery({

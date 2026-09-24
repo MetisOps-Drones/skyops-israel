@@ -8,7 +8,7 @@ import type { PublishNotamInput, RejectFlightRequestInput } from "@/lib/validati
 
 export type FlightRequestWithRelations = Tables<"flight_requests"> & {
   profiles: Pick<Tables<"profiles">, "id" | "full_name" | "phone"> | null;
-  drones: Pick<Tables<"drones">, "id" | "nickname" | "model" | "registration_number"> | null;
+  drones: Pick<Tables<"drones">, "id" | "nickname" | "model" | "registration_number" | "mtow_grams"> | null;
 };
 
 /** Pilot-facing: only the signed-in user's own requests (RLS also enforces this). */
@@ -20,7 +20,7 @@ export function useMyFlightRequests() {
       const { data, error } = await supabase
         .from("flight_requests")
         .select(
-          "*, profiles!flight_requests_user_id_fkey ( id, full_name, phone ), drones ( id, nickname, model, registration_number )"
+          "*, profiles!flight_requests_user_id_fkey ( id, full_name, phone ), drones ( id, nickname, model, registration_number, mtow_grams )"
         )
         .order("start_time", { ascending: false });
       if (error) throw error;
@@ -39,7 +39,7 @@ export function usePendingCoordinationRequests() {
       const { data, error } = await supabase
         .from("flight_requests")
         .select(
-          "*, profiles!flight_requests_user_id_fkey ( id, full_name, phone ), drones ( id, nickname, model, registration_number )"
+          "*, profiles!flight_requests_user_id_fkey ( id, full_name, phone ), drones ( id, nickname, model, registration_number, mtow_grams )"
         )
         .in("status", ["pending_dispatcher", "submitted_to_iaf"])
         .order("start_time", { ascending: true });

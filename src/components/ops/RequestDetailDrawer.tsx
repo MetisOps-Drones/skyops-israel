@@ -19,6 +19,7 @@ import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
+import { DispatcherChecklist } from "./DispatcherChecklist";
 import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
@@ -137,6 +138,14 @@ export function RequestDetailDrawer({
               {dmsCoordinates}
             </p>
           </div>
+
+          <DispatcherChecklist
+            request={request}
+            overlaps={overlaps}
+            overlapsLoading={overlapsLoading}
+            authCheck={authCheck}
+            notamCheck={notamCheck}
+          />
 
           {(notamCheck.inside || authCheck.reasons.length > 0) && (
             <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3">
