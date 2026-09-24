@@ -22,12 +22,9 @@ import {
 import { useCoordinationAuthorityLookup } from "@/hooks/useCoordinationAuthorities";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import { FLIGHT_REQUEST_TYPE_LABELS } from "@/lib/constants/flight-request-type";
+import { urgencyHours, urgencyTier, URGENCY_LABEL, URGENCY_BADGE_VARIANT } from "@/lib/coordination/urgency";
 
 type SortMode = "urgency" | "start_date";
-
-function urgencyHours(request: FlightRequestWithRelations): number {
-  return (new Date(request.start_time).getTime() - Date.now()) / (1000 * 60 * 60);
-}
 
 /** Per-row deconfliction glance — a small badge so a dispatcher doesn't have to open every request just to find the ones that overlap another pilot's. */
 function OverlapBadge({ requestId }: { requestId: string }) {
@@ -117,7 +114,7 @@ export function PendingRequestsTable({
             </TableRow>
           )}
           {sorted.map((request) => {
-            const hoursLeft = urgencyHours(request);
+            const tier = urgencyTier(urgencyHours(request));
             return (
               <TableRow key={request.id} className="cursor-pointer" onClick={() => onSelect(request)}>
                 <TableCell>{request.profiles?.full_name ?? "—"}</TableCell>
@@ -127,9 +124,7 @@ export function PendingRequestsTable({
                   {formatDistanceToNow(new Date(request.start_time), { addSuffix: true, locale: he })}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={hoursLeft < 24 ? "destructive" : hoursLeft < 72 ? "warning" : "secondary"}>
-                    {hoursLeft < 24 ? "דחוף" : hoursLeft < 72 ? "השבוע" : "רגיל"}
-                  </Badge>
+                  <Badge variant={URGENCY_BADGE_VARIANT[tier]}>{URGENCY_LABEL[tier]}</Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1.5">
