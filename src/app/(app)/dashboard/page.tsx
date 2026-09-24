@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { PlaneTakeoff, ShieldAlert, Wrench, Clock, Plane, Radar, Gauge } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
+import { resolveCoordinationLimit, periodStart, fetchMyCoordinationOverride } from "@/lib/coordination-quota";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { GreetingHero } from "@/components/dashboard/GreetingHero";
 import { AlertsList, type DashboardAlert } from "@/components/dashboard/AlertsList";
@@ -35,27 +36,24 @@ function greetingForIsraelHour(): string {
 }
 
 export default async function DashboardPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
+  const current = await getCurrentUserProfile();
+  if (!current) return null;
+  const { user, profile } = current;
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
 
+  const supabase = createClient();
   const [
-    { data: profile },
     { data: licenses },
     { data: drones },
     { data: myRequests },
     { data: batteries },
     { count: orgMembershipCount },
     { count: todayCoordinationsCount },
+    override,
   ] = await Promise.all([
-    supabase.from("profiles").select("full_name, role, org_id, plan_code").eq("id", user.id).single(),
     supabase.from("pilot_licenses").select("*").eq("user_id", user.id).order("expires_at"),
     supabase.from("drones").select("*").eq("user_id", user.id),
     supabase
@@ -72,6 +70,7 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .gte("created_at", startOfToday.toISOString())
       .lt("created_at", startOfTomorrow.toISOString()),
+    fetchMyCoordinationOverride(supabase),
   ]);
 
   const needsFirstDrone = (drones?.length ?? 0) === 0 && (orgMembershipCount ?? 0) === 0;
@@ -80,6 +79,7 @@ export default async function DashboardPage() {
     role: profile?.role ?? null,
     hasOrg: Boolean(profile?.org_id),
     planCode: profile?.plan_code ?? null,
+    override,
   });
   let coordinationsUsedThisPeriod = 0;
   if (coordinationLimit) {

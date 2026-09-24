@@ -1,16 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
 import { LogsPageClient } from "./LogsPageClient";
 
 export default async function LogsPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/auth/login");
-
-  const { data: profile } = await supabase.from("profiles").select("role, org_id").eq("id", user.id).single();
+  const current = await getCurrentUserProfile();
+  if (!current) redirect("/auth/login");
+  const { profile } = current;
 
   // Flight logs are a paid feature (private_standard and up — see
   // src/lib/constants/plans.ts) that a pure hobby pilot on the free tier

@@ -1,18 +1,13 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
 import { OpsPageClient } from "./OpsPageClient";
 
 export default async function OpsPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const current = await getCurrentUserProfile();
+  if (!current) redirect("/auth/login");
+  const { profile } = current;
 
-  if (!user) redirect("/auth/login");
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-
-  if (profile?.role !== "dispatcher_admin") {
+  if (profile.role !== "dispatcher_admin") {
     redirect("/dashboard");
   }
 

@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
 import { MarketplacePageClient } from "./MarketplacePageClient";
 
 export default async function MarketplacePage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/login");
-
-  const { data: profile } = await supabase.from("profiles").select("org_id, role").eq("id", user.id).single();
+  const current = await getCurrentUserProfile();
+  if (!current) redirect("/auth/login");
+  const { profile } = current;
 
   // The admin's own equivalent of this page is /admin/marketplace (booking
   // monitoring across the platform) — sending them to the org-facing browse
