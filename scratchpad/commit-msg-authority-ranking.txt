@@ -1,0 +1,24 @@
+Rank coordination authorities by real-world relevance, not arbitrary order
+
+find_coordination_authority() had no ORDER BY -- for a point matching
+several authorities (which is most of Israel, since every רש"ת/רת"א row
+is a 200km-radius circle centered on Tel Aviv), the dispatcher got an
+unranked pile of phone numbers with no signal on which to call first,
+even though CoordinationPanel already silently treats index 0 as "the"
+authority when saving a status without an explicit pick.
+
+Researched each org's actual real-world role (CAAI's own site describes
+itself as regulatory/licensing, not per-flight operational coordination;
+רש"ת AIS/ARO are the real national NOTAM desks) and ranked by tier: local
+airspace gatekeepers (base towers, CTRs, private airfields, border
+units) first, then regional courtesy/security contacts, then רש"ת's
+national NOTAM desks, then environmental/advisory bodies, then רת"א's
+regulatory departments last. Same-tier rows sort by radius_m ascending --
+the more specific (smaller-radius) match first.
+
+Pure DB-side fix, no application code changes needed -- the client
+already just renders whatever order the RPC returns.
+
+Included a full read-only dump of the current 43-row table
+(coordination-authorities-dump.json) as the research artifact this
+ranking was built from.
