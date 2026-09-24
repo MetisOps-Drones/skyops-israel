@@ -35,14 +35,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ available: true, isNearBuilding: near, bufferM });
   } catch (err) {
     console.error("building-proximity failed:", err);
-    // TEMPORARY: surfacing the real error message to diagnose a
-    // production-only failure that doesn't reproduce locally — revert once
-    // root-caused, this isn't meant to stay in the response long-term.
-    return NextResponse.json({
-      available: false,
-      isNearBuilding: false,
-      bufferM,
-      debugError: err instanceof Error ? err.message : String(err),
-    });
+    return NextResponse.json({ available: false, isNearBuilding: false, bufferM });
   }
 }
