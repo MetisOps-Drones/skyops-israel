@@ -141,6 +141,16 @@ export function RequestDetailPanel({
         return;
       }
       toast.success("ה-NOTAM בוטל והמטיס קיבל התראה");
+      // Unlike publish/reject (which fully leave the pending queue on
+      // success), a cancelled request stays reachable via
+      // RecentlyDecidedList — but `request` here is the snapshot passed in
+      // when this panel opened, not a live subscription, so it would keep
+      // showing the stale "פורסם" banner and this same cancel button
+      // instead of the new cancelled state. Returning to the queue (same
+      // as publish/reject) avoids that; the toast + updated decision
+      // history already confirm the action, and reopening it from
+      // "הוחלט לאחרונה" shows the correct state.
+      onClose();
       setCancelFormOpen(false);
       setCancelReason("");
     } catch (err) {
@@ -321,7 +331,7 @@ export function RequestDetailPanel({
 
         <DecisionHistory requestId={request.id} />
 
-        {request.status !== "notam_published" && request.status !== "rejected" && (
+        {request.status !== "notam_published" && request.status !== "rejected" && request.status !== "cancelled" && (
           <>
             <Separator />
             <div className="flex flex-col gap-2">

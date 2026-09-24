@@ -59,11 +59,16 @@ export async function publishNotam(input: PublishNotamInput): Promise<NotamActio
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", data.flight_request_id)
+      // Only a still-pending request can be published — without this, a
+      // stale UI (or a direct call) could re-publish an already-cancelled
+      // or already-rejected request. Mirrors the same guard cancelNotam
+      // uses below, just for the opposite direction.
+      .in("status", ["pending_dispatcher", "submitted_to_iaf"])
       .select("*, profiles!flight_requests_user_id_fkey ( id, full_name, phone )")
       .single();
 
     if (updateError) {
-      return { success: false, error: `פרסום ה-NOTAM נכשל: ${updateError.message}` };
+      return { success: false, error: "ניתן לפרסם NOTAM רק לבקשה שממתינה לטיפול: " + updateError.message };
     }
 
     const { error: decisionError } = await supabase.from("flight_request_decisions").insert({
@@ -128,11 +133,12 @@ export async function rejectFlightRequest(input: RejectFlightRequestInput): Prom
         reviewed_at: new Date().toISOString(),
       })
       .eq("id", data.flight_request_id)
+      .in("status", ["pending_dispatcher", "submitted_to_iaf"])
       .select("user_id")
       .single();
 
     if (updateError) {
-      return { success: false, error: updateError.message };
+      return { success: false, error: "ניתן לדחות רק בקשה שממתינה לטיפול: " + updateError.message };
     }
 
     const { error: decisionError } = await supabase.from("flight_request_decisions").insert({
