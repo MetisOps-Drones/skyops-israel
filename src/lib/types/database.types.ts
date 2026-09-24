@@ -300,6 +300,196 @@ export type Database = {
           },
         ]
       }
+      billing_checkouts: {
+        Row: {
+          amount_ils: number
+          cardcom_low_profile_id: string | null
+          cardcom_token: string | null
+          cardcom_token_expiry: string | null
+          consumed_at: string | null
+          created_at: string
+          id: string
+          intended_org_name: string | null
+          plan_code: string
+          profile_id: string
+          status: string
+          switch_to_pro: boolean
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_ils: number
+          cardcom_low_profile_id?: string | null
+          cardcom_token?: string | null
+          cardcom_token_expiry?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          intended_org_name?: string | null
+          plan_code: string
+          profile_id: string
+          status?: string
+          switch_to_pro?: boolean
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_ils?: number
+          cardcom_low_profile_id?: string | null
+          cardcom_token?: string | null
+          cardcom_token_expiry?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          intended_org_name?: string | null
+          plan_code?: string
+          profile_id?: string
+          status?: string
+          switch_to_pro?: boolean
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_checkouts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_invoices: {
+        Row: {
+          amount_ils: number
+          cardcom_document_number: string | null
+          cardcom_document_url: string | null
+          cardcom_transaction_id: string | null
+          checkout_id: string | null
+          id: string
+          issued_at: string
+          profile_id: string
+          subscription_id: string | null
+        }
+        Insert: {
+          amount_ils: number
+          cardcom_document_number?: string | null
+          cardcom_document_url?: string | null
+          cardcom_transaction_id?: string | null
+          checkout_id?: string | null
+          id?: string
+          issued_at?: string
+          profile_id: string
+          subscription_id?: string | null
+        }
+        Update: {
+          amount_ils?: number
+          cardcom_document_number?: string | null
+          cardcom_document_url?: string | null
+          cardcom_transaction_id?: string | null
+          checkout_id?: string | null
+          id?: string
+          issued_at?: string
+          profile_id?: string
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_checkout_id_fkey"
+            columns: ["checkout_id"]
+            isOneToOne: false
+            referencedRelation: "billing_checkouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "billing_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_subscriptions: {
+        Row: {
+          amount_ils: number
+          cancelled_at: string | null
+          cardcom_token: string
+          cardcom_token_expiry: string | null
+          created_at: string
+          created_by_profile_id: string
+          failed_attempts: number
+          id: string
+          next_billing_date: string
+          org_id: string | null
+          plan_code: string
+          profile_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_ils: number
+          cancelled_at?: string | null
+          cardcom_token: string
+          cardcom_token_expiry?: string | null
+          created_at?: string
+          created_by_profile_id: string
+          failed_attempts?: number
+          id?: string
+          next_billing_date: string
+          org_id?: string | null
+          plan_code: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_ils?: number
+          cancelled_at?: string | null
+          cardcom_token?: string
+          cardcom_token_expiry?: string | null
+          created_at?: string
+          created_by_profile_id?: string
+          failed_attempts?: number
+          id?: string
+          next_billing_date?: string
+          org_id?: string | null
+          plan_code?: string
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_subscriptions_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_messages: {
         Row: {
           body: string
@@ -3317,6 +3507,8 @@ export type Database = {
         | "coordination_requested"
         | "flight_request_rejected"
         | "recommended_flight_window"
+        | "subscription_payment_failed"
+        | "subscription_cancelled"
       org_membership_status: "pending" | "active" | "rejected" | "removed"
       special_authorization_status: "pending_payment" | "active" | "expired"
       user_role:
@@ -4064,6 +4256,8 @@ export const Constants = {
         "coordination_requested",
         "flight_request_rejected",
         "recommended_flight_window",
+        "subscription_payment_failed",
+        "subscription_cancelled",
       ],
       org_membership_status: ["pending", "active", "rejected", "removed"],
       special_authorization_status: ["pending_payment", "active", "expired"],
