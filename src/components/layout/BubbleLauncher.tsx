@@ -77,7 +77,13 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   const bubbles: BubbleItem[] = [
     ...(canSeeLogs ? [{ key: "logs", label: "יומן טיסות", icon: BookOpen, href: "/logs" }] : []),
     { key: "marketplace", label: "מארקטפלייס", icon: Store, href: "/marketplace" },
-    { key: "coordination", label: "תיאומים", icon: ClipboardCheck, href: "/dashboard" },
+    // Pilot-only: for dispatcher_admin, /dashboard renders nothing but a
+    // single link card pointing at /ops (everything else there — drones,
+    // license, flight hours — is pilot-personal data an admin account
+    // never has), which made this bubble a dead-end detour to the exact
+    // same place the "ops" bubble below goes to directly. Showing both to
+    // an admin was pure duplication.
+    ...(!isAdmin ? [{ key: "coordination", label: "תיאומים", icon: ClipboardCheck, href: "/dashboard" }] : []),
     // /ops is the dispatcher's actual day-to-day workflow (live queue,
     // NOTAM publishing) — split out from the other admin-only bubble so it
     // isn't buried behind an extra hub screen the way one-off setup tasks
