@@ -23,7 +23,7 @@ import { fetchLiveNotams } from "@/lib/notams/live-feed";
 import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { checkProximity } from "@/lib/geo/proximity-check";
-import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
+import { resolveCoordinationLimit, periodStart, fetchMyCoordinationOverride } from "@/lib/coordination-quota";
 import { flightRequestEditEligibility } from "@/lib/validations/flight-request-edit-window";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 
@@ -237,6 +237,7 @@ export async function createFlightRequest(
     role: profile?.role ?? null,
     hasOrg: Boolean(profile?.org_id),
     planCode: profile?.plan_code ?? null,
+    override: await fetchMyCoordinationOverride(supabase),
   });
   if (coordinationLimit) {
     const since = periodStart(coordinationLimit.period);

@@ -535,6 +535,51 @@ export type Database = {
         }
         Relationships: []
       }
+      coordination_quota_overrides: {
+        Row: {
+          user_id: string
+          override_count: number
+          override_period: string
+          override_complex_allowed: number
+          note: string | null
+          set_by: string | null
+          set_at: string
+        }
+        Insert: {
+          user_id: string
+          override_count: number
+          override_period: string
+          override_complex_allowed?: number
+          note?: string | null
+          set_by?: string | null
+          set_at?: string
+        }
+        Update: {
+          user_id?: string
+          override_count?: number
+          override_period?: string
+          override_complex_allowed?: number
+          note?: string | null
+          set_by?: string | null
+          set_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_quota_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coordination_quota_overrides_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           id: string
@@ -2517,6 +2562,14 @@ export type Database = {
           pilot_avatar_url: string
           pilot_full_name: string
           pilot_id: string
+        }[]
+      }
+      my_coordination_override: {
+        Args: never
+        Returns: {
+          override_count: number
+          override_period: string
+          override_complex_allowed: number
         }[]
       }
       my_marketplace_bookings: {

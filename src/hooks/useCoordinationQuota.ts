@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { resolveCoordinationLimit, periodStart, type CoordinationLimit } from "@/lib/coordination-quota";
+import { resolveCoordinationLimit, periodStart, fetchMyCoordinationOverride, type CoordinationLimit } from "@/lib/coordination-quota";
 
 export interface CoordinationQuotaStatus {
   /** null = unlimited (org account or dispatcher_admin) — nothing else in this object is meaningful then. */
@@ -29,15 +29,15 @@ export function useCoordinationQuota() {
       } = await supabase.auth.getUser();
       if (!user) return { limit: null, used: 0, complexUsed: 0 };
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, org_id, plan_code")
-        .eq("id", user.id)
-        .single();
+      const [{ data: profile }, override] = await Promise.all([
+        supabase.from("profiles").select("role, org_id, plan_code").eq("id", user.id).single(),
+        fetchMyCoordinationOverride(supabase),
+      ]);
       const limit = resolveCoordinationLimit({
         role: profile?.role ?? null,
         hasOrg: Boolean(profile?.org_id),
         planCode: profile?.plan_code ?? null,
+        override,
       });
       if (!limit) return { limit: null, used: 0, complexUsed: 0 };
 

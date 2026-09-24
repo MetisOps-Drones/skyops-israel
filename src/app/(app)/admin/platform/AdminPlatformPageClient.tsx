@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAdminOrganizations, useAdminUsers } from "@/hooks/useAdminPlatform";
+import { useAdminOrganizations, useAdminUsers, useAdminQuotaOverrides } from "@/hooks/useAdminPlatform";
 import { downloadCsv } from "@/lib/csv";
+import { AdminUserPlanDialog } from "./AdminUserPlanDialog";
 
 const ROLE_LABELS: Record<string, string> = {
   fleet_manager: "מנהל צי",
@@ -100,6 +101,8 @@ function OrganizationsTab() {
 function UsersTab() {
   const [search, setSearch] = useState("");
   const { data: users = [], isLoading } = useAdminUsers(true);
+  const { data: overrides = [] } = useAdminQuotaOverrides(true);
+  const overrideByUserId = useMemo(() => new Map(overrides.map((o) => [o.user_id, o])), [overrides]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -155,19 +158,20 @@ function UsersTab() {
             <TableHead>טלפון</TableHead>
             <TableHead>תוכנית</TableHead>
             <TableHead>נוצר בתאריך</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 טוען...
               </TableCell>
             </TableRow>
           )}
           {!isLoading && filtered.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 אין משתמשים תואמים
               </TableCell>
             </TableRow>
@@ -187,8 +191,20 @@ function UsersTab() {
               <TableCell dir="ltr" className="text-end">
                 {u.phone ?? "—"}
               </TableCell>
-              <TableCell>{u.plan_code ?? "—"}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  {u.plan_code ?? "—"}
+                  {overrideByUserId.has(u.id) && (
+                    <Badge variant="outline" className="text-xs">
+                      מכסה מותאמת
+                    </Badge>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>{new Date(u.created_at).toLocaleDateString("he-IL")}</TableCell>
+              <TableCell>
+                <AdminUserPlanDialog user={u} override={overrideByUserId.get(u.id)} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
