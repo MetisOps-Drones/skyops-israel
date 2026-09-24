@@ -3,18 +3,22 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full">
-      {/* table-layout: fixed — table-layout: auto (the default) sizes the
-          table to fit every column's natural content width and lets the
-          TOTAL exceed its container if the sum doesn't fit, which is
-          exactly what forced a horizontal scrollbar on every dense table
-          in the app regardless of how much individual cells/headers were
-          told to truncate. Fixed layout caps the table at its own width
-          (100% of the container, from w-full) and divides that among
-          columns instead, so a cell's truncate + max-w actually gets
-          enforced rather than being a width the browser was free to
-          ignore. */}
-      <table ref={ref} className={cn("w-full caption-bottom text-xs [table-layout:fixed]", className)} {...props} />
+    // overflow-x-auto here (not on the table itself): table-layout: fixed
+    // below divides w-full evenly among columns, which is what a wide
+    // desktop container wants — but a 6-8 column table (every dense table
+    // in this app) squeezed into a ~350px phone width that same way gives
+    // each column just a few px, truncating every header down to 2-3
+    // characters. min-w-[640px] gives the fixed layout enough room to
+    // actually honor each TableHead's own max-w-[120px] instead of
+    // dividing something much smaller; on a container already wider than
+    // that (any normal desktop panel) min-width never engages and nothing
+    // changes there — the scrollbar only ever shows up where it's needed.
+    <div className="relative w-full overflow-x-auto">
+      <table
+        ref={ref}
+        className={cn("w-full min-w-[640px] caption-bottom text-xs [table-layout:fixed]", className)}
+        {...props}
+      />
     </div>
   )
 );

@@ -50,13 +50,28 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   // a fixed radius/offset looked right on a normal desktop window but sent
   // the bottom bubbles off-screen on a shorter one. Recomputed on resize so
   // rotating a phone or resizing a window doesn't leave it stale.
+  //
+  // window.innerHeight is the wrong signal on a phone: it doesn't reliably
+  // track the browser's own collapsing/expanding address bar (Safari in
+  // particular can under- or over-report it right after load, before the
+  // chrome settles), which put the closed FAB noticeably above the real
+  // bottom edge — reading as "stuck in the middle of the screen" once you
+  // account for how far off it was. window.visualViewport is the layer
+  // built for exactly this: it reports the actual visible viewport and
+  // fires its own resize event when the browser chrome changes size, not
+  // just when the window itself does.
   useEffect(() => {
     function updateViewport() {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      const vv = window.visualViewport;
+      setViewport({ width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight });
     }
     updateViewport();
     window.addEventListener("resize", updateViewport);
-    return () => window.removeEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("resize", updateViewport);
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+    };
   }, []);
 
   const bubbles: BubbleItem[] = [
@@ -107,9 +122,14 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   // other FAB. Open: the whole launcher moves to true screen center first —
   // simpler and more robust than trying to fit a ring around a button
   // pinned near an edge, which is what clipped bubbles off-screen before.
+  // The closed position also backs off by the phone's own home-indicator/
+  // gesture-bar inset (env(safe-area-inset-bottom), 0 on anything without
+  // one) so the FAB doesn't sit under it — done as a calc() added on top of
+  // the JS pixel value rather than folded into closedTop itself, since env()
+  // isn't a number useVisualViewport can reason about.
   const closedTop = viewport.height - 60;
   const openTop = viewport.height / 2;
-  const centerTop = ringOpen ? openTop : closedTop;
+  const centerTop = ringOpen ? `${openTop}px` : `calc(${closedTop}px - env(safe-area-inset-bottom, 0px))`;
 
   // Largest radius that fits from true center to the nearest edge in every
   // direction — always symmetric now that the ring only ever opens centered.
@@ -135,7 +155,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
           the closed-to-open move above is one animatable property. */}
       <div
         className="fixed left-1/2 z-40 -translate-x-1/2 -translate-y-1/2 transition-[top] duration-300 ease-out"
-        style={{ top: `${centerTop}px` }}
+        style={{ top: centerTop }}
       >
         <div className="relative h-14 w-14">
           {bubbles.map((bubble, i) => {
