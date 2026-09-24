@@ -14,7 +14,7 @@
 -- security-definer function that controls exactly what it returns — the same
 -- pattern 0049 used to keep marketplace_freelancers() from leaking phone
 -- numbers.
-create table coordination_quota_overrides (
+create table if not exists coordination_quota_overrides (
   user_id uuid primary key references profiles (id) on delete cascade,
   override_count integer not null check (override_count > 0),
   override_period text not null check (override_period in ('week', 'month')),
@@ -30,6 +30,7 @@ alter table coordination_quota_overrides enable row level security;
 -- (see comment above). The security-definer function below is the ONLY way
 -- a user's own session ever sees their own numbers, and it returns only
 -- three columns — never note/set_by/set_at.
+drop policy if exists "Dispatcher admins manage quota overrides" on coordination_quota_overrides;
 create policy "Dispatcher admins manage quota overrides"
   on coordination_quota_overrides for all
   using (is_dispatcher_admin())
