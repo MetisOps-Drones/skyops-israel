@@ -54,7 +54,7 @@ export function LayerControlPanel({
           aria-label="שכבות ומקרא מפה"
           title="שכבות ומקרא מפה"
           className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-colors hover:bg-accent",
+            "flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-[background-color,box-shadow,transform] duration-150 hover:scale-110 hover:bg-accent hover:shadow-lg active:scale-95",
             highContrast ? "border-2 border-foreground" : "border border-input"
           )}
         >

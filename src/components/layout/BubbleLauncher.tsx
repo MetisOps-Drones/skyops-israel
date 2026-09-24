@@ -173,21 +173,25 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                   aria-label={bubble.label}
                   tabIndex={ringOpen ? 0 : -1}
                   className={cn(
-                    "absolute left-1/2 top-1/2 z-10 flex h-14 w-14 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
+                    "group absolute left-1/2 top-1/2 z-10 flex h-14 w-14 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-[opacity,transform,background-color,box-shadow] duration-300 ease-out hover:bg-accent hover:shadow-xl",
                     ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                   )}
                   style={{
                     // Combines the button's own centering offset with its ring
                     // position and open/closed scale into one transform —
                     // mixing this with Tailwind's translate/scale utility
-                    // classes would silently drop whichever set it last.
+                    // classes would silently drop whichever set it last. A
+                    // hover scale can't join this inline transform (it isn't
+                    // reactive to :hover), so the icon below scales up on
+                    // group-hover instead — same visible "lift" feedback
+                    // without fighting the positional transform.
                     transform: ringOpen
                       ? `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1)`
                       : "translate(-50%, -50%) scale(0)",
                     transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
                 >
-                  <Icon className="h-6 w-6" />
+                  <Icon className="h-6 w-6 transition-transform duration-150 group-hover:scale-125" />
                   {Boolean(bubble.badge) && (
                     <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                       {bubble.badge}
@@ -223,7 +227,7 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
             title="תפריט MetisOps"
             aria-expanded={ringOpen}
             className={cn(
-              "relative z-20 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300",
+              "relative z-20 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 hover:scale-110 hover:shadow-2xl active:scale-95",
               ringOpen && "rotate-90"
             )}
           >

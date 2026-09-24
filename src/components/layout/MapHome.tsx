@@ -195,9 +195,9 @@ export function MapHome() {
             aria-label="איפוס המפה למיקום הנוכחי"
             title="איפוס המפה למיקום הנוכחי"
             className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-colors hover:bg-accent",
+              "flex h-14 w-14 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-[background-color,box-shadow,transform] duration-150 hover:scale-110 hover:bg-accent hover:shadow-lg active:scale-95",
               highContrast ? "border-2 border-foreground" : "border border-input",
-              "disabled:opacity-60"
+              "disabled:opacity-60 disabled:hover:scale-100"
             )}
           >
             {locating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Navigation className="h-6 w-6" />}
@@ -209,7 +209,7 @@ export function MapHome() {
           aria-label="דקירת מרחב אווירי לתיאום"
           title="דקירת מרחב אווירי לתיאום"
           className={cn(
-            "flex h-14 w-14 items-center justify-center rounded-full shadow-md transition-colors",
+            "flex h-14 w-14 items-center justify-center rounded-full shadow-md transition-[background-color,box-shadow,transform] duration-150 hover:scale-110 hover:shadow-lg active:scale-95",
             drawMode !== "idle" && drawMode !== "done"
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : cn("bg-card text-foreground hover:bg-accent", highContrast ? "border-2 border-foreground" : "border border-input")

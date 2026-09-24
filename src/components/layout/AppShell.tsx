@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { MapHome } from "@/components/layout/MapHome";
 import { BubbleLauncher } from "@/components/layout/BubbleLauncher";
 import { NewCoordinationRequestToast } from "@/components/layout/NewCoordinationRequestToast";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useBubbleLauncherStore } from "@/stores/useBubbleLauncherStore";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
@@ -69,36 +69,57 @@ export function AppShell({
             clean, correctly-centered start every time. */}
         <DialogContent
           key={pathname}
+          hideClose
           className={cn(
-            style === "panel" &&
-              "h-[88vh] max-h-[88vh] w-[92vw] max-w-5xl gap-0 overflow-y-auto overflow-x-hidden rounded-xl p-0"
+            "flex flex-col gap-0 overflow-hidden p-0",
+            style === "panel" ? "h-[88vh] max-h-[88vh] w-[92vw] max-w-5xl rounded-xl" : "max-w-lg"
           )}
         >
           <DialogTitle className="sr-only">תוכן העמוד</DialogTitle>
           <DialogDescription className="sr-only">תוכן העמוד שנבחר מהתפריט, מוצג כשכבה מעל המפה</DialogDescription>
-          {/* Sits just start-of (i.e. before, in RTL further right of) the X
-              from DialogContent's own DialogPrimitive.Close — that one exits
-              to the plain map, this one reopens the bubble ring on the way
-              out so the pilot lands back on "all the open bubbles" instead
-              of having to re-tap the launcher from scratch. */}
-          <button
-            type="button"
-            onClick={handleBack}
-            aria-label="חזרה לתפריט הבועות"
-            title="חזרה לתפריט הבועות"
-            className="absolute end-12 top-2 z-10 rounded-sm p-2.5 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          {/* min-w-0: DialogContent is display:grid, so this is a grid item —
-              without an explicit min-width it defaults to "auto" (its
-              content's intrinsic width), which lets any unwrappable child
-              (e.g. a Badge with nowrap text inside a shrinking grid-cols-N
-              stat row) blow the whole page wider than the panel instead of
-              wrapping/shrinking to fit it. Confirmed live: without this, one
-              admin page's stat cards rendered ~200px past the panel's left
-              edge on a 375px viewport. */}
-          <div className="min-w-0">{children}</div>
+
+          {/* A real header row, not floating buttons over content: the old
+              absolute-positioned back/close pair sat right where a page's
+              own heading naturally starts (no reserved clearance for them),
+              and — since the OUTER DialogContent used to be the thing that
+              scrolled — scrolled away with the content on any tall page
+              instead of staying put. This row is a flex sibling of the
+              scrollable body below, so it can never overlap or scroll with
+              the page's own content, and always looks like a designed
+              toolbar rather than two buttons floating over whatever's
+              underneath. */}
+          <div className="flex h-12 shrink-0 items-center justify-end gap-1 border-b px-2">
+            {/* Reopens the bubble ring on the way out (unlike the close
+                button, which exits straight to the plain map) so the pilot
+                lands back on "all the open bubbles" instead of having to
+                re-tap the launcher from scratch. */}
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label="חזרה לתפריט הבועות"
+              title="חזרה לתפריט הבועות"
+              className="rounded-md p-2 text-muted-foreground transition-[background-color,color,transform] duration-150 hover:scale-110 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <DialogClose
+              aria-label="סגירה וחזרה למפה"
+              title="סגירה וחזרה למפה"
+              className="rounded-md p-2 text-muted-foreground transition-[background-color,color,transform] duration-150 hover:scale-110 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="h-4 w-4" />
+            </DialogClose>
+          </div>
+
+          {/* min-w-0: a flex item otherwise defaults to its content's
+              intrinsic width, which let any unwrappable child (e.g. a Badge
+              with nowrap text inside a shrinking grid-cols-N stat row) blow
+              the whole page wider than the panel instead of wrapping/
+              shrinking to fit it. Confirmed live: without this, one admin
+              page's stat cards rendered ~200px past the panel's left edge
+              on a 375px viewport. flex-1 + its own scroll: this is now the
+              ONLY thing that scrolls, so the header row above never moves. */}
+          <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
         </DialogContent>
       </Dialog>
     </div>
