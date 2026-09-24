@@ -5,6 +5,7 @@ import { PendingRequestsTable } from "@/components/ops/PendingRequestsTable";
 import { OpsQueueMap } from "@/components/ops/OpsQueueMap";
 import { RequestDetailPanel } from "@/components/ops/RequestDetailPanel";
 import { CoordinationAuthoritiesCard } from "@/components/ops/CoordinationAuthoritiesCard";
+import { RecentlyDecidedList } from "@/components/ops/RecentlyDecidedList";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 
 export function OpsPageClient() {
@@ -24,6 +25,7 @@ export function OpsPageClient() {
       </div>
       <OpsQueueMap selectedId={null} onSelect={setSelected} />
       <PendingRequestsTable onSelect={setSelected} />
+      <RecentlyDecidedList onSelect={setSelected} />
       <CoordinationAuthoritiesCard />
     </div>
   );

@@ -90,3 +90,10 @@ export const rejectFlightRequestSchema = z.object({
 });
 
 export type RejectFlightRequestInput = z.infer<typeof rejectFlightRequestSchema>;
+
+export const cancelNotamSchema = z.object({
+  flight_request_id: z.string().uuid(),
+  dispatcher_notes: z.string().min(3, "יש לציין סיבת ביטול").max(2000),
+});
+
+export type CancelNotamInput = z.infer<typeof cancelNotamSchema>;

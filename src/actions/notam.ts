@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { publishNotamSchema, rejectFlightRequestSchema } from "@/lib/validations/flight-request";
-import type { PublishNotamInput, RejectFlightRequestInput } from "@/lib/validations/flight-request";
+import { publishNotamSchema, rejectFlightRequestSchema, cancelNotamSchema } from "@/lib/validations/flight-request";
+import type { PublishNotamInput, RejectFlightRequestInput, CancelNotamInput } from "@/lib/validations/flight-request";
 import { sendSms } from "@/lib/notifications/sms";
 
 async function requireDispatcherAdmin() {
@@ -56,6 +56,7 @@ export async function publishNotam(input: PublishNotamInput): Promise<NotamActio
         notam_code: data.notam_code.toUpperCase(),
         dispatcher_notes: data.dispatcher_notes ?? null,
         reviewed_by: dispatcherId,
+        reviewed_at: new Date().toISOString(),
       })
       .eq("id", data.flight_request_id)
       .select("*, profiles!flight_requests_user_id_fkey ( id, full_name, phone )")
@@ -64,6 +65,19 @@ export async function publishNotam(input: PublishNotamInput): Promise<NotamActio
     if (updateError) {
       return { success: false, error: `פרסום ה-NOTAM נכשל: ${updateError.message}` };
     }
+
+    const { error: decisionError } = await supabase.from("flight_request_decisions").insert({
+      flight_request_id: data.flight_request_id,
+      action: "published",
+      notam_code: data.notam_code.toUpperCase(),
+      notes: data.dispatcher_notes ?? null,
+      decided_by: dispatcherId,
+    });
+    // Best-effort: the NOTAM itself already published successfully above (the
+    // part that actually matters to the pilot) — a failed audit-log insert
+    // shouldn't be reported back as "publishing failed" and block the
+    // dispatcher, just logged so it's visible server-side.
+    if (decisionError) console.error("flight_request_decisions insert failed (publish):", decisionError.message);
 
     const pilot = (flightRequest as unknown as { profiles: { id: string; full_name: string; phone: string | null } }).profiles;
 
@@ -121,6 +135,14 @@ export async function rejectFlightRequest(input: RejectFlightRequestInput): Prom
       return { success: false, error: updateError.message };
     }
 
+    const { error: decisionError } = await supabase.from("flight_request_decisions").insert({
+      flight_request_id: data.flight_request_id,
+      action: "rejected",
+      notes: data.dispatcher_notes,
+      decided_by: dispatcherId,
+    });
+    if (decisionError) console.error("flight_request_decisions insert failed (reject):", decisionError.message);
+
     const serviceClient = createServiceRoleClient();
     await serviceClient.from("notifications").insert({
       user_id: flightRequest.user_id,
@@ -128,6 +150,71 @@ export async function rejectFlightRequest(input: RejectFlightRequestInput): Prom
       title: "בקשת הטיסה נדחתה",
       body: data.dispatcher_notes,
       metadata: { flight_request_id: data.flight_request_id },
+    });
+
+    revalidatePath("/ops");
+    revalidatePath("/map");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "שגיאה לא צפויה" };
+  }
+}
+
+/**
+ * Retracts an already-published NOTAM -- the one lifecycle gap a published
+ * NOTAM used to have (a flight cancelled after approval, or a dispatcher's
+ * own mistake, had no in-system way to undo). Reuses the existing
+ * 'cancelled' status (already used for a pilot's own pre-decision self-
+ * cancel in cancelFlightRequest) rather than adding a new one -- a
+ * dispatcher-cancelled-after-publish request is told apart from a pilot's
+ * own cancel by simply still having a notam_code set. Guarded to only ever
+ * run on a request that's actually notam_published, both here and in the
+ * UI (see RequestDetailPanel), so it can never quietly cancel a request
+ * that was never approved in the first place.
+ */
+export async function cancelNotam(input: CancelNotamInput): Promise<NotamActionResult> {
+  const parsed = cancelNotamSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "קלט לא תקין" };
+  }
+  const data = parsed.data;
+
+  try {
+    const { supabase, dispatcherId } = await requireDispatcherAdmin();
+
+    const { data: flightRequest, error: updateError } = await supabase
+      .from("flight_requests")
+      .update({
+        status: "cancelled",
+        dispatcher_notes: data.dispatcher_notes,
+        reviewed_by: dispatcherId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", data.flight_request_id)
+      .eq("status", "notam_published")
+      .select("user_id, notam_code")
+      .single();
+
+    if (updateError) {
+      return { success: false, error: "ניתן לבטל רק NOTAM שכבר פורסם: " + updateError.message };
+    }
+
+    const { error: decisionError } = await supabase.from("flight_request_decisions").insert({
+      flight_request_id: data.flight_request_id,
+      action: "cancelled",
+      notam_code: flightRequest.notam_code,
+      notes: data.dispatcher_notes,
+      decided_by: dispatcherId,
+    });
+    if (decisionError) console.error("flight_request_decisions insert failed (cancel):", decisionError.message);
+
+    const serviceClient = createServiceRoleClient();
+    await serviceClient.from("notifications").insert({
+      user_id: flightRequest.user_id,
+      kind: "flight_request_rejected",
+      title: "ה-NOTAM שלך בוטל",
+      body: data.dispatcher_notes,
+      metadata: { flight_request_id: data.flight_request_id, notam_code: flightRequest.notam_code },
     });
 
     revalidatePath("/ops");

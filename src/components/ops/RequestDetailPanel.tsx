@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
-import { useRejectFlightRequest, useOverlappingFlightRequests } from "@/hooks/useFlightRequests";
+import { useRejectFlightRequest, useOverlappingFlightRequests, useCancelNotam } from "@/hooks/useFlightRequests";
 import { markFlightRequestViewedByDispatcher } from "@/actions/flight-requests";
 import { FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import { AlertTriangle, ChevronRight, Radio } from "lucide-react";
@@ -19,6 +19,7 @@ import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
 import { DispatcherChecklist } from "./DispatcherChecklist";
+import { DecisionHistory } from "./DecisionHistory";
 import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
@@ -52,7 +53,10 @@ export function RequestDetailPanel({
   const [notamModalOpen, setNotamModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [cancelFormOpen, setCancelFormOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const rejectMutation = useRejectFlightRequest();
+  const cancelMutation = useCancelNotam();
   const { data: licenses = [], isLoading: licensesLoading } = usePilotLicensesForDispatcher(request?.user_id ?? null);
   const { data: overlaps = [], isLoading: overlapsLoading } = useOverlappingFlightRequests(request?.id ?? null);
   const { data: aipZones = [] } = useAipReferenceZones();
@@ -119,6 +123,28 @@ export function RequestDetailPanel({
       onClose();
     } finally {
       setRejecting(false);
+    }
+  }
+
+  async function handleCancelNotam() {
+    if (!cancelReason.trim()) {
+      toast.error("יש לציין סיבת ביטול");
+      return;
+    }
+    try {
+      const result = await cancelMutation.mutateAsync({
+        flight_request_id: request!.id,
+        dispatcher_notes: cancelReason,
+      });
+      if (!result.success) {
+        toast.error(result.error ?? "ביטול ה-NOTAM נכשל");
+        return;
+      }
+      toast.success("ה-NOTAM בוטל והמטיס קיבל התראה");
+      setCancelFormOpen(false);
+      setCancelReason("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ביטול ה-NOTAM נכשל");
     }
   }
 
@@ -293,6 +319,8 @@ export function RequestDetailPanel({
           </div>
         </div>
 
+        <DecisionHistory requestId={request.id} />
+
         {request.status !== "notam_published" && request.status !== "rejected" && (
           <>
             <Separator />
@@ -324,9 +352,48 @@ export function RequestDetailPanel({
           </>
         )}
 
-        {request.notam_code && (
-          <div className="rounded-lg bg-success/10 p-3 text-sm">
-            <span className="font-semibold">NOTAM פורסם:</span> {request.notam_code}
+        {request.notam_code && request.status === "notam_published" && (
+          <>
+            <div className="rounded-lg bg-success/10 p-3 text-sm">
+              <span className="font-semibold">NOTAM פורסם:</span> {request.notam_code}
+            </div>
+            {cancelFormOpen ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-sm font-semibold text-destructive">ביטול NOTAM</p>
+                <p className="text-xs text-muted-foreground">
+                  המטיס יקבל התראה מיידית שה-NOTAM בוטל. פעולה זו אינה הפיכה — לאישור מחדש יש לתאם NOTAM חדש.
+                </p>
+                <textarea
+                  className="w-full rounded-md border border-input p-2 text-sm"
+                  placeholder="סיבת ביטול..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={handleCancelNotam}
+                    disabled={cancelMutation.isPending}
+                  >
+                    {cancelMutation.isPending ? "מבטל..." : "אישור ביטול NOTAM"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setCancelFormOpen(false)}>
+                    ביטול
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" className="self-start text-destructive hover:text-destructive" onClick={() => setCancelFormOpen(true)}>
+                ביטול NOTAM
+              </Button>
+            )}
+          </>
+        )}
+
+        {request.notam_code && request.status === "cancelled" && (
+          <div className="rounded-lg bg-warning/10 p-3 text-sm">
+            <span className="font-semibold">NOTAM בוטל:</span> {request.notam_code} — הבקשה אינה בתוקף עוד
           </div>
         )}
       </div>

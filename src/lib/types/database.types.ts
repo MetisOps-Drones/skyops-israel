@@ -1026,6 +1026,51 @@ export type Database = {
           },
         ]
       }
+      flight_request_decisions: {
+        Row: {
+          id: string
+          flight_request_id: string
+          action: string
+          notam_code: string | null
+          notes: string | null
+          decided_by: string | null
+          decided_at: string
+        }
+        Insert: {
+          id?: string
+          flight_request_id: string
+          action: string
+          notam_code?: string | null
+          notes?: string | null
+          decided_by?: string | null
+          decided_at?: string
+        }
+        Update: {
+          id?: string
+          flight_request_id?: string
+          action?: string
+          notam_code?: string | null
+          notes?: string | null
+          decided_by?: string | null
+          decided_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_request_decisions_flight_request_id_fkey"
+            columns: ["flight_request_id"]
+            isOneToOne: false
+            referencedRelation: "flight_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flight_request_decisions_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flight_requests: {
         Row: {
           booking_id: string | null

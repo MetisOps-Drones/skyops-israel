@@ -3,8 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/types/database.types";
-import { publishNotam, rejectFlightRequest } from "@/actions/notam";
-import type { PublishNotamInput, RejectFlightRequestInput } from "@/lib/validations/flight-request";
+import { publishNotam, rejectFlightRequest, cancelNotam } from "@/actions/notam";
+import type { PublishNotamInput, RejectFlightRequestInput, CancelNotamInput } from "@/lib/validations/flight-request";
 
 export type FlightRequestWithRelations = Tables<"flight_requests"> & {
   profiles: Pick<Tables<"profiles">, "id" | "full_name" | "phone"> | null;
@@ -43,6 +43,35 @@ export function usePendingCoordinationRequests() {
         )
         .in("status", ["pending_dispatcher", "submitted_to_iaf"])
         .order("start_time", { ascending: true });
+      if (error) throw error;
+      return data as unknown as FlightRequestWithRelations[];
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+/**
+ * Reachability for the NOTAM-cancel action (see actions/notam.ts): once a
+ * request leaves pending_dispatcher/submitted_to_iaf, usePendingCoordination
+ * Requests above no longer returns it, so an already-published (or
+ * rejected/cancelled) request would otherwise be unreachable from /ops —
+ * this is the "recently decided" list a dispatcher clicks into to open a
+ * decided request's detail view again, same as any pending row.
+ */
+export function useRecentlyDecidedFlightRequests() {
+  return useQuery({
+    queryKey: ["flight_requests", "recently_decided"],
+    queryFn: async (): Promise<FlightRequestWithRelations[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("flight_requests")
+        .select(
+          "*, profiles!flight_requests_user_id_fkey ( id, full_name, phone ), drones ( id, nickname, model, registration_number, mtow_grams )"
+        )
+        .in("status", ["notam_published", "rejected", "cancelled"])
+        .not("reviewed_at", "is", null)
+        .order("reviewed_at", { ascending: false })
+        .limit(20);
       if (error) throw error;
       return data as unknown as FlightRequestWithRelations[];
     },
@@ -134,5 +163,45 @@ export function useRejectFlightRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flight_requests"] });
     },
+  });
+}
+
+export function useCancelNotam() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CancelNotamInput) => cancelNotam(input),
+    onSuccess: (_, input) => {
+      queryClient.invalidateQueries({ queryKey: ["flight_requests"] });
+      queryClient.invalidateQueries({ queryKey: ["flight_request_decisions", input.flight_request_id] });
+    },
+  });
+}
+
+export interface FlightRequestDecision {
+  id: string;
+  action: string;
+  notam_code: string | null;
+  notes: string | null;
+  decided_at: string;
+  profiles: Pick<Tables<"profiles">, "full_name"> | null;
+}
+
+/** The full decision history for one request — every publish/reject/cancel a dispatcher has made on it, oldest first. Admin-only (RLS, 0086); never rendered anywhere a pilot/org can reach. */
+export function useFlightRequestDecisions(requestId: string | null) {
+  return useQuery({
+    queryKey: ["flight_request_decisions", requestId],
+    queryFn: async (): Promise<FlightRequestDecision[]> => {
+      if (!requestId) return [];
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("flight_request_decisions")
+        .select("id, action, notam_code, notes, decided_at, profiles ( full_name )")
+        .eq("flight_request_id", requestId)
+        .order("decided_at", { ascending: true });
+      if (error) throw error;
+      return data as unknown as FlightRequestDecision[];
+    },
+    enabled: Boolean(requestId),
   });
 }
