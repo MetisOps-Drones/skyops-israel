@@ -1,0 +1,56 @@
+Add the missing LLBG (Ben Gurion) CTR zone and dispatcher-side legal text
+
+Two gaps from the map review, both raised by the user directly:
+
+1. Client-side CTR data + calculation (0083_llbg_ctr.sql)
+   0024_aip_zones_real_polygons.sql's official-AIP rebuild gave every other
+   major airport its CTR, but LLBG only ever got its TMA row (3000-9000ft).
+   The user supplied the actual CTR boundary as 5 DMS coordinates
+   (GND-2000ft QNH, Class C) — added as a new aip_reference_zones row.
+
+   blockLevelForKind() in flight-rules.ts already maps CTR to the highest
+   ZoneBlockLevel ("controlled_airspace") and both the pilot-facing cards
+   and the dispatcher note already handle that kind generically, so no
+   calculation logic needed to change — only the missing data.
+
+   Provenance is flagged honestly: unlike the 179 geometry_precise=true
+   rows digitized from the official icd_kml source, this polygon came from
+   the user during this session without a citable AIP chart page. It's
+   geometrically plausible (matches the compass-direction landmarks given,
+   and roughly matches the old mock circle's 9km radius) but unverified —
+   inserted with geometry_precise = false, which already drives the
+   existing "boundary is estimated" footnote in LocationInfoCard/
+   FlightParamsDrawer. Replace with a real digitization once an
+   authoritative source is available, the same way 0037/0068 upgraded the
+   other approximate rows.
+
+   NOTE: this INSERT could not be run directly (blocked by the auto-mode
+   classifier, same as the earlier Cardcom migration) — the migration file
+   is ready to paste into the Supabase SQL Editor.
+
+2. Dispatcher-side legal text (RequestDetailDrawer.tsx, aip-reference-
+   zones.ts)
+   RequestDetailDrawer — the actual screen a dispatcher reviews a request
+   on — never showed *why* a point needed review beyond a generic zone
+   name; dispatcher_notes (set at submission) was write-only, never
+   rendered anywhere. A dispatcher had no way to tell "coordinate with the
+   tower" from "director approval only" from "check the area's posted
+   conditions" without independently knowing the regulation.
+
+   Added a new AIP_ZONE_KIND_DISPATCHER_REQUIREMENT map — one line of
+   what the dispatcher specifically needs before approving, per zone kind
+   (CTR: explicit tower clearance, coordinated bubble, LLBG also needs
+   security control — no self-service path exists for a private/מטיסן
+   account inside a CTR at all; RESTRICTED: check the area's posted
+   conditions; DANGER/PROHIBITED: CAAI director sign-off, org accounts
+   only). Rendered in a new "מרחב אווירי בנקודה" block in
+   RequestDetailDrawer, computed the same way the pilot-facing cards do
+   (useAipReferenceZones + checkFlightAuthorizationRequirement, plus the
+   live NOTAM check) rather than parsing dispatcher_notes' free text.
+
+`npx tsc --noEmit` and `npx eslint` clean. Verified no new console errors
+on the live map (pre-existing, unrelated CORS errors on the neighborhoods
+tile layer aside). Could not click through to a live CTR/zone-overlap
+example in the ops queue this session (no pending request currently
+overlaps one) — the render path reuses the exact hooks/functions already
+verified working in LocationInfoCard/FlightParamsDrawer/AirspaceHUD.

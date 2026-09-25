@@ -1,0 +1,44 @@
+Search/filter the pending queue, kill the N+1 badge queries, guard against re-deciding a closed request
+
+Third of the 3 מוקד תיאום improvements Ohad asked for. The pending table
+had no way to search by pilot name or filter by request type/"needs
+external coordination" -- became unworkable once the queue has more than
+a screenful of requests. Also: every row independently ran its own two
+network round trips (useOverlappingFlightRequests, useCoordinationAuthorityLookup)
+just to render its badges -- 20 pending requests meant 40 extra requests
+on every /ops load.
+
+src/lib/coordination/queue-analysis.ts: client-side mirrors of both RPCs,
+computed once over data already being fetched elsewhere instead of N
+separate round trips:
+  - computeOverlapCounts mirrors overlapping_flight_requests() (0055) --
+    same status set, same time-window + spatial-intersection rule --
+    over useControlTowerFlightRequests, which the map's own control-tower
+    layer already fetches.
+  - authoritiesNear mirrors find_coordination_authority()'s st_dwithin
+    check -- useCoordinationAuthorities already fetches the full (small,
+    ~43-row) authorities list elsewhere, so this is plain distance-within-
+    radius math against data already in memory, not a new query.
+PendingRequestsTable now computes both once for the whole table and reads
+from a map per row, and gained a search box (pilot name), a request-type
+filter, and a "needs external coordination only" toggle.
+
+Two real bugs found live-testing the NOTAM-cancel flow from last commit:
+1. After cancelling, RequestDetailPanel kept showing the stale "פורסם"
+   banner and the cancel button itself, because `request` is a snapshot
+   passed in when the panel opened, not a live subscription. Now returns
+   to the queue on a successful cancel, same as publish/reject already
+   did -- avoids the whole class of stale-snapshot bugs rather than
+   patching this one instance.
+2. That same stale view exposed a real gap: the publish/reject buttons
+   don't check the request's current status before hiding themselves, so
+   they briefly reappeared on an already-cancelled request -- and neither
+   publishNotam nor rejectFlightRequest had ANY server-side status guard
+   (unlike cancelNotam, which already required status = notam_published).
+   A stale UI or a direct call could have re-published or re-rejected an
+   already-decided request. Added .in("status", ["pending_dispatcher",
+   "submitted_to_iaf"]) to both updates, and excluded "cancelled" from the
+   UI's own visibility check for that button block.
+
+npx tsc --noEmit and npx eslint clean. Verified live: search/filter UI
+renders and the console is clean on /ops.

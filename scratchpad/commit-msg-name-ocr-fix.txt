@@ -1,0 +1,27 @@
+Extract the printed name from real OCR text, not just the ID number
+
+The license-vs-ID-card identity cross-check (IdentityVerificationCard,
+identity-verification.ts) already existed and already compares both name
+and ID number — but extractIdentityFields hardcoded name: null whenever a
+real OCR provider is configured, with a comment saying reliable name
+extraction needs a layout-aware provider (Textract AnalyzeID etc.) that
+wasn't integrated. That meant the "שם" match badge would show "לא ניתן
+להשוואה" forever in production, silently leaving only half the
+cross-check actually running — the ID number half.
+
+Added extractNameFromText: a label-based regex extractor covering the
+formats the two real documents actually use — an Israeli ID card's split
+שם פרטי/שם משפחה fields (in either order, either half alone still useful
+since namesRoughlyMatch does a substring comparison), a single שם/שם מלא
+label (how the CAAI pilot license prints it), and an English Name: label
+as a fallback. Same "never guess" contract as extractIdNumberFromText:
+an unmatched document returns null, not a wrong name.
+
+Can't exercise this through the app itself — no OCR_API_KEY/OCR_API_ENDPOINT
+are configured in this environment, so extractIdentityFields always takes
+the simulated branch this code doesn't touch. Verified the regex logic
+directly against 5 representative OCR-text samples (split ID fields,
+partial split fields, combined label, English label, no name field at
+all) — all 5 extract correctly or correctly return null.
+
+npx tsc --noEmit and npx eslint clean.

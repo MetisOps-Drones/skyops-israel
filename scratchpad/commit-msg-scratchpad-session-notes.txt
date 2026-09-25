@@ -1,0 +1,8 @@
+Add this session's leftover scratchpad artifacts
+
+Commit-message drafts (used with git commit -F, since inline -m with
+Hebrew/punctuation kept breaking PowerShell's parser), a dummy license PDF
+and name-extraction test cases used while building OCR name extraction,
+and the R2 bucket CORS policy applied by hand via the Cloudflare dashboard
+earlier this session. Working notes, not app code -- kept for the paper
+trail.

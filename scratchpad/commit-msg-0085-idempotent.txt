@@ -1,0 +1,8 @@
+Make 0085 safe to re-run (table + policy already existed)
+
+Ohad hit "relation already exists" on the create table statement -- the
+table had already been created from an earlier partial run, so the script
+stopped there without reaching the policy/function/grant below it. Switched
+to create table if not exists and drop policy if exists before create
+policy so the whole file can just be re-run start to finish regardless of
+what already landed.

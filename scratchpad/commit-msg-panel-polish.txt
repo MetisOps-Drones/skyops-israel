@@ -1,0 +1,41 @@
+Give every button real hover feedback, fix panel content overlapping its own back/close buttons
+
+Two more pieces of the same "make it feel nicer" ask:
+
+1. Hover feedback. The self-location button was Ohad's reference for what
+   "some animation on hover" should look like -- most icon buttons around
+   the map (the bubble-menu ring, its central toggle, the layer-control
+   trigger) had no hover state at all beyond whatever the browser does by
+   default. Added a consistent hover treatment: buttonVariants' icon size
+   now scales up on hover (plus a universal active:scale press-down, so
+   every shared <Button> gets tactile feedback), and every custom
+   map/menu button got the matching hover:scale + shadow treatment. The
+   bubble-menu ring bubbles are a special case -- their position is driven
+   by an inline style transform (angle/radius math), which a hover: class
+   can't touch since inline styles always win -- so the icon inside each
+   bubble scales via group-hover instead, same visible feedback without
+   touching the positional transform.
+
+2. Panel content overlapping the X/back buttons. AppShell renders every
+   menu item as a Dialog overlay on top of the map, with a back-to-ring
+   button and the dialog's own close X floating via absolute positioning
+   over the page content. Two bugs from that: the "panel" style strips
+   DialogContent's own padding (pages bring their own p-4/md:p-6), but
+   nothing reserved clearance for the ~40px the two floating buttons
+   actually occupy at the top -- so a page's own heading could render
+   right underneath them. And because the OUTER DialogContent was the
+   thing that scrolled, on any page taller than the viewport the buttons
+   -- despite being "fixed" looking -- scrolled away with the content
+   instead of staying put.
+
+   Restructured AppShell's DialogContent as a real flex column: a fixed
+   12-unit header row (border-b, back + close side by side) as a flex
+   sibling of the content, which is now the only thing that scrolls.
+   DialogContent gained a `hideClose` prop (src/components/ui/dialog.tsx)
+   so AppShell can render its own close button inline in that header
+   instead of the built-in floating one -- every other Dialog usage in the
+   app is unaffected (hideClose defaults to off). Applied to both the
+   "card" (profile) and "panel" (everything else) overlay styles, since
+   the back button floated over both.
+
+npx tsc --noEmit and npx eslint clean on every touched file.

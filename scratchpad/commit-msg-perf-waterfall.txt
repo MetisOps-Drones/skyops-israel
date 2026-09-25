@@ -1,0 +1,30 @@
+Stop every page re-fetching the auth+profile lookup the layout just did
+
+Ohad's report: map panning feels instant, but opening any menu item is
+noticeably slow. The map never navigates -- it's all client-side, already-
+loaded data. Every menu item DOES navigate (AppShell renders the target
+route as an overlay), and every single page.tsx under (app)/layout.tsx was
+independently re-running the exact auth.getUser() + profiles select that
+the layout had ALREADY just run moments earlier in the same request, to
+re-derive a narrower slice of the same row. That's a 4-hop waterfall
+(layout auth -> layout profile -> page auth -> page profile) on top of
+whatever the page's own actual data needs are, on every navigation.
+
+Added getCurrentUserProfile() (src/lib/supabase/current-user.ts), a
+React cache()-wrapped fetch of {user, profile}. cache() dedupes a no-arg
+async function per request, so the layout's call and every page's call
+collapse into ONE real round trip each -- every caller after the first
+just gets the already-resolved result back. Every page under (app)/ that
+did its own getUser()+profiles select now calls this instead: layout,
+profile, dashboard, admin hub, logs, admin/platform, marketplace,
+admin/marketplace, admin/pilots, admin/api, ops, and the three
+guard-only pages (marketplace/bookings, marketplace/bookings/[bookingId],
+marketplace/[pilotId]) that were re-checking auth for nothing beyond a
+redirect guard the layout already covers.
+
+Also wired the new quota-override system (0085, previous commit) into
+dashboard/page.tsx's own coordinationLimit calculation -- it was still
+plan-only, so a design-partner override wouldn't have shown up in the
+dashboard's own "X/Y coordinations this period" stat card.
+
+npx tsc --noEmit and npx eslint clean on every touched file.

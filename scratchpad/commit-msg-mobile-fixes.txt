@@ -1,0 +1,50 @@
+Fix mobile FAB positioning and illegible table headers on narrow screens
+
+Found on a real phone: the bubble-menu FAB read as stuck in the middle
+of the screen instead of docked near the bottom, and dense tables (flight
+log, drone fleet, etc.) showed unreadable 2-3 character column headers.
+
+1. BubbleLauncher.tsx — the closed FAB position was computed from
+   window.innerHeight, which mobile browsers don't update reliably when
+   their own address bar collapses/expands (Safari especially can under-
+   or over-report it right after load before the chrome settles) — the
+   FAB ended up noticeably above the real bottom edge, which reads as
+   "centered" once you account for how far off it actually was. Switched
+   to window.visualViewport, which tracks the real visible viewport and
+   fires its own resize event exactly when the browser chrome changes
+   size. Also added an env(safe-area-inset-bottom) backoff on the closed
+   position so it clears a phone's home-indicator bar (inert everywhere
+   else — resolves to 0 without a safe-area context).
+
+2. table.tsx — TableHead already truncates each column to max-w-[120px],
+   but table-layout: fixed (chosen deliberately in an earlier pass to
+   stop desktop tables from forcing a horizontal scrollbar) divides the
+   table's full width evenly among columns first. On a ~350px phone
+   width, a 7-8 column table gives each column a few px long before that
+   120px cap ever matters, truncating every header to 2-3 characters.
+   Gave the wrapping div overflow-x-auto and the table itself
+   min-w-[640px]: on any container already wider than that (every normal
+   desktop panel) nothing changes, min-width never engages; only a
+   narrower container scrolls, and only within the table's own box, not
+   the page.
+
+Both verified live under 375x812 mobile emulation: the closed FAB's
+computed top now lands at the real bottom of the viewport via
+visualViewport; the flight-log table's headers render as real Hebrew
+words instead of truncated fragments, with document.body.scrollWidth
+staying at 375 (no page-level overflow) while the table's own wrapper
+scrolls internally (scrollWidth 640 vs clientWidth ~282).
+
+Investigated but not changed: the reported "buildings layer doesn't work
+on mobile" — confirmed the R2 tile fetch itself succeeds with a working
+CORS header (same bucket/fix as the neighborhoods layer), and the layer
+is a plain static Mapbox fill/line paint with no hover dependency, so
+nothing in the code path is mobile-specific. Couldn't reproduce further:
+this browser tool's mobile emulation dispatches clicks as mouse events,
+not real touch, which made pinch-zoom (needed to reach the layer's
+minzoom: 14) and even some overlay-button taps unreliable to test here
+regardless of the app's own code. Left as open pending the user's own
+on-device retest now that CORS is fixed — that was quite possibly what
+they were seeing.
+
+npx tsc --noEmit and npx eslint clean on both files.

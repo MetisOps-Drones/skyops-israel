@@ -1,0 +1,38 @@
+Add a live map to the ops queue -- see the whole picture, not row by row
+
+First of the 3 מוקד תיאום improvements Ohad asked for. Today a dispatcher
+has zero spatial awareness of the pending queue without opening every
+single request -- no view of where they cluster, which overlap sensitive
+areas, anything. The rest of the app is built around a map; this was the
+one screen that most needed one and didn't have it.
+
+OpsQueueMap (src/components/ops/OpsQueueMap.tsx): a small read-only map
+above the existing table, showing every pending request's real footprint
+(polygon for a manual_notam_bubble, buffered circle otherwise -- same
+geometry logic RequestDetailDrawer already uses for its static preview),
+colored by urgency rather than status (everything here is pending by
+definition, so urgency -- <24h/<72h/else -- is the signal that actually
+matters). Auto-fits its view to the whole current queue whenever it
+changes, so opening /ops always shows every pending request at once.
+Clicking a marker opens the same RequestDetailDrawer the table's own row
+click does (shared onSelect callback, already wired in OpsPageClient).
+
+Deliberately its own lean component, not a reuse of BubbleMap -- that one
+carries a full draw/base-style/buildings toolkit built for the pilot-
+facing request flow, none of which belongs on a dispatcher's queue
+overview.
+
+Extracted urgencyHours/urgencyTier/URGENCY_COLOR/URGENCY_LABEL into
+src/lib/coordination/urgency.ts (previously a local function duplicated
+inline in PendingRequestsTable) so the table's urgency badge and the map's
+shape colors are provably driven by the same cutoffs -- same hex values
+as the destructive/warning/secondary badge variants they mirror, so the
+map reads as the same visual language as the table.
+
+Verified structurally in the browser (renders, correct empty state, no
+console errors) -- couldn't verify the actual shape/marker rendering
+against live data because inserting even a temporary test flight_request
+via the service-role key was blocked by the auto-mode classifier
+("Modify Shared Resources"); the rendering path follows the exact pattern
+BubbleMap.tsx already uses successfully for its own allCoordinations
+layer. npx tsc --noEmit and npx eslint clean.

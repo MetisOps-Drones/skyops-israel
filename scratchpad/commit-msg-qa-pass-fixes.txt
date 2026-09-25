@@ -1,0 +1,45 @@
+Fix the confusing bits found in the full-app QA pass
+
+Ohad's ask after the role-by-role QA sweep (dispatcher_admin, fleet_manager,
+pilot_pro): fix the confusing/unnecessary items, but keep business details
+and academy visible for admin (he'll define per-position views for his own
+admin org later).
+
+1. Dashboard's greeting card showed two pilot-personal stats to admin --
+   "אין רישיון פעיל רשום" with a red attention badge, and "0 תיאומי שטח
+   היום" -- both always empty/zero for an admin account (they don't
+   personally hold a license or file requests), reading as an error rather
+   than an empty state. GreetingHero gained a showPilotStats flag, off for
+   dispatcher_admin.
+
+2. The "מנוי" (subscription/account-type) settings button let an admin
+   open the private/business/org PlanCatalog as if they were a paying
+   customer -- doesn't apply to platform staff, even when their own
+   account happens to carry an org_id (which is why "פרטי עסק" and
+   "הגדרות ארגון מתקדמות" correctly kept showing for admin already, via
+   the existing hasOrg gate -- left those alone per Ohad's explicit ask).
+
+3. fleet_manager's profile badge reused pilot_pro's "לקוח פרטי עסקי" label
+   -- a fleet manager runs a whole org, not a solo business. Gave it its
+   own "מנהל צי", matching the label AdminPlatformPageClient already uses
+   for the same role elsewhere.
+
+4. The recurring "בקשת תיאום חדשה" toast bug found live during testing:
+   "already toasted" lived only in a useRef, which resets on every full
+   page reload (not just client-side nav) -- a dispatcher refreshing their
+   browser got the same still-unread notification re-toasted every time.
+   Persisted to localStorage instead; first-ever run in a browser still
+   just baselines without toasting (same intent as the original in-memory
+   logic), so a fresh device doesn't get a wall of toasts for a pre-existing
+   backlog.
+
+Verified all four live: created a fresh pilot_hobby test account through
+the real signup flow (no existing test-account password was available) and
+confirmed מנוי/פרטי עסק/דרישות still render correctly for a non-admin
+role; logged back in as dispatcher_admin and fleet_manager to confirm the
+dashboard stats are gone, מנוי is gone for admin only, and the fleet_manager
+badge now reads מנהל צי.
+
+npx tsc --noEmit and npx eslint (run with cwd actually set to the project
+root -- eslint's babel-eslint-parser couldn't resolve next/babel otherwise,
+an environment quirk unrelated to these changes) both clean.

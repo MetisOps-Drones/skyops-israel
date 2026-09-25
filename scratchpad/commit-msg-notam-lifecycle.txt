@@ -1,0 +1,51 @@
+NOTAM lifecycle: cancel a published NOTAM, and a real decision audit trail
+
+Second of the 3 מוקד תיאום improvements Ohad asked for -- "from design to
+legal control." Audited the schema: flight_requests has exactly one "last
+touched" snapshot (reviewed_by/reviewed_at/dispatcher_notes/notam_code),
+overwritten in place by whichever action ran last. No way to see who did
+what across multiple actions on the same request, and concretely worse --
+publishing a NOTAM was a dead end. If a flight got cancelled or a
+dispatcher made a mistake, there was no in-system way to retract it.
+Also found and fixed a real bug along the way: publishNotam never set
+reviewed_at (rejectFlightRequest did), so a published request's own
+"reviewed" timestamp was always null.
+
+flight_request_decisions (0086): an append-only log of every dispatcher
+decision -- publish/reject/cancel -- with who and when. Its own table,
+not more flight_requests columns, because this is a genuine one-to-many
+history (reject, reconsider, publish is a real sequence a single row's
+columns can't represent). RLS scoped to dispatcher_admin only, same
+"internal, never shown to the pilot/org" boundary as CoordinationPanel --
+the pilot already gets the outcome via the existing notifications insert
+at decision time.
+
+cancelNotam (actions/notam.ts): the new action. Guarded to only run on a
+request that's actually status = notam_published (both in the update's
+own .eq("status", "notam_published") and in the UI), reuses the existing
+'cancelled' status rather than adding a new enum value -- distinguishable
+from a pilot's own pre-decision self-cancel by still having a notam_code
+set -- and notifies the pilot immediately.
+
+UI: DecisionHistory (new) renders the full timeline on a request's detail
+view. RecentlyDecidedList (new, collapsed by default) is the only way to
+reach an already-decided request again -- the queue view only ever shows
+pending ones, so without this the cancel button would have been
+unreachable. RequestDetailPanel gained the ביטול NOTAM control, shown
+only when status is notam_published, with its own required-reason form
+mirroring the existing reject flow.
+
+Decision-log inserts are best-effort (logged via console.error, not
+thrown) -- the flight_request update is the part that actually matters to
+the pilot and dispatcher, a failed audit-log write shouldn't be reported
+back as "publishing failed."
+
+Verified live against a real pending test request: published a test NOTAM
+(LL W9999/26) end to end, watched it move into "הוחלט לאחרונה" and reopen
+correctly. The decision-history entry itself didn't appear because
+migration 0086 hasn't been run yet -- needs to be applied before the
+history/cancel-audit-log path is fully live (the flight_requests-only
+parts, publish/reject/cancel status changes themselves, already work
+without it since those don't depend on the new table).
+
+npx tsc --noEmit and npx eslint clean.

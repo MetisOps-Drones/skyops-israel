@@ -1,0 +1,44 @@
+Add a per-request dispatcher checklist (draft SOP, v1)
+
+Ohad's ask: every request the dispatcher opens should carry a clear
+"what do I need to do here" checklist, modeled on how flight
+coordination actually works today (forward details to the area's
+responsible authority by phone/WhatsApp/email, wait for their
+clearance, then publish NOTAM or reject) — explicitly a first draft to
+refine together, not a final spec.
+
+DispatcherChecklist.tsx renders 6 items, most computed from data
+RequestDetailDrawer already loads rather than their own persisted
+checked/unchecked state:
+  1. Pilot license covers the drone's weight class (reuses
+     resolveLicenseRequirement, the same check the pilot-facing form
+     itself runs)
+  2. Valid insurance, only shown when the matched license needs one
+  3. No overlapping request in the same area/time
+  4. Airspace/NOTAM check clear
+  5. External-authority coordination — reads the same
+     flight_request_coordination.status CoordinationPanel itself
+     writes, so marking it "approved" there checks it off here too;
+     shown as not-applicable when step 4 found nothing needing
+     coordination
+  6. Final decision made (NOTAM published or rejected)
+
+Deliberately no new DB column for v1: every item already has a real
+source of truth elsewhere (a license row, the coordination status, the
+request's own status) — a separate checkbox that could drift out of
+sync with those would be worse than no checklist. Needed two small
+data additions to compute item 1 for the pilot being reviewed (not the
+signed-in dispatcher): drones.mtow_grams wasn't selected in
+FlightRequestWithRelations, and there was no dispatcher-scoped
+insurance check (useHasValidInsurance was hardcoded to the signed-in
+user) — added useHasValidInsuranceForDispatcher alongside the existing
+usePilotLicensesForDispatcher pattern.
+
+Verified live end-to-end as ohad@metis-ops.com (dispatcher_admin)
+against a real pending request: all 6 items render with the correct
+computed status (green check / amber warning / grey pending), the
+airspace warning correctly triggers the coordination step instead of
+marking it not-applicable, and it sits above the existing airspace
+warning + CoordinationPanel + overlaps blocks it summarizes.
+
+npx tsc --noEmit and npx eslint clean.
