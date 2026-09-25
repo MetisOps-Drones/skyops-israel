@@ -172,6 +172,7 @@ export default async function DashboardPage() {
         formattedDate={formattedDate}
         todayCoordinationsCount={todayCoordinationsCount ?? 0}
         daysUntilLicenseRenewal={daysUntilLicenseRenewal}
+        showPilotStats={profile?.role !== "dispatcher_admin"}
       />
 
       {profile?.role === "pilot_pro" && <IncomingContactRequestsCard />}

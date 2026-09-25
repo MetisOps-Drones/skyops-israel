@@ -8,10 +8,13 @@ import { useMyOrgContext } from "@/hooks/useOrgContext";
 import { useUploadAvatar } from "@/hooks/useProfileSettings";
 import type { Tables } from "@/lib/types/database.types";
 
+// Matches ROLE_LABELS in admin/platform/AdminPlatformPageClient.tsx — a fleet
+// manager runs a whole org, not a solo business, so it gets its own label
+// instead of reusing pilot_pro's "לקוח פרטי עסקי".
 const TIER_LABELS: Record<string, string> = {
   pilot_hobby: "לקוח פרטי",
   pilot_pro: "לקוח פרטי עסקי",
-  fleet_manager: "לקוח פרטי עסקי",
+  fleet_manager: "מנהל צי",
   dispatcher_admin: "מוקדן תיאום",
 };
 

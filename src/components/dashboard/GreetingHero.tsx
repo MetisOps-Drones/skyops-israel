@@ -37,12 +37,15 @@ export function GreetingHero({
   formattedDate,
   todayCoordinationsCount,
   daysUntilLicenseRenewal,
+  showPilotStats = true,
 }: {
   greeting: string;
   firstName: string;
   formattedDate: string;
   todayCoordinationsCount: number;
   daysUntilLicenseRenewal: number | null;
+  /** Both stats below are pilot-personal (their own coordination count today, their own license) — always 0/"no license" for a dispatcher_admin account, which reads as an error rather than an empty state. Off for admin. */
+  showPilotStats?: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-xl bg-brand-navy p-6 text-brand-navy-foreground">
@@ -52,19 +55,21 @@ export function GreetingHero({
       </h1>
       <p className="mt-1 text-sm text-brand-navy-foreground/75">הנה מה שקורה היום ב-MetisOps שלך</p>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        <HeroStat icon={MapPinned} value={todayCoordinationsCount} label="תיאומי שטח היום" />
-        {daysUntilLicenseRenewal !== null ? (
-          <HeroStat
-            icon={CalendarClock}
-            value={daysUntilLicenseRenewal}
-            label="ימים לחידוש הרישיון"
-            attention={daysUntilLicenseRenewal <= 30}
-          />
-        ) : (
-          <HeroStat icon={CalendarClock} value="—" label="אין רישיון פעיל רשום" attention />
-        )}
-      </div>
+      {showPilotStats && (
+        <div className="mt-5 flex flex-wrap gap-3">
+          <HeroStat icon={MapPinned} value={todayCoordinationsCount} label="תיאומי שטח היום" />
+          {daysUntilLicenseRenewal !== null ? (
+            <HeroStat
+              icon={CalendarClock}
+              value={daysUntilLicenseRenewal}
+              label="ימים לחידוש הרישיון"
+              attention={daysUntilLicenseRenewal <= 30}
+            />
+          ) : (
+            <HeroStat icon={CalendarClock} value="—" label="אין רישיון פעיל רשום" attention />
+          )}
+        </div>
+      )}
     </div>
   );
 }

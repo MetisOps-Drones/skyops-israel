@@ -282,6 +282,10 @@ export function SettingsMenu({ profile }: { profile: Profile }) {
   const hasOrg = Boolean(orgContext?.orgId);
   const isPro = profile.role === "pilot_pro" || profile.role === "fleet_manager";
   const showBusinessSection = isPro || hasOrg;
+  // dispatcher_admin is platform staff, not a paying customer — picking a
+  // private/business/org subscription plan for themselves doesn't apply,
+  // even when their own account happens to carry an org_id.
+  const showSubscription = profile.role !== "dispatcher_admin";
 
   const searchParams = useSearchParams();
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
@@ -319,18 +323,20 @@ export function SettingsMenu({ profile }: { profile: Profile }) {
           <NotificationsSection profile={profile} />
         </Disclosure>
 
-        <button
-          type="button"
-          onClick={() => setSubscriptionOpen(true)}
-          className="flex w-full items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2.5 text-right transition-colors hover:bg-accent"
-        >
-          <SectionIcon icon={CreditCard} accent="gold" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">מנוי</p>
-            <p className="text-xs text-muted-foreground">סוג חשבון ושדרוג — נפתח בחלון נפרד</p>
-          </div>
-          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
+        {showSubscription && (
+          <button
+            type="button"
+            onClick={() => setSubscriptionOpen(true)}
+            className="flex w-full items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2.5 text-right transition-colors hover:bg-accent"
+          >
+            <SectionIcon icon={CreditCard} accent="gold" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">מנוי</p>
+              <p className="text-xs text-muted-foreground">סוג חשבון ושדרוג — נפתח בחלון נפרד</p>
+            </div>
+            <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        )}
 
         {showBusinessSection && (
           <Disclosure
