@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Phone, Plus, Pencil, Trash2, ShieldQuestion } from "lucide-react";
+import Map, { Source, Layer, Marker, type MapLayerMouseEvent } from "react-map-gl";
+import * as turf from "@turf/turf";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { Phone, Plus, Pencil, Trash2, ShieldQuestion, MapPin } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ISRAEL_MAP_CENTER, ISRAEL_MAP_DEFAULT_ZOOM } from "@/lib/constants/airspace-zones";
 import {
   useCoordinationAuthorities,
   useCreateCoordinationAuthority,
@@ -57,6 +61,69 @@ function toFormState(a: CoordinationAuthority): FormState {
     center_lng: String(a.center_lng),
     radius_km: String(a.radius_m / 1000),
   };
+}
+
+/** Click-to-place picker for an authority's coverage center — mirrors the map-picker pattern from OpsQueueMap, since typing raw lat/lng by hand was the only way to set this before. */
+function AuthorityLocationPicker({
+  lat,
+  lng,
+  radiusKm,
+  onPick,
+}: {
+  lat: number | null;
+  lng: number | null;
+  radiusKm: number | null;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  const hasPoint = lat !== null && lng !== null && !Number.isNaN(lat) && !Number.isNaN(lng);
+
+  const circle = useMemo<GeoJSON.Feature<GeoJSON.Polygon> | null>(() => {
+    if (!hasPoint || !radiusKm || Number.isNaN(radiusKm) || radiusKm <= 0) return null;
+    return turf.circle([lng as number, lat as number], radiusKm, { units: "kilometers" });
+  }, [hasPoint, lat, lng, radiusKm]);
+
+  function handleClick(e: MapLayerMouseEvent) {
+    onPick(Number(e.lngLat.lat.toFixed(5)), Number(e.lngLat.lng.toFixed(5)));
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>מיקום מרכז (לחיצה על המפה כדי להזיז)</Label>
+      <div className="relative h-48 w-full overflow-hidden rounded-lg border">
+        <Map
+          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          initialViewState={
+            hasPoint
+              ? { longitude: lng as number, latitude: lat as number, zoom: 8 }
+              : { longitude: ISRAEL_MAP_CENTER[0], latitude: ISRAEL_MAP_CENTER[1], zoom: ISRAEL_MAP_DEFAULT_ZOOM }
+          }
+          mapStyle="mapbox://styles/mapbox/light-v11"
+          cursor="crosshair"
+          onClick={handleClick}
+        >
+          {circle && (
+            <Source id="authority-radius" type="geojson" data={circle}>
+              <Layer
+                id="authority-radius-fill"
+                type="fill"
+                paint={{ "fill-color": "#2563eb", "fill-opacity": 0.12 }}
+              />
+              <Layer
+                id="authority-radius-line"
+                type="line"
+                paint={{ "line-color": "#2563eb", "line-width": 1.5 }}
+              />
+            </Source>
+          )}
+          {hasPoint && (
+            <Marker longitude={lng as number} latitude={lat as number} anchor="bottom">
+              <MapPin className="h-6 w-6 fill-primary text-primary" />
+            </Marker>
+          )}
+        </Map>
+      </div>
+    </div>
+  );
 }
 
 function AuthorityDialog({
@@ -141,6 +208,12 @@ function AuthorityDialog({
               <Input id="ca-backup-phone" dir="ltr" value={form.backup_phone} onChange={(e) => set("backup_phone", e.target.value)} />
             </div>
           </div>
+          <AuthorityLocationPicker
+            lat={form.center_lat.trim() ? Number(form.center_lat) : null}
+            lng={form.center_lng.trim() ? Number(form.center_lng) : null}
+            radiusKm={form.radius_km.trim() ? Number(form.radius_km) : null}
+            onPick={(lat, lng) => setForm((f) => ({ ...f, center_lat: String(lat), center_lng: String(lng) }))}
+          />
           <div className="grid grid-cols-3 gap-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ca-lat">קו רוחב (Lat)</Label>

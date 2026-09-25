@@ -11,8 +11,9 @@ export function useDrones() {
     queryFn: async (): Promise<Tables<"drones">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
       // Mirrors the RLS scope a non-admin pilot already gets ("own drones"

@@ -10,8 +10,9 @@ export function useClients() {
     queryFn: async (): Promise<Tables<"clients">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
       // Mirrors the RLS scope a non-admin pilot already gets ("own clients"

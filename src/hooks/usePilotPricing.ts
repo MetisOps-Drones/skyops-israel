@@ -28,8 +28,9 @@ export function useMyPilotPricing() {
     queryFn: async (): Promise<PilotPricing | null> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return null;
       const { data, error } = await supabase.from("pilot_pricing").select("*").eq("pilot_id", user.id).maybeSingle();
       if (error) throw error;

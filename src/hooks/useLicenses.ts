@@ -10,8 +10,9 @@ export function useMyLicenses() {
     queryFn: async (): Promise<Tables<"pilot_licenses">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       // Explicit user_id filter, not just RLS: "Dispatcher admins read all
       // licenses" is a separate permissive SELECT policy for the dispatcher
@@ -37,8 +38,9 @@ export function useHasValidInsurance() {
     queryFn: async (): Promise<boolean> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return false;
       const { count, error } = await supabase
         .from("documents")

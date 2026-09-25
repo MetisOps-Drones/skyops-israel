@@ -27,8 +27,9 @@ export function useMyOrgContext() {
     queryFn: async (): Promise<MyOrgContext> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user)
         return {
           userId: null,
@@ -87,8 +88,9 @@ export function useMyGlobalRole() {
     queryFn: async (): Promise<string | null> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return null;
       const { data, error } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (error) throw error;

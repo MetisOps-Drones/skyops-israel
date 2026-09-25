@@ -13,8 +13,9 @@ export function useMyPortfolioItems() {
     queryFn: async (): Promise<PortfolioItem[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data, error } = await supabase
         .from("portfolio_items")
