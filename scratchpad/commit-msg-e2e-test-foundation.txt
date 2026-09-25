@@ -1,0 +1,30 @@
+Add Playwright e2e test foundation (audit item 6)
+
+The platform had zero automated test coverage. Adds @playwright/test
+plus 3 specs on the two flows the audit flagged as most critical:
+
+- auth.spec.ts: a pilot can log in and lands on /map.
+- flight-request.spec.ts: the map-click -> pin -> drawer sequence
+  actually opens the flight-request form (doesn't submit -- that would
+  write a real row against production). This is exactly the path a
+  cross-user cache bug or a broken empty state silently breaks, as
+  this session's own auth-cache-leak fix demonstrated.
+- notam-publish.spec.ts: a dispatcher_admin can reach /ops and the
+  coordination queue renders. Full "publish a NOTAM" coverage needs a
+  seeded pending complex request to click into and would write a real
+  notams row if it ran the actual publish action -- too fragile/unsafe
+  to automate against production without a seeding mechanism, so this
+  intentionally stops short of that and says why in a comment.
+
+Every spec reads its required test-account credentials from env vars
+(tests/e2e/README.md documents them) and calls test.skip() with a
+named reason when they're missing, rather than failing -- so
+`npm run test:e2e` is always safe to run. Added the hobby-pilot test
+account's credentials to .env.local (gitignored, never committed); no
+dispatcher_admin test account exists yet, so that spec currently
+skips until one is created and its env vars added locally.
+
+There's no local/staging Supabase project to point these at yet, so
+they run against the real dev server against production data -- kept
+deliberately read-only (view/open, never submit) for exactly that
+reason.

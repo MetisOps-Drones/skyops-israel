@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "supabase:types": "supabase gen types typescript --local > src/lib/types/database.types.ts"
   },
   "dependencies": {
@@ -52,6 +53,7 @@
     "zustand": "4.5.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/mapbox__mapbox-gl-draw": "1.4.8",
     "@types/mapbox-gl": "3.4.0",
     "@types/node": "22.5.5",
