@@ -25,10 +25,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Every user-scoped query key (useMyLicenses, etc.) omits the user id, so
   // TanStack Query has no way to tell "the signed-in user changed" on its
   // own — a long-lived tab keeps serving one account's cached data after a
-  // sign-out/sign-in or an account switch. undefined = "haven't seen the
-  // first auth event yet"; only a real id change (including to/from null)
-  // clears the cache, so a same-user TOKEN_REFRESHED doesn't wipe it for no
-  // reason.
+  // sign-out/sign-in or an account switch. This app's own login/logout
+  // (src/actions/auth.ts) run entirely as Server Actions against the
+  // server-side Supabase client, so they never actually fire this
+  // listener — the real clear() calls live at those call sites (LoginForm,
+  // SettingsMenu's logout button). This listener stays as a safety net for
+  // any auth change that DOES go through the client SDK directly (e.g. an
+  // OAuth callback). undefined = "haven't seen the first auth event yet";
+  // only a real id change (including to/from null) clears the cache, so a
+  // same-user TOKEN_REFRESHED doesn't wipe it for no reason.
   const lastUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { UserRound, Bell, CreditCard, Briefcase, Building2, Loader2, ExternalLink, LogOut } from "lucide-react";
 import { signOut } from "@/actions/auth";
@@ -278,6 +279,7 @@ function SubscriptionDialog({ profile, open, onOpenChange }: { profile: Profile;
 }
 
 export function SettingsMenu({ profile }: { profile: Profile }) {
+  const queryClient = useQueryClient();
   const { data: orgContext } = useMyOrgContext();
   const hasOrg = Boolean(orgContext?.orgId);
   const isPro = profile.role === "pilot_pro" || profile.role === "fleet_manager";
@@ -370,10 +372,19 @@ export function SettingsMenu({ profile }: { profile: Profile }) {
         )}
 
         {/* There was previously no way to reach this at all — signOut()
-            existed as a server action with nothing in the UI calling it. */}
+            existed as a server action with nothing in the UI calling it.
+            queryClient.clear() first: signOut() is a Server Action (runs
+            against the server-side Supabase client only), so it never fires
+            the client SDK's onAuthStateChange — the QueryClient survives
+            the redirect to /auth/login untouched, and whoever logs in next
+            in the same tab would see this account's cached data until
+            something forced a refetch. */}
         <button
           type="button"
-          onClick={() => signOut()}
+          onClick={() => {
+            queryClient.clear();
+            signOut();
+          }}
           className="mt-2 flex w-full items-center gap-3 rounded-lg border border-destructive/30 px-3 py-2.5 text-right text-destructive transition-colors hover:bg-destructive/10"
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">

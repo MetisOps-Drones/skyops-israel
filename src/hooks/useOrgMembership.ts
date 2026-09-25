@@ -172,7 +172,7 @@ export function useDecideMembership() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { org_id: string; user_id: string; approve: boolean; role?: string }) => {
+    mutationFn: async (input: { org_id: string; user_id: string; approve: boolean; role?: string; position?: string }) => {
       const supabase = createClient();
       const {
         data: { user },
@@ -182,9 +182,34 @@ export function useDecideMembership() {
         .update({
           status: input.approve ? "active" : "rejected",
           role: input.approve ? (input.role as Tables<"organization_members">["role"]) : null,
+          position: input.approve ? (input.position?.trim() || null) : null,
           decided_at: new Date().toISOString(),
           decided_by: user?.id ?? null,
         })
+        .eq("org_id", input.org_id)
+        .eq("user_id", input.user_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organization_members"] });
+    },
+  });
+}
+
+/**
+ * Edits an active member's free-text position (e.g. "מגייסת", "מטיס ניסוי")
+ * — separate from `role`, which stays fixed at approval time and keeps
+ * gating fleet-manager permissions. This never touches `role`.
+ */
+export function useUpdateMemberPosition() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { org_id: string; user_id: string; position: string }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("organization_members")
+        .update({ position: input.position.trim() || null })
         .eq("org_id", input.org_id)
         .eq("user_id", input.user_id);
       if (error) throw error;

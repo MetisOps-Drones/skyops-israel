@@ -10,6 +10,8 @@ export type MyOrgContext = {
   inviteCode: string | null;
   /** The caller's role *within this org* (organization_members.role), not their global profile role. Null if they have no active org. */
   orgRole: string | null;
+  /** Free-text job title/function within the org (e.g. "מגייסת", "מטיס ניסוי") — separate axis from orgRole, which stays permission-only. Null if unset or no active org. */
+  orgPosition: string | null;
   isFleetManager: boolean;
 };
 
@@ -28,7 +30,15 @@ export function useMyOrgContext() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user)
-        return { userId: null, orgId: null, orgName: null, inviteCode: null, orgRole: null, isFleetManager: false };
+        return {
+          userId: null,
+          orgId: null,
+          orgName: null,
+          inviteCode: null,
+          orgRole: null,
+          orgPosition: null,
+          isFleetManager: false,
+        };
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -43,12 +53,13 @@ export function useMyOrgContext() {
           orgName: null,
           inviteCode: null,
           orgRole: null,
+          orgPosition: null,
           isFleetManager: false,
         };
 
       const { data: membership, error: membershipError } = await supabase
         .from("organization_members")
-        .select("role")
+        .select("role, position")
         .eq("org_id", profile.org_id)
         .eq("user_id", user.id)
         .eq("status", "active")
@@ -62,6 +73,7 @@ export function useMyOrgContext() {
         orgName: org?.name ?? null,
         inviteCode: org?.invite_code ?? null,
         orgRole: membership?.role ?? null,
+        orgPosition: membership?.position ?? null,
         isFleetManager: membership?.role === "fleet_manager",
       };
     },

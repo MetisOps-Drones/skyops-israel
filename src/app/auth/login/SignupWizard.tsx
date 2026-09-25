@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { User, Briefcase, Building2, Loader2, ChevronRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,7 @@ function TypeCard({
 
 export function SignupWizard() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("basics");
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +180,11 @@ export function SignupWizard() {
       }
 
       toast.success("החשבון נוצר בהצלחה!");
+      // Same reasoning as LoginForm: signUpWithPassword is a Server Action,
+      // so it never fires providers.tsx's onAuthStateChange — clear the
+      // cache here explicitly so anyone signing up right after a different
+      // account was active in this tab doesn't inherit its cached data.
+      queryClient.clear();
       router.push("/map");
       router.refresh();
     } catch (err) {

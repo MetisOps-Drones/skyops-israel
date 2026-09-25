@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { signInWithPassword, type AuthActionResult } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,14 +24,26 @@ function SubmitButton({ label }: { label: string }) {
 
 export function LoginForm() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [signInState, signInAction] = useFormState(signInWithPassword, initialState);
 
   useEffect(() => {
     if (signInState.success) {
+      // signInWithPassword runs entirely server-side (it's a Server Action
+      // hitting the server-side Supabase client), so the client SDK
+      // instance providers.tsx listens on via onAuthStateChange never sees
+      // this sign-in — that listener never fires for it. Without this, the
+      // QueryClient set up in providers.tsx survives the whole logout ->
+      // login round trip (Next's client-side router, not a hard reload),
+      // so a second person signing in right after someone else on the same
+      // tab got served the first person's cached org/profile data until
+      // something happened to force a refetch. Cleared explicitly here,
+      // the one place that actually knows "a new session just started".
+      queryClient.clear();
       router.push("/map");
       router.refresh();
     }
-  }, [signInState.success, router]);
+  }, [signInState.success, router, queryClient]);
 
   return (
     <div className="flex flex-col gap-4">

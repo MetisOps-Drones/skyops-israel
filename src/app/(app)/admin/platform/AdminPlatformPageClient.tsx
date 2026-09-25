@@ -9,14 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAdminOrganizations, useAdminUsers, useAdminQuotaOverrides } from "@/hooks/useAdminPlatform";
 import { downloadCsv } from "@/lib/csv";
+import { ROLE_LABEL } from "@/lib/constants/roles";
 import { AdminUserPlanDialog } from "./AdminUserPlanDialog";
-
-const ROLE_LABELS: Record<string, string> = {
-  fleet_manager: "מנהל צי",
-  pilot_pro: "לקוח פרטי עסקי",
-  pilot_hobby: "לקוח פרטי",
-  dispatcher_admin: "מוקדן תיאום",
-};
 
 function OrganizationsTab() {
   const [search, setSearch] = useState("");
@@ -120,7 +114,7 @@ function UsersTab() {
       `metisops-users-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((u) => ({
         שם: u.full_name,
-        תפקיד: ROLE_LABELS[u.role] ?? u.role,
+        תפקיד: ROLE_LABEL[u.role] ?? u.role,
         ארגון: u.organizations?.name ?? "",
         טלפון: u.phone ?? "",
         תוכנית: u.plan_code ?? "",
@@ -185,7 +179,7 @@ function UsersTab() {
                 </div>
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                <Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge>
               </TableCell>
               <TableCell>{u.organizations?.name ?? "—"}</TableCell>
               <TableCell dir="ltr" className="text-end">

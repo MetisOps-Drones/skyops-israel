@@ -6,17 +6,9 @@ import { Camera, Loader2, Phone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyOrgContext } from "@/hooks/useOrgContext";
 import { useUploadAvatar } from "@/hooks/useProfileSettings";
+import { ROLE_LABEL } from "@/lib/constants/roles";
+import { findPlan } from "@/lib/constants/plans";
 import type { Tables } from "@/lib/types/database.types";
-
-// Matches ROLE_LABELS in admin/platform/AdminPlatformPageClient.tsx — a fleet
-// manager runs a whole org, not a solo business, so it gets its own label
-// instead of reusing pilot_pro's "לקוח פרטי עסקי".
-const TIER_LABELS: Record<string, string> = {
-  pilot_hobby: "לקוח פרטי",
-  pilot_pro: "לקוח פרטי עסקי",
-  fleet_manager: "מנהל צי",
-  dispatcher_admin: "מוקדן תיאום",
-};
 
 function initials(name: string) {
   return name
@@ -34,7 +26,31 @@ export function ProfileHeader({ profile }: { profile: Tables<"profiles"> }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const hasOrg = Boolean(orgContext?.orgId);
-  const tierLabel = hasOrg ? "ארגון" : TIER_LABELS[profile.role] ?? "לקוח פרטי";
+
+  // Role and subscription are two different facts about a person and used
+  // to collapse into one badge — hasOrg alone decided the whole label, so a
+  // fleet manager's own role name never actually rendered (always
+  // overridden to the generic "ארגון") the moment they had an org, and
+  // there was no way to say "this person is on an org subscription but
+  // holds the מגייסת/מטיס ניסוי position" at all. Role always shows the
+  // real role name now (plus org position, when set); subscription is its
+  // own separate badge.
+  const roleLabel = ROLE_LABEL[profile.role] ?? "לקוח פרטי";
+  const orgPosition = orgContext?.orgPosition ?? null;
+
+  // dispatcher_admin is platform staff, not a paying customer — no
+  // subscription badge for them, matching the same gate SettingsMenu uses
+  // to hide the "מנוי" settings button.
+  const subscriptionLabel =
+    profile.role === "dispatcher_admin"
+      ? null
+      : hasOrg
+        // No org-level plan_code exists today (see resolveCoordinationLimit's
+        // own note on this gap) — profiles.plan_code is meaningless once
+        // someone's on an org, so this stays a generic label rather than a
+        // stale/wrong tier name.
+        ? "חשבון ארגוני"
+        : (findPlan(profile.plan_code)?.name ?? null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -92,9 +108,17 @@ export function ProfileHeader({ profile }: { profile: Tables<"profiles"> }) {
         </div>
         <div className="min-w-0">
           <p className="truncate text-xl font-bold">{profile.full_name}</p>
-          <span className="mt-1.5 inline-flex items-center rounded-full bg-brand-gold/15 px-2.5 py-0.5 text-xs font-semibold text-brand-gold">
-            {tierLabel}
-          </span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center rounded-full bg-brand-gold/15 px-2.5 py-0.5 text-xs font-semibold text-brand-gold">
+              {roleLabel}
+              {orgPosition && ` · ${orgPosition}`}
+            </span>
+            {subscriptionLabel && (
+              <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-brand-navy-foreground/80">
+                מנוי: {subscriptionLabel}
+              </span>
+            )}
+          </div>
           {profile.phone && (
             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-brand-navy-foreground/70">
               <Phone className="h-3 w-3" />

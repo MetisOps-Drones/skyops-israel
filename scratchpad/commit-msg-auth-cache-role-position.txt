@@ -1,0 +1,36 @@
+Fix cross-user cache leak on login/logout/signup; separate org role from job position
+
+Auth cache leak (audit item 1):
+Login, logout and signup all run as Server Actions against the
+server-side Supabase client, so the client-side onAuthStateChange
+listener in providers.tsx (which calls queryClient.clear() on user-id
+change) never actually fires for them -- it only helps OAuth, which
+does a full page navigation anyway. This meant a fresh dispatcher_admin
+or fleet_manager session could keep serving React Query cache entries
+seeded by whoever was logged in a moment before on the same tab (e.g.
+"my equipment" screens showing the previous pilot's drones).
+
+Fixed at the three real client-side call sites instead: LoginForm's
+success effect, SignupWizard's success block, and SettingsMenu's
+logout button now all call queryClient.clear() before navigating.
+providers.tsx's listener comment updated to describe it accurately as
+an OAuth-only safety net rather than the primary fix.
+
+Role vs. subscription vs. org position (audit item 2):
+profiles.role (platform access), profiles.plan_code (billing tier) and
+organization_members.role (permission level within one org) were
+getting conflated in the UI -- ProfileHeader.tsx collapsed to a
+generic "ארגון" badge for any org member, discarding their actual role
+name, so a fleet manager's own title never rendered. There was also no
+way to record a free-text job function (e.g. "מגייסת", "מטיס ניסוי")
+independent of the permission-bearing org role.
+
+- New organization_members.position text column (migration 0087),
+  purely descriptive, never gates anything.
+- New src/lib/constants/roles.ts as the single ROLE_LABEL source,
+  replacing duplicated maps in ProfileHeader and AdminPlatformPageClient.
+- ProfileHeader now renders role and subscription as two independent,
+  always-computed badges instead of one hasOrg-collapsing ternary.
+- OrgPageClient: pending-approval and active-member tables gained an
+  editable "position" field/column alongside the existing role select,
+  via a new useUpdateMemberPosition hook.

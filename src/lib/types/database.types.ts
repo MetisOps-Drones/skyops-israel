@@ -1574,6 +1574,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           org_id: string
+          position: string | null
           role: Database["public"]["Enums"]["user_role"] | null
           status: Database["public"]["Enums"]["org_membership_status"]
           user_id: string
@@ -1583,6 +1584,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           org_id: string
+          position?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           status?: Database["public"]["Enums"]["org_membership_status"]
           user_id: string
@@ -1592,6 +1594,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           org_id?: string
+          position?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           status?: Database["public"]["Enums"]["org_membership_status"]
           user_id?: string
