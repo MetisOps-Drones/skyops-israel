@@ -98,15 +98,40 @@
     /* Every Tailwind text/spacing size is rem-based, so this one number
        shrinks type AND spacing consistently across every page at once —
        the deliberate lever for "make it all smaller everywhere" instead of
-       hunting down every individual text-* class. 87.5% wasn't enough —
-       still forcing scroll on content that shouldn't need it. 75% of the
-       16px browser default = a 12px root. */
-    font-size: 75%;
+       hunting down every individual text-* class. Only ever applied from
+       md up: on a phone this same 75% (12px root) made every text-sm/
+       text-xs label and icon read as genuinely too small, so phones keep
+       the real 16px browser default and only tablet/desktop — where this
+       was tuned to fix dense admin/dispatcher tables forcing scroll at
+       87.5% — get the denser root. */
+    font-size: 100%;
+  }
+
+  @media (min-width: 768px) {
+    html {
+      font-size: 75%;
+    }
   }
 
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* iOS Safari auto-zooms the whole page in when a focused form control's
+   computed font-size is under 16px — with the 12px desktop root this
+   never showed up there, but on a phone (16px root, see above) every
+   text-sm input still computes to 14px, still under the threshold, so
+   tapping any field (e.g. the login form) made the page "jump" zoomed in
+   until manually pinched back out. Pinning real form controls to exactly
+   16px on phones only (md+ keeps its own text-sm sizing) stops that
+   without changing how inputs look anywhere else. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 

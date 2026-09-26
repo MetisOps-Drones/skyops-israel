@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { signInWithPassword, type AuthActionResult } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +14,13 @@ import { OAuthButtons } from "./OAuthButtons";
 
 const initialState: AuthActionResult = {};
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({ label, forcePending }: { label: string; forcePending: boolean }) {
   const { pending } = useFormStatus();
+  const isPending = pending || forcePending;
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "מתחבר..." : label}
+    <Button type="submit" className="w-full" disabled={isPending}>
+      {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+      {isPending ? "מתחבר..." : label}
     </Button>
   );
 }
@@ -26,9 +29,18 @@ export function LoginForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [signInState, signInAction] = useFormState(signInWithPassword, initialState);
+  // useFormStatus's `pending` only covers the server action itself — once it
+  // resolves successfully, it flips back to false immediately, but
+  // router.push/refresh below still take a moment (the (app) layout's own
+  // auth+profile check) before /map actually appears. Without this, the
+  // button would briefly flip back to its idle "התחבר" label in that gap,
+  // right in the middle of what the person experiences as one continuous
+  // "logging in" wait.
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     if (signInState.success) {
+      setRedirecting(true);
       // signInWithPassword runs entirely server-side (it's a Server Action
       // hitting the server-side Supabase client), so the client SDK
       // instance providers.tsx listens on via onAuthStateChange never sees
@@ -57,14 +69,22 @@ export function LoginForm() {
       <form action={signInAction} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">אימייל</Label>
-          <Input id="email" name="email" type="email" required autoComplete="email" dir="ltr" />
+          <Input id="email" name="email" type="email" required autoComplete="email" dir="ltr" disabled={redirecting} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="password">סיסמה</Label>
-          <Input id="password" name="password" type="password" required autoComplete="current-password" dir="ltr" />
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            dir="ltr"
+            disabled={redirecting}
+          />
         </div>
         {signInState.error && <p className="text-sm text-destructive">{signInState.error}</p>}
-        <SubmitButton label="התחבר" />
+        <SubmitButton label="התחבר" forcePending={redirecting} />
       </form>
 
       <p className="text-center text-sm text-muted-foreground">

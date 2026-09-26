@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell } from "lucide-react";
+import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell, Loader2 } from "lucide-react";
 import { MetisOpsLogo } from "./MetisOpsLogo";
 import { NotificationsOverlay } from "./NotificationsOverlay";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
@@ -37,6 +37,12 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
   const router = useRouter();
+  // isPending stays true for the whole navigation, including the (app)
+  // layout's own server-side auth+profile check — not just the client-side
+  // route change — so this is a real signal, not a cosmetic delay. The ring
+  // itself closes the instant a bubble is tapped (see handleBubbleClick),
+  // so the FAB is the only thing still on screen to show it against.
+  const [isNavigating, startNavigation] = useTransition();
   const unreadCount = useUnreadNotificationCount();
   const { data: orgContext } = useMyOrgContext();
   const isAdmin = role === "dispatcher_admin";
@@ -103,7 +109,10 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   function handleBubbleClick(bubble: BubbleItem) {
     setRingOpen(false);
     if (bubble.action) bubble.action();
-    else if (bubble.href) router.push(bubble.href);
+    else if (bubble.href) {
+      const href = bubble.href;
+      startNavigation(() => router.push(href));
+    }
   }
 
   // BubbleLauncher is persistent chrome mounted on every route, so this runs
@@ -237,8 +246,12 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
               ringOpen && "rotate-90"
             )}
           >
-            <MetisOpsLogo className="h-8 w-8" />
-            {!ringOpen && unreadCount > 0 && (
+            {isNavigating ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <MetisOpsLogo className="h-8 w-8" />
+            )}
+            {!ringOpen && !isNavigating && unreadCount > 0 && (
               <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {unreadCount}
               </span>

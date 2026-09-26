@@ -1,0 +1,39 @@
+Fix mobile text/zoom, cache page revisits, add navigation/login loading feedback
+
+Mobile text too small + page opens "zoomed" (reported on a real phone):
+globals.css's html { font-size: 75% } (a deliberate desktop density lever
+from an earlier session) was applying on phones too, shrinking the root
+to a 12px. Every Tailwind text-sm/text-xs form input then computed well
+under 16px, which is exactly the threshold where iOS Safari auto-zooms
+the whole page in when a field is focused -- explains both complaints
+at once (everything reads too small, then focusing a field on the login
+page "opens enlarged"). Fixed by scoping the 75% root to md+ only
+(tablet/desktop keep the density it was tuned for) and pinning real
+form controls to 16px on phones specifically, which stops the
+focus-zoom without changing how inputs look anywhere else. Verified
+live at 375px: root font 16px, no horizontal overflow, inputs compute
+exactly 16px; desktop (1280px) still gets the dense 12px root.
+
+Re-entering a page reloads it even though nothing changed:
+Every route under (app)/ is dynamic (its layout reads cookies for
+auth), so Next's default dynamic Router Cache staleTime of 0 meant
+re-entering any page -- even seconds after leaving it, still signed
+in -- re-ran the whole server round trip from scratch every time.
+next.config.mjs now sets experimental.staleTimes.dynamic = 30,
+matching the existing React Query staleTime (providers.tsx) so both
+cache layers agree on "how fresh is fresh enough" -- a page reopened
+within that window is instant, and it quietly revalidates on its own
+past that.
+
+No feedback while logging in / opening a section (~4s, looks stuck):
+LoginForm's pending state only covered the server action itself --
+once it resolved, the button flipped back to its idle label for the
+few hundred ms router.push/refresh still needed, right in the middle
+of what reads as one continuous wait. Added a `redirecting` flag that
+keeps the spinner + disabled fields up through the whole flow.
+BubbleLauncher (the app's main way to switch sections) now wraps its
+router.push in useTransition and shows a spinner on the menu FAB
+itself while the panel is loading -- the ring closes the instant a
+bubble is tapped, so the FAB is the only thing left on screen to show
+it against. Both only render while something is actually pending, per
+Ohad's "no forced loading if it isn't needed."
