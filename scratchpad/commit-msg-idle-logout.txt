@@ -1,0 +1,17 @@
+Add 30-minute idle auto-logout
+
+Supabase's own session (refresh token) stays valid far longer than
+this on purpose -- this is a separate, shorter UX/security timer for
+an unattended or shared device. src/hooks/useIdleLogout.ts tracks real
+user activity (mouse/keyboard/touch/scroll) and, after 30 minutes with
+none, signs out: queryClient.clear() + a toast explaining why + the
+same signOut() Server Action the manual logout button uses (so the
+next person to sign in on this tab never inherits stale cached data,
+same reasoning as SettingsMenu's logout). Mounted once in AppShell.tsx,
+so it covers every route under (app)/.
+
+Covered by two new Playwright specs (idle-logout.spec.ts) using
+page.clock to fast-forward 30 minutes of virtual time instead of
+actually waiting: one confirms the auto-logout fires and lands back on
+/auth/login, the other confirms a real interaction just before the
+deadline resets the timer instead of signing out anyway.

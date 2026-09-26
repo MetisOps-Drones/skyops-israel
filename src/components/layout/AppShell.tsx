@@ -7,6 +7,7 @@ import { BubbleLauncher } from "@/components/layout/BubbleLauncher";
 import { NewCoordinationRequestToast } from "@/components/layout/NewCoordinationRequestToast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { useBubbleLauncherStore } from "@/stores/useBubbleLauncherStore";
+import { useIdleLogout } from "@/hooks/useIdleLogout";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/types/database.types";
 
@@ -39,6 +40,7 @@ export function AppShell({
   const router = useRouter();
   const style = overlayStyle(pathname);
   const setRingOpen = useBubbleLauncherStore((s) => s.setRingOpen);
+  useIdleLogout();
 
   function handleBack() {
     setRingOpen(true);
