@@ -22,7 +22,7 @@ import {
   requiredInfrastructureDistanceM,
   zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
-import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
+import { checkLiveNotamOverlap, formatNotamTime, notamsValidUntilLabel } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import {
   computeFullAltitudeCeiling,
@@ -86,6 +86,7 @@ export function LocationInfoCard({
 
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones, isHobby) : null;
   const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
+  const notamUntil = notamCheck?.inside ? notamsValidUntilLabel(notamCheck.notams) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
   const fullCeiling = altitudeResult
     ? computeFullAltitudeCeiling(
@@ -253,14 +254,10 @@ export function LocationInfoCard({
             ) : notamCheck?.inside ? (
               <div className="flex items-start gap-3 rounded-xl p-4" style={{ backgroundColor: "rgb(234 88 12 / 0.1)", color: "#ea580c" }}>
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold">
-                    נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית
-                  </p>
-                  <p className="mt-0.5 text-sm">
-                    ניתן להגיש בקשת תיאום — המוקדן יבדוק את הנוטאם לפני אישור.
-                  </p>
-                </div>
+                <p className="text-base font-semibold">
+                  נוטאם פעיל בנקודה זו
+                  {notamUntil ? ` · בתוקף עד ${notamUntil}` : ""} — נדרש תיאום
+                </p>
               </div>
             ) : requiresAttention ? (
               <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
@@ -463,7 +460,10 @@ export function LocationInfoCard({
                         </p>
                         <p className="mt-1 text-xs">{notam.eText}</p>
                         <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
-                          {new Date(notam.fromDate).toLocaleString("he-IL")} – {new Date(notam.toDate).toLocaleString("he-IL")}
+                          {formatNotamTime(notam.fromDate)} – {formatNotamTime(notam.toDate)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          זה תוקף הנוטאם; שעות הפעילות בפועל (למשל יומיות) כתובות בטקסט שלו.
                         </p>
                       </div>
                     ))}

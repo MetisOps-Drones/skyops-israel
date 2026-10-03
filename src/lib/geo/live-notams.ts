@@ -8,6 +8,38 @@ export interface LiveNotamOverlapCheck {
   notams: LiveNotam[];
 }
 
+const FAR_FUTURE_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** A NOTAM date/time in Israel time ("31.10, 23:59"; the year is added when it isn't this year). The feed publishes UTC. */
+export function formatNotamTime(iso: string): string {
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    day: "2-digit",
+    month: "2-digit",
+    ...(sameYear ? {} : { year: "numeric" }),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * When the last of these NOTAMs expires — the earliest moment the NOTAM side
+ * of a point is clear. A NOTAM published years ahead is a standing
+ * restriction rather than a date to wait for, so it reads as "לטווח ארוך"
+ * instead of a date nobody can plan around. Note this is the end of the
+ * NOTAM's validity window; many are month-long windows whose actual daily
+ * activity hours are written in the NOTAM text itself.
+ */
+export function notamsValidUntilLabel(notams: LiveNotam[]): string | null {
+  const ends = notams.map((n) => Date.parse(n.toDate)).filter((t) => !Number.isNaN(t));
+  if (ends.length === 0) return null;
+  const latest = Math.max(...ends);
+  if (latest - Date.now() > FAR_FUTURE_MS) return `לטווח ארוך (עד ${new Date(latest).getFullYear()})`;
+  return formatNotamTime(new Date(latest).toISOString());
+}
+
 /**
  * Every live NOTAM resolves to a circle (center + radius), never a real
  * polygon — see src/lib/notams/live-feed.ts. A point-in-circle distance

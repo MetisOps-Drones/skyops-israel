@@ -32,7 +32,7 @@ import {
   requiredInfrastructureDistanceM,
   zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
-import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
+import { checkLiveNotamOverlap, notamsValidUntilLabel } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, mToFt, altitudeAmslFt } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
 import { ClearanceBadge } from "./ClearanceBadge";
@@ -584,7 +584,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                   : zoneVerdict.tone !== "none"
                     ? zoneVerdict.headline
                     : notamCheck?.inside
-                      ? "נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית"
+                      ? `נוטאם פעיל בנקודה זו${notamsValidUntilLabel(notamCheck.notams) ? ` · בתוקף עד ${notamsValidUntilLabel(notamCheck.notams)}` : ""} — נדרש תיאום`
                       : needsSpecialAuthorization
                         ? "אזור זה דורש הרשאת הפעלה מיוחדת"
                         : buildingCheckUnavailable
