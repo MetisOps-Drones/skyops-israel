@@ -22,7 +22,14 @@ import {
   requiredInfrastructureDistanceM,
   zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
-import { checkLiveNotamOverlap, formatNotamTime, notamsValidUntilLabel } from "@/lib/geo/live-notams";
+import {
+  checkLiveNotamOverlap,
+  formatNotamSchedule,
+  formatNotamTime,
+  notamsActivityLabel,
+  notamsValidUntilLabel,
+  upcomingNotamsAt,
+} from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import {
   computeFullAltitudeCeiling,
@@ -87,6 +94,9 @@ export function LocationInfoCard({
   const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones, isHobby) : null;
   const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
   const notamUntil = notamCheck?.inside ? notamsValidUntilLabel(notamCheck.notams) : null;
+  const notamHours = notamCheck?.inside ? notamsActivityLabel(notamCheck.notams) : null;
+  // Not in force yet, but will be within two weeks — shown so planning ahead isn't told "clear".
+  const upcomingNotams = point ? upcomingNotamsAt(point, liveNotams) : [];
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
   const fullCeiling = altitudeResult
     ? computeFullAltitudeCeiling(
@@ -163,6 +173,7 @@ export function LocationInfoCard({
   const hasDetails = Boolean(
     (aipCheck && aipCheck.reasons.length > 0) ||
       notamCheck?.inside ||
+      upcomingNotams.length > 0 ||
       proximityFindings.length > 0 ||
       needsSpecialAuthorization ||
       buildingProximity.data?.available
@@ -256,7 +267,8 @@ export function LocationInfoCard({
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <p className="text-base font-semibold">
                   נוטאם פעיל בנקודה זו
-                  {notamUntil ? ` · בתוקף עד ${notamUntil}` : ""} — נדרש תיאום
+                  {notamUntil ? ` · בתוקף עד ${notamUntil}` : ""}
+                  {notamHours ? ` · פעיל ${notamHours}` : ""} — נדרש תיאום
                 </p>
               </div>
             ) : requiresAttention ? (
@@ -316,6 +328,14 @@ export function LocationInfoCard({
                   בקשת תיאום לנקודה זו
                 </Button>
               ) : null)}
+
+            {upcomingNotams[0] && (
+              <p className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "#ea580c" }}>
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                נוטאם עתידי בנקודה זו — מתחיל {formatNotamTime(upcomingNotams[0].fromDate)}
+                {upcomingNotams.length > 1 ? ` (ועוד ${upcomingNotams.length - 1})` : ""}
+              </p>
+            )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
                 (/api/building-proximity — the R2 bitmap grid built from the same
@@ -462,9 +482,33 @@ export function LocationInfoCard({
                         <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
                           {formatNotamTime(notam.fromDate)} – {formatNotamTime(notam.toDate)}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          זה תוקף הנוטאם; שעות הפעילות בפועל (למשל יומיות) כתובות בטקסט שלו.
+                        <p className="mt-0.5 text-xs font-medium">
+                          {notam.schedule
+                            ? `שעות פעילות: ${formatNotamSchedule(notam.schedule, notam.fromDate)}`
+                            : "ללא שעות פעילות מוגדרות — בתוקף ברצף לכל משך התוקף"}
                         </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {upcomingNotams.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">נוטאמים שיתחילו בקרוב בנקודה זו</p>
+                    {upcomingNotams.map((notam) => (
+                      <div key={notam.id} className="rounded-lg border p-3 text-sm">
+                        <p className="font-medium" dir="ltr">
+                          {notam.id}
+                        </p>
+                        <p className="mt-1 text-xs">{notam.eText}</p>
+                        <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                          {formatNotamTime(notam.fromDate)} – {formatNotamTime(notam.toDate)}
+                        </p>
+                        {notam.schedule && (
+                          <p className="mt-0.5 text-xs font-medium">
+                            שעות פעילות: {formatNotamSchedule(notam.schedule, notam.fromDate)}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>

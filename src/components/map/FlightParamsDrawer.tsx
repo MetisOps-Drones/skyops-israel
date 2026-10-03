@@ -136,9 +136,18 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
     [checkPoint, aipZones]
   );
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  // Once the pilot has picked a flight window, a NOTAM only counts if it overlaps that window (including ones that start later).
+  const notamWindow = useMemo(() => {
+    if (!startTime || !endTime) return null;
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start ? null : { start, end };
+  }, [startTime, endTime]);
   const notamCheck = useMemo(
-    () => (checkPoint ? checkLiveNotamOverlap(checkPoint, liveNotams) : null),
-    [checkPoint, liveNotams]
+    () => (checkPoint ? checkLiveNotamOverlap(checkPoint, liveNotams, notamWindow) : null),
+    [checkPoint, liveNotams, notamWindow]
   );
   const proximity = useProximityCheck(checkPoint);
   const proximityFindings = proximity.data?.findings ?? [];
@@ -211,8 +220,6 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // instead of the generic spinner.
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // The ceiling differs by licence type — if the store still holds an altitude above what this

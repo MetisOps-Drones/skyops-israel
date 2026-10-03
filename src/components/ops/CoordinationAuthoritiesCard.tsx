@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import Map, { Source, Layer, Marker, type MapLayerMouseEvent } from "react-map-gl";
 import * as turf from "@turf/turf";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Phone, Plus, Pencil, Trash2, ShieldQuestion, MapPin, MessageCircle } from "lucide-react";
-import { whatsAppChatLink } from "@/lib/coordination/message";
+import { Plus, Pencil, Trash2, ShieldQuestion, MapPin } from "lucide-react";
+import { AuthorityContactList } from "@/components/ops/AuthorityContactList";
+import { authorityContacts, isMobileNumber, type AuthorityContact } from "@/lib/coordination/authority-contacts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,9 +33,7 @@ import {
 interface FormState {
   name: string;
   unit_type: string;
-  phone: string;
-  backup_phone: string;
-  whatsapp_phone: string;
+  contacts: AuthorityContact[];
   notes: string;
   center_lat: string;
   center_lng: string;
@@ -44,9 +43,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   name: "",
   unit_type: "",
-  phone: "",
-  backup_phone: "",
-  whatsapp_phone: "",
+  contacts: [{ label: "", phone: "" }],
   notes: "",
   center_lat: "",
   center_lng: "",
@@ -57,9 +54,7 @@ function toFormState(a: CoordinationAuthority): FormState {
   return {
     name: a.name,
     unit_type: a.unit_type,
-    phone: a.phone,
-    backup_phone: a.backup_phone ?? "",
-    whatsapp_phone: a.whatsapp_phone ?? "",
+    contacts: authorityContacts(a),
     notes: a.notes ?? "",
     center_lat: String(a.center_lat),
     center_lng: String(a.center_lng),
@@ -144,16 +139,23 @@ function AuthorityDialog({
   const update = useUpdateCoordinationAuthority();
   const pending = create.isPending || update.isPending;
 
-  function set<K extends keyof FormState>(key: K, value: string) {
+  function set<K extends Exclude<keyof FormState, "contacts">>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setContact(index: number, patch: Partial<AuthorityContact>) {
+    setForm((f) => ({ ...f, contacts: f.contacts.map((c, i) => (i === index ? { ...c, ...patch } : c)) }));
   }
 
   async function handleSubmit() {
     const lat = Number(form.center_lat);
     const lng = Number(form.center_lng);
     const radiusKm = Number(form.radius_km);
-    if (!form.name.trim() || !form.unit_type.trim() || !form.phone.trim()) {
-      toast.error("יש למלא שם, סוג גורם וטלפון");
+    const contacts = form.contacts
+      .map((c) => ({ label: c.label.trim(), phone: c.phone.trim() }))
+      .filter((c) => c.phone);
+    if (!form.name.trim() || !form.unit_type.trim() || contacts.length === 0) {
+      toast.error("יש למלא שם, סוג גורם ולפחות מספר טלפון אחד");
       return;
     }
     if (Number.isNaN(lat) || Number.isNaN(lng) || Number.isNaN(radiusKm) || radiusKm <= 0) {
@@ -163,9 +165,11 @@ function AuthorityDialog({
     const payload = {
       name: form.name.trim(),
       unit_type: form.unit_type.trim(),
-      phone: form.phone.trim(),
-      backup_phone: form.backup_phone.trim() || null,
-      whatsapp_phone: form.whatsapp_phone.trim() || null,
+      // phone is still NOT NULL and the older columns still feed other readers — kept in step with the list.
+      phone: contacts[0]!.phone,
+      backup_phone: contacts[1]?.phone ?? null,
+      whatsapp_phone: contacts.find((c) => isMobileNumber(c.phone))?.phone ?? null,
+      contacts,
       notes: form.notes.trim() || null,
       center_lat: lat,
       center_lng: lng,
@@ -203,26 +207,48 @@ function AuthorityDialog({
               <Input id="ca-type" value={form.unit_type} onChange={(e) => set("unit_type", e.target.value)} placeholder="יבא / מבא / אוגדה / פיקוח / אחר" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ca-phone">טלפון</Label>
-              <Input id="ca-phone" dir="ltr" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="05X-XXXXXXX" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ca-backup-phone">טלפון גיבוי (אופציונלי)</Label>
-              <Input id="ca-backup-phone" dir="ltr" value={form.backup_phone} onChange={(e) => set("backup_phone", e.target.value)} />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ca-whatsapp">מספר וואטסאפ לתיאום (אופציונלי)</Label>
-            <Input
-              id="ca-whatsapp"
-              dir="ltr"
-              value={form.whatsapp_phone}
-              onChange={(e) => set("whatsapp_phone", e.target.value)}
-              placeholder="05X-XXXXXXX"
-            />
-            <p className="text-xs text-muted-foreground">מוצג למתאם כקישור שפותח ישירות את הצ&apos;אט.</p>
+          <div className="flex flex-col gap-2">
+            <Label>מספרי טלפון (כל מספר עם תיאור)</Label>
+            {form.contacts.map((c, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                <Input
+                  aria-label="תיאור המספר"
+                  value={c.label}
+                  onChange={(e) => setContact(i, { label: e.target.value })}
+                  placeholder="מגדל פיקוח / תיאום טיסות"
+                />
+                <Input
+                  aria-label="מספר טלפון"
+                  dir="ltr"
+                  value={c.phone}
+                  onChange={(e) => setContact(i, { phone: e.target.value })}
+                  placeholder="05X-XXXXXXX"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="הסרת מספר"
+                  disabled={form.contacts.length <= 1}
+                  onClick={() => setForm((f) => ({ ...f, contacts: f.contacts.filter((_, idx) => idx !== i) }))}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={() => setForm((f) => ({ ...f, contacts: [...f.contacts, { label: "", phone: "" }] }))}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              הוספת מספר
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              מספר נייד (05X) מוצג למתאם עם כפתור לפתיחת שיחה בוואטסאפ, וקו נייח עם כפתור חיוג.
+            </p>
           </div>
           <AuthorityLocationPicker
             lat={form.center_lat.trim() ? Number(form.center_lat) : null}
@@ -324,21 +350,7 @@ export function CoordinationAuthoritiesCard() {
                 <p className="truncate text-sm font-medium">
                   {a.name} <span className="text-xs font-normal text-muted-foreground">· {a.unit_type}</span>
                 </p>
-                {a.whatsapp_phone ? (
-                  // Coordination with this authority runs over WhatsApp — a button that opens the chat
-                  // replaces the phone number.
-                  <Button size="sm" variant="outline" asChild className="mt-1 border-success/40 text-success hover:bg-success/10 hover:text-success">
-                    <a href={whatsAppChatLink(a.whatsapp_phone)} target="_blank" rel="noopener noreferrer">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      פתיחת שיחה בוואטסאפ
-                    </a>
-                  </Button>
-                ) : (
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground" dir="ltr">
-                    <Phone className="h-3 w-3 shrink-0" />
-                    {a.phone}
-                  </p>
-                )}
+                <AuthorityContactList authority={a} />
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button size="icon" variant="ghost" aria-label={`עריכת ${a.name}`} onClick={() => openEdit(a)}>

@@ -33,6 +33,8 @@ export interface LiveNotam {
   position: { lat: number; lon: number; radiusNm: number; source: "e_text" | "q_line" };
   notamType: "N" | "R" | "C";
   replaces: string | null;
+  /** The NOTAM's item D) — its daily/weekly activity hours, in UTC (e.g. "DAILY 0500-1500"). Null when it has none (active around the clock for the whole validity window). */
+  schedule: string | null;
 }
 
 interface RawFeed {
@@ -51,7 +53,15 @@ interface RawFeed {
     notamType: "N" | "R" | "C";
     replaces: string | null;
     qLine: { qcode: string };
+    rawText?: string;
   }>;
+}
+
+/** Item D) of the raw ICAO text — "D) DAILY 0500-1500 E) ..." — collapsed to one line, or null when absent. */
+function parseSchedule(rawText: string | undefined): string | null {
+  const match = rawText?.match(/\bD\)\s*([\s\S]*?)\s*\bE\)/);
+  const text = match?.[1]?.replace(/\s+/g, " ").trim();
+  return text ? text : null;
 }
 
 /**
@@ -121,10 +131,13 @@ export async function fetchLiveNotams(): Promise<LiveNotam[]> {
   return body.notams
     .filter((n) => !n.administrative)
     .filter((n) => HAZARD_SUBJECTS.has(n.qLine.qcode.slice(1, 3)))
+    // Active AND upcoming (not yet started) — a pilot planning tomorrow's flight needs to hear about
+    // a NOTAM that starts tomorrow. Consumers decide what "relevant" means for them (active now for the
+    // map, overlapping the requested window for a request) — see src/lib/geo/live-notams.ts.
     .filter((n) => {
       const from = Date.parse(n.fromDate);
       const to = Date.parse(n.toDate);
-      return !Number.isNaN(from) && !Number.isNaN(to) && from <= now && now <= to;
+      return !Number.isNaN(from) && !Number.isNaN(to) && now <= to;
     })
     // Observed live: an occasional entry has position.radiusNm: null (seen
     // on an e_text-sourced "WI 1KM RADIUS..." phrase the source's parser
@@ -146,5 +159,6 @@ export async function fetchLiveNotams(): Promise<LiveNotam[]> {
       position: n.position,
       notamType: n.notamType,
       replaces: n.replaces,
+      schedule: parseSchedule(n.rawText),
     }));
 }

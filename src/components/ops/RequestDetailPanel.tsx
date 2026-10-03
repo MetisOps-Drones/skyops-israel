@@ -88,8 +88,13 @@ export function RequestDetailPanel({
     [requestLng, requestLat, aipZones]
   );
   const notamCheck = useMemo(
-    () => checkLiveNotamOverlap([requestLng, requestLat], liveNotams),
-    [requestLng, requestLat, liveNotams]
+    () =>
+      checkLiveNotamOverlap(
+        [requestLng, requestLat],
+        liveNotams,
+        request ? { start: new Date(request.start_time), end: new Date(request.end_time) } : null
+      ),
+    [requestLng, requestLat, liveNotams, request]
   );
 
   // The pilot enters meters above the ground; ATC/the AIP work in feet above sea level (מעפ"י) —

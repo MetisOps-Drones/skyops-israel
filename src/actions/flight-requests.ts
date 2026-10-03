@@ -104,7 +104,8 @@ async function evaluateFlightRequestSafety(
   let notamCheckFailed = false;
   try {
     const liveNotams = await fetchLiveNotams();
-    notamCheck = checkLiveNotamOverlap(centerPoint, liveNotams);
+    // Judged on the requested flight window: a NOTAM that starts tomorrow still counts for a flight tomorrow.
+    notamCheck = checkLiveNotamOverlap(centerPoint, liveNotams, { start: data.start_time, end: data.end_time });
   } catch (err) {
     notamCheckFailed = true;
     console.error("fetchLiveNotams failed during flight request evaluation:", err);

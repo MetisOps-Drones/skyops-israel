@@ -1,0 +1,23 @@
+NOTAM activity hours + upcoming NOTAMs; labeled numbers per coordination authority
+
+NOTAMs:
+- The feed's item D) schedule ("DAILY 0500-1500", UTC) is parsed from the raw
+  text and shown as Israel-time hours (DST-aware) in the map card banner/
+  details, the NOTAM popup, and anywhere the NOTAM is listed.
+- The feed now carries NOTAMs that have not started yet (it used to drop
+  everything not in force at fetch time). The map, HUD and point inspector
+  still only treat what is active right now as active; the card lists
+  upcoming ones separately. A request is judged on its own flight window:
+  the request form, the dispatcher view and the server action all use
+  checkLiveNotamOverlap(point, notams, window), so a NOTAM that starts
+  tomorrow no longer lets a request for tomorrow auto-clear.
+
+Coordination contacts (0091):
+The previous change replaced the tower's phone number with a WhatsApp
+button in the contacts list, hiding it. Authorities now have an ordered
+list of labeled numbers (contacts jsonb) — e.g. Hatzor: "מגדל פיקוח"
+073-3485024 and "תיאום טיסות" 058-672-6900 — each shown with its number
+and, next to it, a WhatsApp button (mobile) or a call button (landline).
+Legacy phone/backup_phone/whatsapp_phone columns are kept in sync and used
+as a fallback for rows without a list. The edit form is a labeled-numbers
+editor.

@@ -32,7 +32,7 @@ import {
   ISRAEL_MAP_DEFAULT_ZOOM,
 } from "@/lib/constants/airspace-zones";
 import { AIP_ZONE_KIND_COLORS, AIP_ZONE_KIND_LABELS, LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
-import { notamsValidUntilLabel } from "@/lib/geo/live-notams";
+import { notamsValidUntilLabel, isNotamActiveNow, formatNotamSchedule } from "@/lib/geo/live-notams";
 import type { LiveNotam } from "@/lib/notams/live-feed";
 import { formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import { FLIGHT_REQUEST_STATUS_COLORS, FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
@@ -262,10 +262,18 @@ export function BubbleMap({
   const liveNotamsGeojson = useMemo<GeoJSON.FeatureCollection>(
     () => ({
       type: "FeatureCollection",
-      features: liveNotams.map((notam) =>
+      // The feed also carries NOTAMs that start later — only what's in force now is drawn.
+      features: liveNotams.filter(isNotamActiveNow).map((notam) =>
         turf.circle([notam.position.lon, notam.position.lat], notam.position.radiusNm * 1.852, {
           units: "kilometers",
-          properties: { id: notam.id, eText: notam.eText, toDate: notam.toDate, label: `נוטאם · ${notam.id}` },
+          properties: {
+            id: notam.id,
+            eText: notam.eText,
+            toDate: notam.toDate,
+            fromDate: notam.fromDate,
+            schedule: notam.schedule,
+            label: `נוטאם · ${notam.id}`,
+          },
         })
       ),
     }),
@@ -758,6 +766,11 @@ export function BubbleMap({
                   {typeof zonePopup.properties.toDate === "string" && (
                     <p className="mt-1 text-xs font-medium">
                       בתוקף עד {notamsValidUntilLabel([{ toDate: zonePopup.properties.toDate } as LiveNotam])}
+                    </p>
+                  )}
+                  {typeof zonePopup.properties.schedule === "string" && typeof zonePopup.properties.fromDate === "string" && (
+                    <p className="text-xs">
+                      שעות פעילות: {formatNotamSchedule(zonePopup.properties.schedule, zonePopup.properties.fromDate)}
                     </p>
                   )}
                 </>

@@ -501,6 +501,7 @@ export type Database = {
           phone: string
           backup_phone: string | null
           whatsapp_phone: string | null
+          contacts: Json
           notes: string | null
           center_lng: number
           center_lat: number
@@ -515,6 +516,7 @@ export type Database = {
           phone: string
           backup_phone?: string | null
           whatsapp_phone?: string | null
+          contacts?: Json
           notes?: string | null
           center_lng: number
           center_lat: number
@@ -529,6 +531,7 @@ export type Database = {
           phone?: string
           backup_phone?: string | null
           whatsapp_phone?: string | null
+          contacts?: Json
           notes?: string | null
           center_lng?: number
           center_lat?: number
@@ -2382,6 +2385,7 @@ export type Database = {
           phone: string
           backup_phone: string | null
           whatsapp_phone: string | null
+          contacts: Json
           notes: string | null
           center_lng: number
           center_lat: number
