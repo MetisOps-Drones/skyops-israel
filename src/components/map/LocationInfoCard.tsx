@@ -200,18 +200,6 @@ export function LocationInfoCard({
                       ? zoneVerdictFor("forbidden", hasOrg).headline
                       : zoneVerdict.headline}
                   </p>
-                  {aipCheck && aipCheck.reasons.length > 0 && (
-                    <ul className="mt-1 list-inside list-disc text-sm">
-                      {aipCheck.reasons.map((reason, i) => (
-                        <li key={i}>{reason.label}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="mt-1 text-sm">
-                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
-                      ? zoneVerdictFor("forbidden", hasOrg).detail
-                      : zoneVerdict.detail}
-                  </p>
                   {zoneVerdict.upgradeHelps && (
                     <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
                       מה כן אפשר: לשדרג לחשבון ארגון ←
@@ -260,10 +248,7 @@ export function LocationInfoCard({
                 )}
               >
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold">{zoneVerdict.headline}</p>
-                  <p className="mt-0.5 text-sm">{zoneVerdict.detail}</p>
-                </div>
+                <p className="text-base font-semibold">{zoneVerdict.headline}</p>
               </div>
             ) : notamCheck?.inside ? (
               <div className="flex items-start gap-3 rounded-xl p-4" style={{ backgroundColor: "rgb(234 88 12 / 0.1)", color: "#ea580c" }}>
@@ -359,6 +344,22 @@ export function LocationInfoCard({
 
             {(hasDetails || (!altitudeResult?.blockedFromGround && fullCeiling)) && (
               <Disclosure label="למה? — פירוט מלא ומקורות">
+                {(forbiddenByAirspace || zoneVerdict.tone !== "none") && (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm">
+                      {forbiddenByAirspace && (zoneBlockLevel === "forbidden" || !zoneHardBlocked)
+                        ? zoneVerdictFor("forbidden", hasOrg).detail
+                        : zoneVerdict.detail}
+                    </p>
+                    {aipCheck?.reasons
+                      .filter((reason) => !reason.zone)
+                      .map((reason, i) => (
+                        <p key={i} className="text-sm font-medium">
+                          {reason.label}
+                        </p>
+                      ))}
+                  </div>
+                )}
                 {aipCheck && aipCheck.reasons.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <div>

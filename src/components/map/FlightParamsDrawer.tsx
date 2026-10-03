@@ -299,18 +299,20 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     ? zoneVerdictFor("forbidden", hasOrg).headline
                     : zoneVerdict.headline}
                 </p>
-                {authCheck && authCheck.reasons.length > 0 && (
-                  <ul className="mt-1 list-inside list-disc text-sm">
-                    {authCheck.reasons.map((reason, i) => (
-                      <li key={i}>{reason.label}</li>
-                    ))}
-                  </ul>
-                )}
-                <p className="mt-1 text-sm">
-                  {zoneBlockLevel === "forbidden" || !zoneHardBlocked
-                    ? zoneVerdictFor("forbidden", hasOrg).detail
-                    : zoneVerdict.detail}
-                </p>
+                <Disclosure label="למה? — פירוט מלא">
+                  {authCheck && authCheck.reasons.length > 0 && (
+                    <ul className="list-inside list-disc text-sm">
+                      {authCheck.reasons.map((reason, i) => (
+                        <li key={i}>{reason.label}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-sm">
+                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                      ? zoneVerdictFor("forbidden", hasOrg).detail
+                      : zoneVerdict.detail}
+                  </p>
+                </Disclosure>
                 {zoneVerdict.upgradeHelps && (
                   <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
                     מה כן אפשר: לשדרג לחשבון ארגון ←

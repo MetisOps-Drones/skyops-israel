@@ -1,0 +1,6 @@
+Zone verdict banners: headline only, details under "למה? — פירוט מלא"
+
+The map card and the request form showed the full legal explanation under
+every zone verdict. A pilot only needs the one line; the explanation (and
+the specific zone / runway distance) now lives in the existing "why"
+disclosure.
