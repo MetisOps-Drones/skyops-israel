@@ -6,6 +6,7 @@ import { OpsQueueMap } from "@/components/ops/OpsQueueMap";
 import { RequestDetailPanel } from "@/components/ops/RequestDetailPanel";
 import { CoordinationAuthoritiesCard } from "@/components/ops/CoordinationAuthoritiesCard";
 import { RecentlyDecidedList } from "@/components/ops/RecentlyDecidedList";
+import { WhatsAppQuickLinks } from "@/components/ops/WhatsAppQuickLinks";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 
 export function OpsPageClient() {
@@ -23,6 +24,7 @@ export function OpsPageClient() {
         <h1 className="text-2xl font-bold">מוקד תיאום</h1>
         <p className="text-sm text-muted-foreground">בקשות NOTAM ותיאום מרחב אווירי הממתינות לטיפול</p>
       </div>
+      <WhatsAppQuickLinks />
       <OpsQueueMap selectedId={null} onSelect={setSelected} />
       <PendingRequestsTable onSelect={setSelected} />
       <RecentlyDecidedList onSelect={setSelected} />

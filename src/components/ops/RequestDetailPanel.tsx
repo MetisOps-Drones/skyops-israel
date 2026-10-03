@@ -18,6 +18,7 @@ import { buildStaticBubbleMapUrl } from "@/lib/geo/staticMapUrl";
 import * as turf from "@turf/turf";
 import { PublishNotamModal } from "./PublishNotamModal";
 import { CoordinationPanel } from "./CoordinationPanel";
+import { WhatsAppQuickLinks } from "./WhatsAppQuickLinks";
 import { DispatcherChecklist } from "./DispatcherChecklist";
 import { DecisionHistory } from "./DecisionHistory";
 import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
@@ -186,6 +187,7 @@ export function RequestDetailPanel({
       </div>
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+        <WhatsAppQuickLinks />
         {process.env.NEXT_PUBLIC_MAPBOX_TOKEN && (
           <Image
             src={staticMapUrl}
