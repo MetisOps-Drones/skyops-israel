@@ -1,5 +1,6 @@
 import * as turf from "@turf/turf";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
+import { zoneIsInForce } from "@/lib/geo/weekday-zones";
 
 export interface AipMaxAltitudeResult {
   /** Highest altitude (ft) with no AIP-reference restriction on it at this point — null when we have no local data, 0 when a ground-based zone covers the point. */
@@ -29,10 +30,16 @@ const APPROVAL_PATH_KINDS = new Set(["CTR", "ATZ", "RESTRICTED", "DANGER"]);
  * lowest zone stacked above the point. Advisory only — same caveat as the
  * layer itself (see 0024_aip_zones_real_polygons.sql).
  */
-export function maxLegalAltitudeAtPoint(point: [number, number], zones: AipReferenceZone[]): AipMaxAltitudeResult {
+export function maxLegalAltitudeAtPoint(
+  point: [number, number],
+  zones: AipReferenceZone[],
+  /** Flight window — weekday-only areas are left out when it sits wholly on the weekend (default: now). */
+  window?: { start: Date; end: Date } | null
+): AipMaxAltitudeResult {
   const covering = zones.filter((zone) => {
     const geom = zone.geom_geojson as unknown as GeoJSON.Geometry;
     if (!geom || geom.type !== "Polygon") return false;
+    if (!zoneIsInForce(zone, window)) return false;
     try {
       return turf.booleanPointInPolygon(point, geom as GeoJSON.Polygon);
     } catch {

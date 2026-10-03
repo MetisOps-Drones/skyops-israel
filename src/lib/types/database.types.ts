@@ -44,6 +44,7 @@ export type Database = {
           altitude_text: string
           code: string | null
           created_at: string
+          drone_max_altitude_m: number | null
           geom_geojson: Json
           geometry_precise: boolean
           id: string
@@ -51,13 +52,16 @@ export type Database = {
           max_altitude_ft: number | null
           min_altitude_ft: number | null
           name: string
+          note: string | null
           source_edition: string
           source_sheet: string
+          weekdays_only: boolean
         }
         Insert: {
           altitude_text: string
           code?: string | null
           created_at?: string
+          drone_max_altitude_m?: number | null
           geom_geojson: Json
           geometry_precise?: boolean
           id?: string
@@ -65,13 +69,16 @@ export type Database = {
           max_altitude_ft?: number | null
           min_altitude_ft?: number | null
           name: string
+          note?: string | null
           source_edition: string
           source_sheet: string
+          weekdays_only?: boolean
         }
         Update: {
           altitude_text?: string
           code?: string | null
           created_at?: string
+          drone_max_altitude_m?: number | null
           geom_geojson?: Json
           geometry_precise?: boolean
           id?: string
@@ -79,8 +86,10 @@ export type Database = {
           max_altitude_ft?: number | null
           min_altitude_ft?: number | null
           name?: string
+          note?: string | null
           source_edition?: string
           source_sheet?: string
+          weekdays_only?: boolean
         }
         Relationships: []
       }

@@ -130,28 +130,31 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // (the pin / the polygon's centre), not on the size of the bubble.
   const terrain = useAltitudeCeiling(checkPoint);
   const terrainM = terrain.data?.terrainElevationM ?? null;
-  const authCheck = useMemo(
-    () =>
-      checkPoint
-        ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby, {
-            maxAltitudeAmslM: terrainM === null ? null : terrainM + maxAltitudeMeters,
-          })
-        : null,
-    [checkPoint, aipZones, isHobby, terrainM, maxAltitudeMeters]
-  );
-  const altitudeResult = useMemo(
-    () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
-    [checkPoint, aipZones]
-  );
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   // Once the pilot has picked a flight window, a NOTAM only counts if it overlaps that window (including ones that start later).
+  // Weekday-only areas follow the same window: a Saturday flight isn't held up by a weekday firing range.
   const notamWindow = useMemo(() => {
     if (!startTime || !endTime) return null;
     const start = new Date(startTime);
     const end = new Date(endTime);
     return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start ? null : { start, end };
   }, [startTime, endTime]);
+  const authCheck = useMemo(
+    () =>
+      checkPoint
+        ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby, {
+            maxAltitudeAmslM: terrainM === null ? null : terrainM + maxAltitudeMeters,
+            plannedAltitudeM: maxAltitudeMeters,
+            window: notamWindow,
+          })
+        : null,
+    [checkPoint, aipZones, isHobby, terrainM, maxAltitudeMeters, notamWindow]
+  );
+  const altitudeResult = useMemo(
+    () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones, notamWindow) : null),
+    [checkPoint, aipZones, notamWindow]
+  );
   const notamCheck = useMemo(
     () => (checkPoint ? checkLiveNotamOverlap(checkPoint, liveNotams, notamWindow) : null),
     [checkPoint, liveNotams, notamWindow]

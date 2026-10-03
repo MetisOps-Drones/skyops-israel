@@ -88,12 +88,16 @@ export function RequestDetailPanel({
   const terrain = useAltitudeCeiling(request ? [requestLng, requestLat] : null);
   const terrainM = terrain.data?.terrainElevationM ?? null;
   const requestAltitudeM = request ? Number(request.max_altitude_meters) : 0;
+  const requestStart = request?.start_time;
+  const requestEnd = request?.end_time;
   const authCheck = useMemo(
     () =>
       checkFlightAuthorizationRequirement([requestLng, requestLat], aipZones, false, {
         maxAltitudeAmslM: terrainM === null ? null : terrainM + requestAltitudeM,
+        plannedAltitudeM: requestAltitudeM,
+        window: requestStart && requestEnd ? { start: new Date(requestStart), end: new Date(requestEnd) } : null,
       }),
-    [requestLng, requestLat, aipZones, terrainM, requestAltitudeM]
+    [requestLng, requestLat, aipZones, terrainM, requestAltitudeM, requestStart, requestEnd]
   );
   const notamCheck = useMemo(
     () =>

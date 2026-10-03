@@ -3,6 +3,8 @@ import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 import type { ProximityFinding } from "@/lib/geo/proximity-check";
 import { AERODROME_RUNWAYS, type AerodromeRunway } from "@/lib/geo/aerodrome-runways";
 import { ftToM } from "@/lib/geo/aip";
+import { HOBBY_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
+import { zoneIsInForce } from "@/lib/geo/weekday-zones";
 
 /**
  * תקנות הטיס (הפעלת מטיסן / הפעלת כטב"ם קטן), תשפ"ד 2024 — "לא ניתן להטיס
@@ -261,6 +263,18 @@ export function checkFlightAuthorizationRequirement(
      * conservative default; never guess the ground).
      */
     maxAltitudeAmslM?: number | null;
+    /**
+     * Planned flight height above the ground, in meters. Areas that only limit small drones to a height
+     * (helicopter areas, the 100-ft area — `drone_max_altitude_m`) count only when this exceeds that cap.
+     * Omitted/null = not chosen yet: a hobby account is judged at its fixed ceiling, anyone else is assumed
+     * to fly above the cap.
+     */
+    plannedAltitudeM?: number | null;
+    /**
+     * The requested flight window. Weekday-only areas (`weekdays_only`) count only if the window touches a
+     * weekday; omitted = judged at the current moment (a point inspected on the map).
+     */
+    window?: { start: Date; end: Date } | null;
   }
 ): FlightAuthorizationCheck {
   const reasons: AuthorizationReason[] = [];
@@ -280,10 +294,13 @@ export function checkFlightAuthorizationRequirement(
   }
 
   const ceilingAmslM = options?.maxAltitudeAmslM ?? null;
+  const plannedAltitudeM = options?.plannedAltitudeM ?? (isHobby ? HOBBY_GENERAL_CEILING_M : null);
 
   for (const zone of zones) {
     const geom = zone.geom_geojson as unknown as GeoJSON.Geometry;
     if (!geom || geom.type !== "Polygon") continue;
+    if (!zoneIsInForce(zone, options?.window)) continue;
+    if (zone.drone_max_altitude_m != null && plannedAltitudeM !== null && plannedAltitudeM <= zone.drone_max_altitude_m) continue;
     if (ceilingAmslM !== null && zone.min_altitude_ft !== null && ftToM(zone.min_altitude_ft) > ceilingAmslM) continue;
 
     let inside = false;
@@ -295,7 +312,8 @@ export function checkFlightAuthorizationRequirement(
 
     if (inside) {
       raiseTo(blockLevelForKind(zone.kind));
-      reasons.push({ label: `בתוך ${zone.name}${zone.code ? ` (${zone.code})` : ""}`, zone });
+      const capNote = zone.drone_max_altitude_m != null ? ` — כטב"ם מעל ${zone.drone_max_altitude_m} מ' טעון תיאום` : "";
+      reasons.push({ label: `בתוך ${zone.name}${zone.code ? ` (${zone.code})` : ""}${capNote}`, zone });
     }
   }
 

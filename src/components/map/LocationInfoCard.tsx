@@ -432,6 +432,8 @@ export function LocationInfoCard({
                           <p className="text-xs font-medium">
                             {formatAltitudeRangeMeters(zone.min_altitude_ft, zone.max_altitude_ft)}
                           </p>
+                          {zone.weekdays_only && <p className="text-xs font-medium">בתוקף בימי חול בלבד</p>}
+                          {zone.note && <p className="mt-1 text-xs text-muted-foreground">{zone.note}</p>}
                           {!zone.geometry_precise && (
                             <p className="mt-1 text-xs text-warning">
                               * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת

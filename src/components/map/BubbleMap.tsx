@@ -35,6 +35,7 @@ import { AIP_ZONE_KIND_COLORS, AIP_ZONE_KIND_LABELS, LIVE_NOTAM_COLOR } from "@/
 import { notamsValidUntilLabel, isNotamActiveNow, formatNotamSchedule } from "@/lib/geo/live-notams";
 import type { LiveNotam } from "@/lib/notams/live-feed";
 import { formatAltitudeRangeMeters } from "@/lib/geo/aip";
+import { isWeekdayEditionAt } from "@/lib/geo/weekday-zones";
 import { FLIGHT_REQUEST_STATUS_COLORS, FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import {
   DEFAULT_MAP_BASE_STYLE,
@@ -237,11 +238,20 @@ export function BubbleMap({
       .filter((m): m is NonNullable<typeof m> => m !== null);
   }, [allCoordinations, layerVisibility.allCoordinations]);
 
+  // Weekday-only areas (ranges, helicopter areas) are drawn on weekdays only. Re-checked every minute
+  // so a map left open across Friday midday updates itself.
+  const [isWeekdayEdition, setIsWeekdayEdition] = useState(() => isWeekdayEditionAt(new Date()));
+  useEffect(() => {
+    const id = setInterval(() => setIsWeekdayEdition(isWeekdayEditionAt(new Date())), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const aipZonesGeojson = useMemo<GeoJSON.FeatureCollection>(
     () => ({
       type: "FeatureCollection",
       features: aipZones
         .filter((zone) => zone.geom_geojson && typeof zone.geom_geojson === "object")
+        .filter((zone) => isWeekdayEdition || !zone.weekdays_only)
         .map((zone) => ({
           type: "Feature",
           geometry: zone.geom_geojson as unknown as GeoJSON.Geometry,
@@ -253,10 +263,13 @@ export function BubbleMap({
             color: AIP_ZONE_KIND_COLORS[zone.kind],
             minAltitudeFt: zone.min_altitude_ft,
             maxAltitudeFt: zone.max_altitude_ft,
+            weekdaysOnly: Boolean(zone.weekdays_only),
+            droneMaxAltitudeM: zone.drone_max_altitude_m,
+            note: zone.note,
           },
         })),
     }),
-    [aipZones]
+    [aipZones, isWeekdayEdition]
   );
 
   const liveNotamsGeojson = useMemo<GeoJSON.FeatureCollection>(
@@ -756,6 +769,10 @@ export function BubbleMap({
                       (zonePopup.properties.maxAltitudeFt as number | null) ?? null
                     )}
                   </p>
+                  {zonePopup.properties.weekdaysOnly ? <p className="font-medium">בתוקף בימי חול בלבד</p> : null}
+                  {typeof zonePopup.properties.note === "string" && zonePopup.properties.note ? (
+                    <p className="max-w-[220px] text-muted-foreground">{zonePopup.properties.note}</p>
+                  ) : null}
                 </>
               ) : (
                 <>

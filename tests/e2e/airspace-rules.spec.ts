@@ -27,7 +27,8 @@ test.skip(!hasServiceKey, "Set SUPABASE_SERVICE_ROLE_KEY in .env.local to audit 
 
 let zones: AipReferenceZone[] = [];
 test.beforeAll(async () => {
-  zones = await loadAipZones();
+  // The weekday-only / height-capped areas have their own spec (weekday-zones.spec.ts); the oracle below models the standing layer.
+  zones = (await loadAipZones()).filter((z) => !z.weekdays_only);
 });
 
 const SEVERITY: Record<ZoneBlockLevel, number> = {

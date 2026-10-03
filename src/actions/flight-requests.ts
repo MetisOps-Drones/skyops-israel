@@ -85,10 +85,14 @@ async function evaluateFlightRequestSafety(
   // Ground elevation lets a zone whose floor is above anything the drone can reach (e.g. the 9,000 ft Tel
   // Aviv upper sector) be ignored. If the elevation lookup fails every zone counts — never a guessed ground.
   const terrainM = await fetchTerrainElevationM(centerPoint[1], centerPoint[0], 4_000);
+  // Weekday-only areas (ranges, helicopter areas) are checked against the weekdays inside the requested window.
+  const flightWindow = { start: data.start_time, end: data.end_time };
   const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby, {
     maxAltitudeAmslM: terrainM === null ? null : terrainM + data.max_altitude_meters,
+    plannedAltitudeM: data.max_altitude_meters,
+    window: flightWindow,
   });
-  const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
+  const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones, flightWindow);
 
   if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {
     const why = authCheck.reasons.map((r) => r.label).join("; ");
