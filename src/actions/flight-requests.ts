@@ -21,6 +21,7 @@ import {
 import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
 import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
 import { fetchLiveNotams } from "@/lib/notams/live-feed";
+import { fetchTerrainElevationM } from "@/lib/geo/terrain";
 import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { checkProximity } from "@/lib/geo/proximity-check";
@@ -81,7 +82,12 @@ async function evaluateFlightRequestSafety(
 
   // Zone and runway-distance rules are judged on the requested point, not
   // on the bubble drawn around it.
-  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby);
+  // Ground elevation lets a zone whose floor is above anything the drone can reach (e.g. the 9,000 ft Tel
+  // Aviv upper sector) be ignored. If the elevation lookup fails every zone counts — never a guessed ground.
+  const terrainM = await fetchTerrainElevationM(centerPoint[1], centerPoint[0], 4_000);
+  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby, {
+    maxAltitudeAmslM: terrainM === null ? null : terrainM + data.max_altitude_meters,
+  });
   const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
 
   if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {

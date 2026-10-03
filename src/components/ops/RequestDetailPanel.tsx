@@ -83,9 +83,17 @@ export function RequestDetailPanel({
   // live-notams.ts) — re-derived here rather than reading dispatcher_notes,
   // since that field is a flat human-readable string with no per-zone kind
   // to key the requirement text off of.
+  // The pilot enters meters above the ground; ATC/the AIP work in feet above sea level (מעפ"י) —
+  // so the coordinator sees both, converted with the ground elevation under the point.
+  const terrain = useAltitudeCeiling(request ? [requestLng, requestLat] : null);
+  const terrainM = terrain.data?.terrainElevationM ?? null;
+  const requestAltitudeM = request ? Number(request.max_altitude_meters) : 0;
   const authCheck = useMemo(
-    () => checkFlightAuthorizationRequirement([requestLng, requestLat], aipZones),
-    [requestLng, requestLat, aipZones]
+    () =>
+      checkFlightAuthorizationRequirement([requestLng, requestLat], aipZones, false, {
+        maxAltitudeAmslM: terrainM === null ? null : terrainM + requestAltitudeM,
+      }),
+    [requestLng, requestLat, aipZones, terrainM, requestAltitudeM]
   );
   const notamCheck = useMemo(
     () =>
@@ -96,10 +104,6 @@ export function RequestDetailPanel({
       ),
     [requestLng, requestLat, liveNotams, request]
   );
-
-  // The pilot enters meters above the ground; ATC/the AIP work in feet above sea level (מעפ"י) —
-  // so the coordinator sees both, converted with the ground elevation under the point.
-  const terrain = useAltitudeCeiling(request ? [requestLng, requestLat] : null);
 
   if (!request) return null;
 

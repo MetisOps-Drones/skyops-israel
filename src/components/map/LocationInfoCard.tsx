@@ -91,7 +91,12 @@ export function LocationInfoCard({
   // quietly retract one already shown.
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
-  const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones, isHobby) : null;
+  const terrainM = altitudeCeiling.data?.terrainElevationM ?? null;
+  const aipCheck = point
+    ? checkFlightAuthorizationRequirement(point, aipZones, isHobby, {
+        maxAltitudeAmslM: terrainM === null ? null : terrainM + conservativeAltitudeM,
+      })
+    : null;
   const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
   const notamUntil = notamCheck?.inside ? notamsValidUntilLabel(notamCheck.notams) : null;
   const notamHours = notamCheck?.inside ? notamsActivityLabel(notamCheck.notams) : null;

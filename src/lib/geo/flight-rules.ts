@@ -2,6 +2,7 @@ import * as turf from "@turf/turf";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 import type { ProximityFinding } from "@/lib/geo/proximity-check";
 import { AERODROME_RUNWAYS, type AerodromeRunway } from "@/lib/geo/aerodrome-runways";
+import { ftToM } from "@/lib/geo/aip";
 
 /**
  * תקנות הטיס (הפעלת מטיסן / הפעלת כטב"ם קטן), תשפ"ד 2024 — "לא ניתן להטיס
@@ -251,7 +252,16 @@ export function checkFlightAuthorizationRequirement(
   point: [number, number],
   zones: AipReferenceZone[],
   /** Hobby (מטיסן) has only the 2 km runway rule; any other caller gets the stricter commercial 3 km military rule (the safe default when the licence type isn't known). */
-  isHobby = false
+  isHobby = false,
+  options?: {
+    /**
+     * Highest altitude the drone can be at, in meters AMSL (ground elevation + planned altitude). A zone whose
+     * floor is above that can't touch the flight — e.g. the 9,000 ft Tel Aviv upper-control sector covers
+     * Tel Aviv, but no drone ever reaches it. Omitted/null = unknown, and every zone then counts (the
+     * conservative default; never guess the ground).
+     */
+    maxAltitudeAmslM?: number | null;
+  }
 ): FlightAuthorizationCheck {
   const reasons: AuthorizationReason[] = [];
   let blockLevel: ZoneBlockLevel = "none";
@@ -269,9 +279,12 @@ export function checkFlightAuthorizationRequirement(
     });
   }
 
+  const ceilingAmslM = options?.maxAltitudeAmslM ?? null;
+
   for (const zone of zones) {
     const geom = zone.geom_geojson as unknown as GeoJSON.Geometry;
     if (!geom || geom.type !== "Polygon") continue;
+    if (ceilingAmslM !== null && zone.min_altitude_ft !== null && ftToM(zone.min_altitude_ft) > ceilingAmslM) continue;
 
     let inside = false;
     try {

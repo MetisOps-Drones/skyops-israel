@@ -128,9 +128,16 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   // Zone and 2 km runway-distance rules are judged on the requested point
   // (the pin / the polygon's centre), not on the size of the bubble.
+  const terrain = useAltitudeCeiling(checkPoint);
+  const terrainM = terrain.data?.terrainElevationM ?? null;
   const authCheck = useMemo(
-    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby) : null),
-    [checkPoint, aipZones, isHobby]
+    () =>
+      checkPoint
+        ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby, {
+            maxAltitudeAmslM: terrainM === null ? null : terrainM + maxAltitudeMeters,
+          })
+        : null,
+    [checkPoint, aipZones, isHobby, terrainM, maxAltitudeMeters]
   );
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
@@ -231,7 +238,6 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
   // The pilot thinks in meters above the ground; ATC and the AIP in feet above sea level (מעפ"י).
   // Shown live so the conversion the coordinator will see is never a surprise.
-  const terrain = useAltitudeCeiling(checkPoint);
   const altitudeFt = mToFt(maxAltitudeMeters);
   const altitudeAmsl = altitudeAmslFt(maxAltitudeMeters, terrain.data?.terrainElevationM ?? null);
 
