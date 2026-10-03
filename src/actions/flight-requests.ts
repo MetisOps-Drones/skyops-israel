@@ -81,7 +81,7 @@ async function evaluateFlightRequestSafety(
 
   // Zone and runway-distance rules are judged on the requested point, not
   // on the bubble drawn around it.
-  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones);
+  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby);
   const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
 
   if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {

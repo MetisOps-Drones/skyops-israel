@@ -84,7 +84,7 @@ export function LocationInfoCard({
   // quietly retract one already shown.
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
-  const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
+  const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones, isHobby) : null;
   const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
   const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
   const fullCeiling = altitudeResult
@@ -393,7 +393,7 @@ export function LocationInfoCard({
                           )}
                           {(zone.kind === "CTR" || zone.kind === "ATZ") && (
                             <p className="mt-1 text-xs text-warning">
-                              אסור להטיס במרחק קטן מ-2 ק&quot;מ ממסלול השדה; מעבר לכך — נדרש תיאום מול מגדל הפיקוח
+                              אסור להטיס במרחק קטן מ-2 ק&quot;מ ממסלול השדה (3 ק&quot;מ משדה צבאי למפעיל מסחרי); מעבר לכך — נדרש תיאום מול מגדל הפיקוח
                             </p>
                           )}
                           {zone.kind === "DANGER" && (

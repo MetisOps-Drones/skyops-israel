@@ -129,8 +129,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // Zone and 2 km runway-distance rules are judged on the requested point
   // (the pin / the polygon's centre), not on the size of the bubble.
   const authCheck = useMemo(
-    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones) : null),
-    [checkPoint, aipZones]
+    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby) : null),
+    [checkPoint, aipZones, isHobby]
   );
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),

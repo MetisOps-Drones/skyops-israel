@@ -11,8 +11,18 @@ import { AERODROME_RUNWAYS, type AerodromeRunway } from "@/lib/geo/aerodrome-run
  * aerodrome-runways.ts) — not from the control zone's boundary and not from
  * the drawn bubble. Inside that distance: forbidden. Further out but still
  * inside the CTR/ATZ: flyable only with the tower's coordination.
+ *
+ * The commercial-operator regulation (הפעלת כטב"ם קטן) adds: "או צבאית
+ * במרחק שקטן מ-3 קילומטרים" — 3 km from a military airfield. The hobby
+ * regulation (הפעלת מטיסן) has only the 2 km.
  */
 export const AERODROME_FORBIDDEN_RADIUS_KM = 2;
+export const MILITARY_AERODROME_FORBIDDEN_RADIUS_KM = 3;
+
+/** The forbidden radius for one runway, by the kind of airfield and the licence type of the requester. */
+export function forbiddenRadiusKm(runway: AerodromeRunway, isHobby: boolean): number {
+  return runway.military && !isHobby ? MILITARY_AERODROME_FORBIDDEN_RADIUS_KM : AERODROME_FORBIDDEN_RADIUS_KM;
+}
 
 /**
  * PROHIBITED (LLP — "אזור אסור"): "אין להטיס באזור אסור". The only way in is
@@ -150,7 +160,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
         tone: "forbidden",
         headline: "אסור להטיס באזור זה",
         detail:
-          'לפי הפמ"ת והתקנות: אזור אסור, או מרחק קטן מ-2 ק"מ ממסלול של שדה תעופה / בסיס חיל אוויר. הטסה כאן אפשרית רק באישור מראש של הגורם השולט מחוץ למערכת — אין מסלול בקשת תיאום עבור נקודה זו.',
+          'לפי הפמ"ת והתקנות: אזור אסור, או מרחק קטן מ-2 ק"מ ממסלול של שדה תעופה (3 ק"מ משדה צבאי למפעיל מסחרי). הטסה כאן אפשרית רק באישור מראש של הגורם השולט מחוץ למערכת — אין מסלול בקשת תיאום עבור נקודה זו.',
         canSubmit: false,
         upgradeHelps: false,
       };
@@ -175,7 +185,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
         tone: "warning",
         headline: "בתוך מרחב מבוקר (CTR/ATZ) — נדרש תיאום מול מגדל הפיקוח",
         detail:
-          'מעבר ל-2 ק"מ מהמסלול, טיסה בתוך המרחב המבוקר מותרת רק באישור מראש של מגדל הפיקוח. ניתן להגיש בקשת תיאום — המוקדן יתאם מול המגדל ויאמת מול NOTAM עדכני לפני אישור.',
+          'מעבר למרחק האסור מהמסלול (2 ק"מ, ו-3 ק"מ משדה צבאי למפעיל מסחרי), טיסה בתוך המרחב המבוקר מותרת רק באישור מראש של מגדל הפיקוח. ניתן להגיש בקשת תיאום — המוקדן יתאם מול המגדל ויאמת מול NOTAM עדכני לפני אישור.',
         canSubmit: true,
         upgradeHelps: false,
       };
@@ -204,26 +214,33 @@ export interface FlightAuthorizationCheck {
 }
 
 /**
- * The nearest aerodrome/base runway to a point, and how far away it is —
- * the distance the 2 km rule is about. Measured from the point itself.
+ * The aerodrome/base runway the point is most inside the forbidden distance
+ * of (smallest distance minus that runway's own radius — a military base's
+ * 3 km can outrank a civil strip that is closer in absolute terms), with the
+ * distance and the radius that applies. Measured from the point itself.
  */
-export function nearestRunway(point: [number, number]): { runway: AerodromeRunway; distanceKm: number } | null {
+export function nearestRunway(
+  point: [number, number],
+  isHobby: boolean
+): { runway: AerodromeRunway; distanceKm: number; radiusKm: number } | null {
   const turfPoint = turf.point(point);
-  let best: { runway: AerodromeRunway; distanceKm: number } | null = null;
+  let best: { runway: AerodromeRunway; distanceKm: number; radiusKm: number } | null = null;
   for (const runway of AERODROME_RUNWAYS) {
     if (runway.line.length < 2) continue;
     const distanceKm = turf.pointToLineDistance(turfPoint, turf.lineString(runway.line), { units: "kilometers" });
-    if (!best || distanceKm < best.distanceKm) best = { runway, distanceKm };
+    const radiusKm = forbiddenRadiusKm(runway, isHobby);
+    if (!best || distanceKm - radiusKm < best.distanceKm - best.radiusKm) best = { runway, distanceKm, radiusKm };
   }
   return best;
 }
 
 /**
  * What the airspace at a point means for a flight request:
- *   - within 2 km of any aerodrome/base runway, or inside a prohibited area:
- *     forbidden, no submit path;
- *   - inside a CTR/ATZ but 2 km or more from the runway: coordination with
- *     the tower;
+ *   - within 2 km of any aerodrome runway (3 km of a military airfield for a
+ *     commercial operator), or inside a prohibited area: forbidden, no
+ *     submit path;
+ *   - inside a CTR/ATZ but beyond that distance: coordination with the
+ *     tower;
  *   - dangerous area: director approval (organization accounts only);
  *   - restricted area: coordination under the area's conditions.
  * Always judged on the requested point (the pin), never on the size of the
@@ -232,7 +249,9 @@ export function nearestRunway(point: [number, number]): { runway: AerodromeRunwa
  */
 export function checkFlightAuthorizationRequirement(
   point: [number, number],
-  zones: AipReferenceZone[]
+  zones: AipReferenceZone[],
+  /** Hobby (מטיסן) has only the 2 km runway rule; any other caller gets the stricter commercial 3 km military rule (the safe default when the licence type isn't known). */
+  isHobby = false
 ): FlightAuthorizationCheck {
   const reasons: AuthorizationReason[] = [];
   let blockLevel: ZoneBlockLevel = "none";
@@ -241,11 +260,11 @@ export function checkFlightAuthorizationRequirement(
     if (BLOCK_LEVEL_SEVERITY[level] > BLOCK_LEVEL_SEVERITY[blockLevel]) blockLevel = level;
   }
 
-  const near = nearestRunway(point);
-  if (near && near.distanceKm < AERODROME_FORBIDDEN_RADIUS_KM) {
+  const near = nearestRunway(point, isHobby);
+  if (near && near.distanceKm < near.radiusKm) {
     raiseTo("forbidden");
     reasons.push({
-      label: `במרחק ${near.distanceKm.toFixed(1)} ק"מ ממסלול ${near.runway.name} — נדרשים לפחות ${AERODROME_FORBIDDEN_RADIUS_KM} ק"מ`,
+      label: `במרחק ${near.distanceKm.toFixed(1)} ק"מ ממסלול ${near.runway.name} — נדרשים לפחות ${near.radiusKm} ק"מ`,
       zone: null,
     });
   }
