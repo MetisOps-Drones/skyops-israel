@@ -1,35 +1,34 @@
 import * as turf from "@turf/turf";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 import type { ProximityFinding } from "@/lib/geo/proximity-check";
+import { AERODROME_RUNWAYS, type AerodromeRunway } from "@/lib/geo/aerodrome-runways";
 
 /**
  * תקנות הטיס (הפעלת מטיסן / הפעלת כטב"ם קטן), תשפ"ד 2024 — "לא ניתן להטיס
  * בתחום שהמרחק בין גבולותיו לבין כל נקודה על מסלול שדה תעופה קטן מ-2
- * קילומטרים (או אם נקבע מרחק גדול יותר בפמ"ת)". Measured here from the
- * drawn CTR/ATZ boundary, which sits well outside any runway, so it's the
- * conservative side of the same rule (the 3 km military-airfield clause for
- * a commercial operator is covered the same way — every air force base has
- * a CTR much wider than 3 km, plus the CAAI base-restriction polygons).
+ * קילומטרים (או אם נקבע מרחק גדול יותר בפמ"ת)". Measured from the requested
+ * point to the nearest point on the aerodrome/base RUNWAY (see
+ * aerodrome-runways.ts) — not from the control zone's boundary and not from
+ * the drawn bubble. Inside that distance: forbidden. Further out but still
+ * inside the CTR/ATZ: flyable only with the tower's coordination.
  */
-const AIRPORT_BUFFER_KM = 2;
+export const AERODROME_FORBIDDEN_RADIUS_KM = 2;
 
 /**
- * CTR/ATZ ("אזור פיקוח" / "אזור פיקוח שדה") and PROHIBITED (LLP — "אזור
- * אסור", which also carries the CAAI air-force-base restriction polygons).
- * The regulations are unambiguous: "לא ניתן להטיס באזור פיקוח, באזור פיקוח
- * שדה או באזור שדה" and "אין להטיס באזור אסור". The only way in is an
- * approval the controlling ATC unit/CAAI gives outside this app — so this
- * is a hard "forbidden", never a "requires coordination" with a submit
- * button (that wording is what made a point 4 km from the Hatzor base read
- * as "just coordinate it").
+ * PROHIBITED (LLP — "אזור אסור"): "אין להטיס באזור אסור". The only way in is
+ * an approval the CAAI gives outside this app, so this is a hard "forbidden"
+ * with no submit path — same as being within 2 km of a runway.
  */
-const FORBIDDEN_KINDS = new Set(["CTR", "ATZ", "PROHIBITED"]);
+const FORBIDDEN_KINDS = new Set(["PROHIBITED"]);
 
-/** Only a real aerodrome's own zones get the 2 km distance rule — a TMA/CTA floor is far above any drone. */
-const AIRPORT_BUFFER_KINDS = new Set(["CTR", "ATZ"]);
-
-/** TMA/CTA — controlled airspace that starts above the ground. A warning and a dispatcher check, not a block. */
-const CONTROLLED_AIRSPACE_KINDS = new Set(["TMA", "CTA"]);
+/**
+ * CTR/ATZ ("אזור פיקוח" / "אזור פיקוח שדה") and TMA/CTA. Past the 2 km
+ * runway distance above, a flight inside is allowed "על בסיס האישור" the
+ * controlling ATC unit gives — i.e. exactly a coordination request the
+ * dispatcher takes to the tower. A warning with a submit path, never
+ * auto-cleared (see actions/flight-requests.ts).
+ */
+const CONTROLLED_AIRSPACE_KINDS = new Set(["CTR", "ATZ", "TMA", "CTA"]);
 
 /**
  * DANGER (LLD — "אזור מסוכן"). Same clause as PROHIBITED in the law ("אין
@@ -102,9 +101,9 @@ export function findingsRequiringAuthorization(
 
 export type ZoneBlockLevel =
   | "none"
-  /** Controlled airspace that starts above the ground (TMA/CTA): flag it, a dispatcher verifies, still submittable. */
+  /** Inside a controlled zone (CTR/ATZ/TMA/CTA) but 2 km or more from the runway: needs the tower's coordination, still submittable. */
   | "controlled_airspace"
-  /** Hard block for every account: inside/within 2 km of a CTR/ATZ, a prohibited area, or an air-force-base restriction. */
+  /** Hard block for every account: a prohibited area, or within 2 km of an aerodrome/base runway. */
   | "forbidden"
   /** Dangerous area: blocked in-app for a solo account; an org may submit while the dispatcher chases the CAAI director's sign-off. */
   | "director_approval_only"
@@ -151,7 +150,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
         tone: "forbidden",
         headline: "אסור להטיס באזור זה",
         detail:
-          'לפי הפמ"ת והתקנות: אזור פיקוח / שדה תעופה / בסיס חיל אוויר / אזור אסור. הטסה כאן אפשרית רק באישור מראש של הגורם השולט מחוץ למערכת — אין מסלול בקשת תיאום עבור נקודה זו.',
+          'לפי הפמ"ת והתקנות: אזור אסור, או מרחק קטן מ-2 ק"מ ממסלול של שדה תעופה / בסיס חיל אוויר. הטסה כאן אפשרית רק באישור מראש של הגורם השולט מחוץ למערכת — אין מסלול בקשת תיאום עבור נקודה זו.',
         canSubmit: false,
         upgradeHelps: false,
       };
@@ -174,8 +173,9 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "controlled_airspace":
       return {
         tone: "warning",
-        headline: "מרחב אווירי מבוקר באזור — נדרשת בדיקה ידנית",
-        detail: "ניתן להגיש בקשת תיאום — המוקדן יאמת מול הגורם השולט ו-NOTAM עדכני לפני אישור.",
+        headline: "בתוך מרחב מבוקר (CTR/ATZ) — נדרש תיאום מול מגדל הפיקוח",
+        detail:
+          'מעבר ל-2 ק"מ מהמסלול, טיסה בתוך המרחב המבוקר מותרת רק באישור מראש של מגדל הפיקוח. ניתן להגיש בקשת תיאום — המוקדן יתאם מול המגדל ויאמת מול NOTAM עדכני לפני אישור.',
         canSubmit: true,
         upgradeHelps: false,
       };
@@ -204,29 +204,50 @@ export interface FlightAuthorizationCheck {
 }
 
 /**
- * What an AIP reference zone at this point means for coordination: fully
- * blocked (controlled airspace — no exception exists), blocked pending a
- * manual director approval (prohibited/danger), or a normal
- * conditions-based coordination request (restricted). Also flags
- * proximity to an airport control zone (CTR/ATZ/TMA) even just outside its
- * drawn boundary. Same advisory-data caveat as the AIP layer itself — see
- * 0024_aip_zones_real_polygons.sql.
+ * The nearest aerodrome/base runway to a point, and how far away it is —
+ * the distance the 2 km rule is about. Measured from the point itself.
+ */
+export function nearestRunway(point: [number, number]): { runway: AerodromeRunway; distanceKm: number } | null {
+  const turfPoint = turf.point(point);
+  let best: { runway: AerodromeRunway; distanceKm: number } | null = null;
+  for (const runway of AERODROME_RUNWAYS) {
+    if (runway.line.length < 2) continue;
+    const distanceKm = turf.pointToLineDistance(turfPoint, turf.lineString(runway.line), { units: "kilometers" });
+    if (!best || distanceKm < best.distanceKm) best = { runway, distanceKm };
+  }
+  return best;
+}
+
+/**
+ * What the airspace at a point means for a flight request:
+ *   - within 2 km of any aerodrome/base runway, or inside a prohibited area:
+ *     forbidden, no submit path;
+ *   - inside a CTR/ATZ but 2 km or more from the runway: coordination with
+ *     the tower;
+ *   - dangerous area: director approval (organization accounts only);
+ *   - restricted area: coordination under the area's conditions.
+ * Always judged on the requested point (the pin), never on the size of the
+ * bubble drawn around it. Same advisory-data caveat as the AIP layer itself
+ * — see 0024_aip_zones_real_polygons.sql.
  */
 export function checkFlightAuthorizationRequirement(
   point: [number, number],
-  zones: AipReferenceZone[],
-  /** The requested flight footprint (circle/drawn polygon). Omit for a bare point inspection. */
-  footprint?: GeoJSON.Polygon | null,
-  /** Radius of a circular footprint, so the 2 km rule is measured from its edge rather than its centre. */
-  radiusM?: number
+  zones: AipReferenceZone[]
 ): FlightAuthorizationCheck {
   const reasons: AuthorizationReason[] = [];
   let blockLevel: ZoneBlockLevel = "none";
-  const turfPoint = turf.point(point);
-  const footprintEdgeKm = footprint && radiusM ? radiusM / 1000 : 0;
 
   function raiseTo(level: ZoneBlockLevel) {
     if (BLOCK_LEVEL_SEVERITY[level] > BLOCK_LEVEL_SEVERITY[blockLevel]) blockLevel = level;
+  }
+
+  const near = nearestRunway(point);
+  if (near && near.distanceKm < AERODROME_FORBIDDEN_RADIUS_KM) {
+    raiseTo("forbidden");
+    reasons.push({
+      label: `במרחק ${near.distanceKm.toFixed(1)} ק"מ ממסלול ${near.runway.name} — נדרשים לפחות ${AERODROME_FORBIDDEN_RADIUS_KM} ק"מ`,
+      zone: null,
+    });
   }
 
   for (const zone of zones) {
@@ -235,40 +256,14 @@ export function checkFlightAuthorizationRequirement(
 
     let inside = false;
     try {
-      // A bubble whose edge crosses into the zone is in the zone as far as
-      // the rules go — the centre alone can sit outside it.
-      inside =
-        turf.booleanPointInPolygon(point, geom as GeoJSON.Polygon) ||
-        Boolean(footprint && turf.booleanIntersects(footprint, geom as GeoJSON.Polygon));
+      inside = turf.booleanPointInPolygon(point, geom as GeoJSON.Polygon);
     } catch {
       continue;
     }
 
-    const zoneLabel = `${zone.name}${zone.code ? ` (${zone.code})` : ""}`;
-
     if (inside) {
       raiseTo(blockLevelForKind(zone.kind));
-      reasons.push({ label: `בתוך ${zoneLabel}`, zone });
-      continue;
-    }
-
-    if (AIRPORT_BUFFER_KINDS.has(zone.kind)) {
-      try {
-        const outline = turf.polygonToLine(geom as GeoJSON.Polygon) as GeoJSON.Feature<GeoJSON.LineString>;
-        const distanceKm = Math.max(
-          0,
-          turf.pointToLineDistance(turfPoint, outline, { units: "kilometers" }) - footprintEdgeKm
-        );
-        if (distanceKm < AIRPORT_BUFFER_KM) {
-          raiseTo("forbidden");
-          reasons.push({
-            label: `במרחק ${distanceKm.toFixed(1)} ק"מ מ${zoneLabel} — נדרשים לפחות ${AIRPORT_BUFFER_KM} ק"מ`,
-            zone,
-          });
-        }
-      } catch {
-        // degenerate geometry — skip rather than block on a data error
-      }
+      reasons.push({ label: `בתוך ${zone.name}${zone.code ? ` (${zone.code})` : ""}`, zone });
     }
   }
 

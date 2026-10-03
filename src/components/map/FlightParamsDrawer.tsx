@@ -126,25 +126,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     return null;
   }, [shapeType, center, polygon]);
 
-  // The bubble's real footprint, not just its centre: the zone rules apply
-  // to wherever the drone can actually be, and the 2 km airport distance is
-  // measured from the bubble's edge.
-  const footprint = useMemo<GeoJSON.Polygon | null>(() => {
-    if (shapeType === "polygon") return polygon ?? null;
-    if (center) return turf.circle(center, Math.max(radiusMeters, 10) / 1000, { units: "kilometers" }).geometry;
-    return null;
-  }, [shapeType, center, radiusMeters, polygon]);
+  // Zone and 2 km runway-distance rules are judged on the requested point
+  // (the pin / the polygon's centre), not on the size of the bubble.
   const authCheck = useMemo(
-    () =>
-      checkPoint
-        ? checkFlightAuthorizationRequirement(
-            checkPoint,
-            aipZones,
-            footprint,
-            shapeType === "circle" ? Math.max(radiusMeters, 10) : 0
-          )
-        : null,
-    [checkPoint, aipZones, footprint, shapeType, radiusMeters]
+    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones) : null),
+    [checkPoint, aipZones]
   );
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),

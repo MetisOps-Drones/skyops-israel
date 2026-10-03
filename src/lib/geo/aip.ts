@@ -10,16 +10,17 @@ export interface AipMaxAltitudeResult {
   zones: AipReferenceZone[];
 }
 
-/** A ground-based zone of one of these kinds means no legal altitude exists at all (CTR/ATZ/prohibited — see flight-rules.ts FORBIDDEN_KINDS). */
-const GROUND_BLOCKING_KINDS = new Set(["CTR", "ATZ", "PROHIBITED"]);
+/** A ground-based zone of one of these kinds means no legal altitude exists at all (prohibited areas — see flight-rules.ts FORBIDDEN_KINDS). */
+const GROUND_BLOCKING_KINDS = new Set(["PROHIBITED"]);
 
 /**
- * RESTRICTED/DANGER are governed by an approval path (the area's conditions /
- * the controlling authority / the CAAI director), not by an altitude ceiling
- * of 0 — letting their GND floor zero the ceiling made a restricted area read
- * as flatly "אסור" and an organization's director-approval route unreachable.
+ * CTR/ATZ/RESTRICTED/DANGER are governed by an approval path (the tower's
+ * coordination / the area's conditions / the CAAI director) — and, for an
+ * aerodrome, by the 2 km runway distance in flight-rules.ts — not by an
+ * altitude ceiling of 0. Letting their GND floor zero the ceiling made a
+ * whole control zone read as flatly "אסור" even 10 km from the runway.
  */
-const APPROVAL_PATH_KINDS = new Set(["RESTRICTED", "DANGER"]);
+const APPROVAL_PATH_KINDS = new Set(["CTR", "ATZ", "RESTRICTED", "DANGER"]);
 
 /**
  * Derives "what's the highest altitude I can legally fly at this exact

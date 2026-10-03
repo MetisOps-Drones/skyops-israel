@@ -386,9 +386,14 @@ export function LocationInfoCard({
                               * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת
                             </p>
                           )}
-                          {(zone.kind === "PROHIBITED" || zone.kind === "CTR" || zone.kind === "ATZ") && (
+                          {zone.kind === "PROHIBITED" && (
                             <p className="mt-1 text-xs text-destructive">
                               אסור להטיס כאן — אין מסלול בקשת תיאום דרך המערכת, בכל סוג חשבון
+                            </p>
+                          )}
+                          {(zone.kind === "CTR" || zone.kind === "ATZ") && (
+                            <p className="mt-1 text-xs text-warning">
+                              אסור להטיס במרחק קטן מ-2 ק&quot;מ ממסלול השדה; מעבר לכך — נדרש תיאום מול מגדל הפיקוח
                             </p>
                           )}
                           {zone.kind === "DANGER" && (

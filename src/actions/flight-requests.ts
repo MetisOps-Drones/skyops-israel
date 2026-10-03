@@ -72,9 +72,6 @@ async function evaluateFlightRequestSafety(
   }
   const aipZones = (aipZonesRaw ?? []) as AipReferenceZone[];
 
-  // The footprint (not just its centre) is what must stay out of a
-  // forbidden zone — a 300 m bubble centred 100 m outside a CTR still
-  // flies inside it.
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
       ? data.polygon
@@ -82,12 +79,9 @@ async function evaluateFlightRequestSafety(
           units: "kilometers",
         }).geometry;
 
-  const authCheck = checkFlightAuthorizationRequirement(
-    centerPoint,
-    aipZones,
-    footprint as GeoJSON.Polygon,
-    data.request_type === "basic_auto_100m" ? data.radius_meters ?? 100 : 0
-  );
+  // Zone and runway-distance rules are judged on the requested point, not
+  // on the bubble drawn around it.
+  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones);
   const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
 
   if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {
