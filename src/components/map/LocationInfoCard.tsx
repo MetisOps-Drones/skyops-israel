@@ -292,6 +292,34 @@ export function LocationInfoCard({
               </div>
             )}
 
+            {/* Right under the verdict, so what the pilot can DO about it is visible without
+                scrolling. cannotSubmit/requiresAttention come from the same not-yet-loaded
+                checks as the banner, so nothing renders until isChecking clears. A
+                zone-forbidden point is fully explained by the red banner above — no second
+                box; this covers the "blocked for hobby by a special authorization" case plus
+                the submit button for everything submittable. */}
+            {!forbiddenByAirspace &&
+              !isChecking &&
+              (cannotSubmit ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <Lock className="h-4 w-4" />
+                    לא ניתן לתאם טיסה באזור זה מחשבון פרטי
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
+                    ופנאי) אינו זכאי לה.
+                  </p>
+                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
+                    שדרוג לחשבון עסקי מהפרופיל שלכם ←
+                  </Link>
+                </div>
+              ) : requiresAttention ? (
+                <Button size="lg" onClick={() => onRequestCoordination(point)}>
+                  בקשת תיאום לנקודה זו
+                </Button>
+              ) : null)}
+
             {/* Primary safety signal: distance to the nearest real building footprint
                 (/api/building-proximity — the R2 bitmap grid built from the same
                 VIDA/Overture dataset the map's building tiles render from), not OSM's
@@ -518,35 +546,6 @@ export function LocationInfoCard({
                 </div>
               </Disclosure>
             )}
-
-            {/* Same reasoning as the verdict banner above: cannotSubmit/requiresAttention are
-                derived from the same not-yet-loaded checks, so no action (or "can't request")
-                signal should render until isChecking clears either. */}
-            {/* A zone-forbidden point is already fully explained by the banner at the top
-                (and answers immediately) — repeating it here would just be a second copy of
-                the same red box. This section only covers the "blocked for hobby by a special
-                authorization" case plus the submit button for everything submittable. */}
-            {!forbiddenByAirspace &&
-              !isChecking &&
-              (cannotSubmit ? (
-                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
-                    <Lock className="h-4 w-4" />
-                    לא ניתן לתאם טיסה באזור זה מחשבון פרטי
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                    ופנאי) אינו זכאי לה.
-                  </p>
-                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                    שדרוג לחשבון עסקי מהפרופיל שלכם ←
-                  </Link>
-                </div>
-              ) : requiresAttention ? (
-                <Button size="lg" onClick={() => onRequestCoordination(point)}>
-                  בקשת תיאום לנקודה זו
-                </Button>
-              ) : null)}
 
             <p className="text-[11px] text-muted-foreground">
               לא לניווט — אינו תחליף לבדיקה רשמית לפני טיסה. האחריות על המטיס.
