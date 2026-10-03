@@ -53,7 +53,7 @@ export function GreetingHero({
       <h1 className="mt-1 text-2xl font-bold">
         {greeting}, {firstName}
       </h1>
-      <p className="mt-1 text-sm text-brand-navy-foreground/75">הנה מה שקורה היום ב-MetisOps שלך</p>
+      <p className="mt-1 text-sm text-brand-navy-foreground/75">הנה מה שקורה היום ב-Metisim שלך</p>
 
       {showPilotStats && (
         <div className="mt-5 flex flex-wrap gap-3">

@@ -16,7 +16,7 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "MetisOps — ניהול תפעול רחפנים",
+  title: "Metisim — ניהול תפעול רחפנים",
   description:
     "פלטפורמת תיאום מרחב אווירי, בקרת רישיונות, יומן טיסות ו-LMS למפעילי רחפנים בישראל.",
 };

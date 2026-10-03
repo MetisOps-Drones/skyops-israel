@@ -30,31 +30,32 @@ import {
   PROXIMITY_CATEGORY_REGULATION,
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
 import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
-import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
+import { maxLegalAltitudeAtPoint, mToFt, altitudeAmslFt } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
 import { ClearanceBadge } from "./ClearanceBadge";
 import { PreFlightChecklist } from "./PreFlightChecklist";
 import { WeatherPanel } from "./WeatherPanel";
+import { BoundedNumberInput, MIN_RADIUS_M, MAX_RADIUS_M } from "./BoundedNumberInput";
 import { createFlightRequest } from "@/actions/flight-requests";
 import { DroneQuickRegisterCard } from "@/components/onboarding/DroneQuickRegisterCard";
-import { ALTITUDE_BAND_METERS, type FlightAltitudeBand } from "@/lib/validations/flight-request";
+import {
+  altitudeBandForMeters,
+  CAMERA_TYPE_LABELS,
+  MIN_TAKEDOWN_SECONDS,
+  MAX_TAKEDOWN_SECONDS,
+  type CameraType,
+} from "@/lib/validations/flight-request";
+import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
+import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
 import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import { cn } from "@/lib/utils";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useCoordinationQuota } from "@/hooks/useCoordinationQuota";
 import { useMyLicenses, useHasValidInsurance } from "@/hooks/useLicenses";
 import { resolveLicenseRequirement } from "@/lib/validations/flight-request-requirements";
-
-const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
-  { value: "under_50m", label: "עד 50 מטר" },
-  { value: "under_100m", label: "עד 100 מטר" },
-  { value: "over_100m", label: "מעל 100 מטר (דורש אישור מיוחד)" },
-];
-
-/** תקנות הטיס (הפעלת מטיסן), תשפ"ד 2024: תקרת הגובה למטיסן היא 50 מ' קבועים — אין ל"ספורט ופנאי" מסלול חוקי לגובה גבוה יותר, לא רק "מעל 100 מ' דורש אישור" כמו בכטב"ם המסחרי. */
-const HOBBY_ALTITUDE_OPTIONS = ALTITUDE_OPTIONS.filter((opt) => opt.value === "under_50m");
 
 export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const {
@@ -64,14 +65,18 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     radiusMeters,
     setRadiusMeters,
     polygon,
-    altitudeBand,
-    setAltitudeBand,
+    maxAltitudeMeters,
+    setMaxAltitudeMeters,
     flightPurpose,
     setFlightPurpose,
     droneId,
     setDroneId,
     emergencyContactPhone,
     setEmergencyContactPhone,
+    cameraType,
+    setCameraType,
+    takedownResponseSeconds,
+    setTakedownResponseSeconds,
     reset,
   } = useMapDrawStore();
 
@@ -83,7 +88,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const { data: liveNotams = [], isLoading: liveNotamsLoading } = useLiveNotamZones();
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
-  const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
+  // תקנות הטיס (הפעלת מטיסן), תשפ"ד 2024: 50 מ' קבועים למטיסן — אין ל"ספורט ופנאי" מסלול חוקי לגובה גבוה יותר; לכטב"ם קטן 100 מ'.
+  const altitudeCeilingM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
 
   const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
   const { data: hasValidInsurance, isLoading: insuranceLoading } = useHasValidInsurance();
@@ -120,9 +126,25 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     return null;
   }, [shapeType, center, polygon]);
 
+  // The bubble's real footprint, not just its centre: the zone rules apply
+  // to wherever the drone can actually be, and the 2 km airport distance is
+  // measured from the bubble's edge.
+  const footprint = useMemo<GeoJSON.Polygon | null>(() => {
+    if (shapeType === "polygon") return polygon ?? null;
+    if (center) return turf.circle(center, Math.max(radiusMeters, 10) / 1000, { units: "kilometers" }).geometry;
+    return null;
+  }, [shapeType, center, radiusMeters, polygon]);
   const authCheck = useMemo(
-    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones) : null),
-    [checkPoint, aipZones]
+    () =>
+      checkPoint
+        ? checkFlightAuthorizationRequirement(
+            checkPoint,
+            aipZones,
+            footprint,
+            shapeType === "circle" ? Math.max(radiusMeters, 10) : 0
+          )
+        : null,
+    [checkPoint, aipZones, footprint, shapeType, radiusMeters]
   );
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
@@ -138,7 +160,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // already chosen here — the legal minimum distance from infrastructure for a מטיס (commercial)
   // is the flight altitude itself (תקנה 32), so this uses the real selected altitude, not a
   // conservative placeholder.
-  const plannedAltitudeM = ALTITUDE_BAND_METERS[altitudeBand];
+  const plannedAltitudeM = maxAltitudeMeters;
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, plannedAltitudeM);
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
   // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
@@ -166,8 +188,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // approval — only an organization account may submit here (the dispatcher
   // still has to chase that approval manually); hobby/solo-pro cannot.
   const zoneBlockLevel = authCheck?.blockLevel ?? "none";
-  const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
+  const zoneVerdict = zoneVerdictFor(zoneBlockLevel, hasOrg);
+  const zoneHardBlocked = !zoneVerdict.canSubmit;
   const matchingRegulations = Array.from(
     new Set([
       ...relevantProximityFindings
@@ -188,6 +210,10 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     groundBlockedByAltitude ||
     buildingCheckUnavailable;
   const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+  // Airspace alone (local data, instant) already forbids this point — see the same note in
+  // LocationInfoCard: the slower building/OSM checks can't change that, and a purchasable
+  // special authorization can't legalize flying inside a CTR or a base restriction.
+  const forbiddenByAirspace = !aipZonesLoading && (groundBlockedByAltitude || zoneHardBlocked);
   // Same reasoning as LocationInfoCard: requiresAttention is derived from
   // aipZones/proximity/buildingProximity, all async — while any is still
   // loading, don't show (or let a hobby pilot act on) a premature "fine to
@@ -203,15 +229,18 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Coordination is arbitrarily capped for hobby pilots — if the store still
-  // holds a band they're no longer allowed to pick (e.g. left over from a
-  // previous session), pull it back down instead of silently submitting a
-  // request the server will reject anyway.
+  // The ceiling differs by licence type — if the store still holds an altitude above what this
+  // account may legally request (e.g. left over from a previous session), pull it back down
+  // instead of silently submitting a request the server will reject anyway.
   useEffect(() => {
-    if (isHobby && altitudeBand !== "under_50m") {
-      setAltitudeBand("under_50m");
-    }
-  }, [isHobby, altitudeBand, setAltitudeBand]);
+    if (maxAltitudeMeters > altitudeCeilingM) setMaxAltitudeMeters(altitudeCeilingM);
+  }, [maxAltitudeMeters, altitudeCeilingM, setMaxAltitudeMeters]);
+
+  // The pilot thinks in meters above the ground; ATC and the AIP in feet above sea level (מעפ"י).
+  // Shown live so the conversion the coordinator will see is never a surprise.
+  const terrain = useAltitudeCeiling(checkPoint);
+  const altitudeFt = mToFt(maxAltitudeMeters);
+  const altitudeAmsl = altitudeAmslFt(maxAltitudeMeters, terrain.data?.terrainElevationM ?? null);
 
   const canSubmit =
     !blockedForSolo &&
@@ -221,15 +250,15 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     !(isChecking && isHobby) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
+    Boolean(cameraType) &&
+    takedownResponseSeconds !== null &&
     Boolean(startTime && endTime) &&
     ((shapeType === "circle" && Boolean(center)) || (shapeType === "polygon" && Boolean(polygon)));
 
   async function handleSubmit() {
-    if (!canSubmit || !center) return;
+    if (!canSubmit || !center || !cameraType || takedownResponseSeconds === null) return;
     setSubmitting(true);
     try {
-      const altitudeMeters = ALTITUDE_BAND_METERS[altitudeBand];
-
       const result = await createFlightRequest({
         drone_id: droneId!,
         request_type: shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble",
@@ -239,9 +268,11 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           shapeType === "polygon" && polygon
             ? { type: "Polygon", coordinates: polygon.coordinates as [number, number][][] }
             : undefined,
-        altitude_band: altitudeBand,
+        altitude_band: altitudeBandForMeters(maxAltitudeMeters),
         flight_purpose: flightPurpose,
-        max_altitude_meters: altitudeMeters,
+        max_altitude_meters: maxAltitudeMeters,
+        camera_type: cameraType,
+        takedown_response_seconds: takedownResponseSeconds,
         start_time: new Date(startTime),
         end_time: new Date(endTime),
         emergency_contact_phone: emergencyContactPhone,
@@ -273,6 +304,36 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
         </DialogHeader>
 
         <div className="mt-4 flex flex-col gap-5">
+          {forbiddenByAirspace && (
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+              <Lock className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-base font-semibold">
+                  {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                    ? zoneVerdictFor("forbidden", hasOrg).headline
+                    : zoneVerdict.headline}
+                </p>
+                {authCheck && authCheck.reasons.length > 0 && (
+                  <ul className="mt-1 list-inside list-disc text-sm">
+                    {authCheck.reasons.map((reason, i) => (
+                      <li key={i}>{reason.label}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-1 text-sm">
+                  {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                    ? zoneVerdictFor("forbidden", hasOrg).detail
+                    : zoneVerdict.detail}
+                </p>
+                {zoneVerdict.upgradeHelps && (
+                  <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
+                    מה כן אפשר: לשדרג לחשבון ארגון ←
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -315,32 +376,67 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           {shapeType === "circle" && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="radius">רדיוס (מטרים)</Label>
-              <Input
+              <BoundedNumberInput
                 id="radius"
-                type="number"
-                min={10}
-                max={5000}
                 value={radiusMeters}
-                onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                dir="ltr"
+                onChange={setRadiusMeters}
+                min={MIN_RADIUS_M}
+                max={MAX_RADIUS_M}
+                errorText={`הרדיוס חייב להיות בין ${MIN_RADIUS_M} ל-${MAX_RADIUS_M.toLocaleString("he-IL")} מטרים`}
               />
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="altitude">גובה מרבי</Label>
-            <Select value={altitudeBand} onValueChange={(v) => setAltitudeBand(v as FlightAltitudeBand)}>
-              <SelectTrigger id="altitude">
-                <SelectValue />
+            <Label htmlFor="altitude">גובה טיסה מרבי (מטרים מעל הקרקע)</Label>
+            <BoundedNumberInput
+              id="altitude"
+              value={maxAltitudeMeters}
+              onChange={setMaxAltitudeMeters}
+              min={1}
+              max={altitudeCeilingM}
+              errorText={`הגובה חייב להיות בין 1 ל-${altitudeCeilingM} מטרים (התקרה החוקית ${isHobby ? "למטיסן" : "לכטב״ם קטן"})`}
+            />
+            <p className="text-xs text-muted-foreground" dir="rtl">
+              = {altitudeFt.toLocaleString("he-IL")} רגל מעל הקרקע
+              {altitudeAmsl !== null
+                ? ` · כ-${altitudeAmsl.toLocaleString("he-IL")} רגל מעל פני הים (מעפ״י) — כך יוצג למתאם`
+                : terrain.isLoading
+                  ? " · מחשב גובה מעל פני הים..."
+                  : ""}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cameraType">סוג מצלמה</Label>
+            <Select value={cameraType ?? undefined} onValueChange={(v) => setCameraType(v as CameraType)}>
+              <SelectTrigger id="cameraType">
+                <SelectValue placeholder="בחר סוג מצלמה" />
               </SelectTrigger>
               <SelectContent>
-                {altitudeOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                {(Object.entries(CAMERA_TYPE_LABELS) as [CameraType, string][]).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="takedown">זמן תגובה לבקשת הורדה (שניות)</Label>
+            <BoundedNumberInput
+              id="takedown"
+              value={takedownResponseSeconds}
+              onChange={setTakedownResponseSeconds}
+              min={MIN_TAKEDOWN_SECONDS}
+              max={MAX_TAKEDOWN_SECONDS}
+              placeholder="לדוגמה: 60"
+              errorText={`יש להזין בין ${MIN_TAKEDOWN_SECONDS} ל-${MAX_TAKEDOWN_SECONDS.toLocaleString("he-IL")} שניות`}
+            />
+            <p className="text-xs text-muted-foreground">
+              כמה זמן ייקח להוריד את הרחפן לקרקע מהרגע שהתקבלה בקשת הורדה מהמתאם.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -460,14 +556,14 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
 
-          {!buildingsOnlyReady && (
+          {!forbiddenByAirspace && !buildingsOnlyReady && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               בודק את הנקודה...
             </p>
           )}
 
-          {buildingsOnlyReady && isChecking && (
+          {!forbiddenByAirspace && buildingsOnlyReady && isChecking && (
             <p
               className={cn(
                 "flex items-center gap-1.5 text-xs",
@@ -481,7 +577,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             </p>
           )}
 
-          {!isChecking && requiresAttention && (
+          {!forbiddenByAirspace && !isChecking && requiresAttention && (
             <div
               className={cn(
                 "flex flex-col gap-2 rounded-lg border p-3 text-sm",
@@ -495,27 +591,20 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                 )}
               >
                 {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                {zoneHardBlocked
-                  ? "לא ניתן לתאם דרך המערכת"
-                  : blockedForHobby
-                    ? "לא ניתן לתאם באזור זה מחשבון פרטי"
-                    : groundBlockedByAltitude
-                      ? "לא ניתן לבקש תיאום לנקודה זו"
-                      : zoneBlockLevel === "controlled_airspace"
-                        ? "קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית"
-                        : zoneRequiresDirectorApproval
-                          ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
-                          : notamCheck?.inside
-                            ? "נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית"
-                            : needsSpecialAuthorization
-                              ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                              : buildingCheckUnavailable
-                                ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
-                                : "אזור זה דורש תיאום בכפוף לתנאים"}
+                {blockedForHobby
+                  ? "לא ניתן לתאם באזור זה מחשבון פרטי"
+                  : zoneVerdict.tone !== "none"
+                    ? zoneVerdict.headline
+                    : notamCheck?.inside
+                      ? "נוטאם פעיל בנקודה זו — נדרשת בדיקה ידנית"
+                      : needsSpecialAuthorization
+                        ? "אזור זה דורש הרשאת הפעלה מיוחדת"
+                        : buildingCheckUnavailable
+                          ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
+                          : "אזור זה דורש תיאום בכפוף לתנאים"}
               </div>
               <Disclosure label="למה? — פירוט מלא">
                 <ul className="list-inside list-disc text-xs text-muted-foreground">
-                  {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
                   {buildingCheckUnavailable && (
                     <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
                   )}
@@ -542,29 +631,13 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     </li>
                   ))}
                 </ul>
-                {zoneBlockLevel === "controlled_airspace" ? (
-                  <p className="text-xs text-muted-foreground">
-                    ניתן לשלוח בקשה — המוקדן יאמת מול NOTAM עדכני לפני אישור.
-                  </p>
-                ) : blockedForHobby ? (
+                {blockedForHobby ? (
                   <p className="text-xs text-muted-foreground">
                     התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
                     ופנאי) אינו זכאי לה.
                   </p>
-                ) : groundBlockedByAltitude ? (
-                  <p className="text-xs text-muted-foreground">
-                    תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין
-                    גובה טיסה חוקי לבקש עליו תיאום, גם לחשבון ארגון.
-                  </p>
-                ) : zoneRequiresDirectorApproval ? (
-                  <p className="text-xs text-muted-foreground">
-                    אזור אסור/מסוכן לטיסה — האישור הסופי מותנה באישור פרטני של מנהל רת&quot;א שהמוקדן יצטרך להשיג מול
-                    הרשות לפני אישור הבקשה.
-                  </p>
-                ) : zoneBlockLevel === "director_approval_only" ? (
-                  <p className="text-xs text-muted-foreground">
-                    אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת&quot;א. תיאום כזה זמין רק לחשבונות ארגון.
-                  </p>
+                ) : zoneVerdict.tone !== "none" ? (
+                  <p className="text-xs text-muted-foreground">{zoneVerdict.detail}</p>
                 ) : notamCheck?.inside ? (
                   <p className="text-xs text-muted-foreground">
                     ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.

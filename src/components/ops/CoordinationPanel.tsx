@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
+import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
+import { altitudeAmslFt } from "@/lib/geo/aip";
 import {
   useCoordinationAuthorityLookup,
   useFlightRequestCoordination,
   useUpsertFlightRequestCoordination,
   type CoordinationAuthority,
 } from "@/hooks/useCoordinationAuthorities";
-import { buildCoordinationMessage, whatsAppLink } from "@/lib/coordination/message";
+import { buildCoordinationMessage, whatsAppLink, whatsAppChatLink, formatLocalPhone } from "@/lib/coordination/message";
 import { COORDINATION_STATUS_LABEL, COORDINATION_STATUS_VARIANT } from "@/lib/constants/coordination-status";
 import type { CoordinationContactStatus } from "@/lib/types/database.types";
 
@@ -35,6 +37,20 @@ function AuthorityRow({ authority, message }: { authority: CoordinationAuthority
           {authority.phone}
           {authority.backup_phone && <span className="text-xs">(גיבוי: {authority.backup_phone})</span>}
         </p>
+        {authority.whatsapp_phone && (
+          // The number itself is the link: one tap opens the WhatsApp chat with this authority.
+          <a
+            href={whatsAppChatLink(authority.whatsapp_phone)}
+            target="_blank"
+            rel="noopener noreferrer"
+            dir="ltr"
+            className="mt-0.5 inline-flex items-center gap-1 text-sm font-medium text-success hover:underline"
+            aria-label={`פתיחת צ'אט וואטסאפ עם ${authority.name}`}
+          >
+            <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+            WhatsApp {formatLocalPhone(authority.whatsapp_phone)}
+          </a>
+        )}
         {authority.notes && <p className="text-xs text-muted-foreground">{authority.notes}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -43,9 +59,9 @@ function AuthorityRow({ authority, message }: { authority: CoordinationAuthority
           העתקת הודעה
         </Button>
         <Button size="sm" asChild>
-          <a href={whatsAppLink(authority.phone, message)} target="_blank" rel="noopener noreferrer">
+          <a href={whatsAppLink(authority.whatsapp_phone ?? authority.phone, message)} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-3.5 w-3.5" />
-            שליחה בוואטסאפ
+            שליחת ההודעה בוואטסאפ
           </a>
         </Button>
         <Button size="sm" variant="ghost" asChild>
@@ -90,7 +106,10 @@ export function CoordinationPanel({
     setNotes(coordination?.notes ?? "");
   }, [coordination?.status, coordination?.notes, request.id]);
 
-  const message = buildCoordinationMessage(request, dmsCoordinates);
+  const { data: terrain } = useAltitudeCeiling([lng, lat]);
+  const message = buildCoordinationMessage(request, dmsCoordinates, {
+    altitudeAmslFt: altitudeAmslFt(Number(request.max_altitude_meters), terrain?.terrainElevationM ?? null),
+  });
 
   async function handleSave(newStatus: CoordinationContactStatus) {
     setStatus(newStatus);

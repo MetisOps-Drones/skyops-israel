@@ -500,6 +500,7 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone: string | null
+          whatsapp_phone: string | null
           notes: string | null
           center_lng: number
           center_lat: number
@@ -513,6 +514,7 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone?: string | null
+          whatsapp_phone?: string | null
           notes?: string | null
           center_lng: number
           center_lat: number
@@ -526,6 +528,7 @@ export type Database = {
           unit_type?: string
           phone?: string
           backup_phone?: string | null
+          whatsapp_phone?: string | null
           notes?: string | null
           center_lng?: number
           center_lat?: number
@@ -1074,6 +1077,7 @@ export type Database = {
       flight_requests: {
         Row: {
           booking_id: string | null
+          camera_type: string | null
           center_point: unknown
           center_point_geojson: Json
           created_at: string
@@ -1095,11 +1099,13 @@ export type Database = {
           reviewed_by: string | null
           start_time: string
           status: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
           booking_id?: string | null
+          camera_type?: string | null
           center_point: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -1121,11 +1127,13 @@ export type Database = {
           reviewed_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
           booking_id?: string | null
+          camera_type?: string | null
           center_point?: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -1147,6 +1155,7 @@ export type Database = {
           reviewed_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -2372,6 +2381,7 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone: string | null
+          whatsapp_phone: string | null
           notes: string | null
           center_lng: number
           center_lat: number

@@ -96,7 +96,7 @@ function Card({ f }: { f: EmbedFreelancer }) {
       )}
 
       <span className="mt-1 flex items-center gap-1 text-xs font-medium text-blue-600">
-        יצירת קשר דרך MetisOps
+        יצירת קשר דרך Metisim
         <ExternalLink className="h-3 w-3" />
       </span>
     </a>
@@ -205,7 +205,7 @@ export function EmbedMarketplace({ apiKey }: { apiKey: string }) {
         rel="noopener noreferrer"
         className="mx-auto mt-2 w-fit text-[11px] font-medium text-slate-400"
       >
-        מופעל על ידי MetisOps
+        מופעל על ידי Metisim
       </a>
     </div>
   );

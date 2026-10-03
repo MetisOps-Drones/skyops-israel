@@ -23,7 +23,7 @@ function OrganizationsTab() {
 
   function handleExport() {
     downloadCsv(
-      `metisops-organizations-${new Date().toISOString().slice(0, 10)}.csv`,
+      `metisim-organizations-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((o) => ({
         שם: o.name,
         "חברים פעילים": o.member_count,
@@ -111,7 +111,7 @@ function UsersTab() {
 
   function handleExport() {
     downloadCsv(
-      `metisops-users-${new Date().toISOString().slice(0, 10)}.csv`,
+      `metisim-users-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((u) => ({
         שם: u.full_name,
         תפקיד: ROLE_LABEL[u.role] ?? u.role,

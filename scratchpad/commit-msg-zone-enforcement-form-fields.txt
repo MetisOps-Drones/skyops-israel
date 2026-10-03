@@ -1,0 +1,52 @@
+Enforce zone types and airport/base distances; request-form fields; radius crash fix; WhatsApp link; rename to Metisim
+
+Zone enforcement (flight-rules.ts, aip.ts, flight-requests.ts, both pilot cards):
+The AIP/regulation text the app is built on (the hobby and commercial
+study material) says "לא ניתן להטיס באזור פיקוח, באזור פיקוח שדה או באזור
+שדה", within 2 km of an aerodrome runway, and "אין להטיס באזור אסור". The
+code treated CTR/ATZ as a warning with a submit button, only gave the
+2 km buffer a "coordinate it" outcome, and let any GND-floor zone of ANY
+kind (including restricted) read as a flat "אסור" because of one shared
+ground-block rule. Now each type has its own outcome:
+  - CTR / ATZ / PROHIBITED (incl. the CAAI air-force-base restriction
+    polygons) -> forbidden for every account, no submit path, also within
+    2 km of a CTR/ATZ boundary, and judged on the bubble's footprint, not
+    just its centre.
+  - DANGER -> blocked solo, an org may submit while the dispatcher chases
+    the CAAI director's sign-off (the previously unreachable org path).
+  - RESTRICTED -> coordination request subject to the area's conditions.
+  - TMA/CTA -> warning only (floors are far above a drone).
+One zoneVerdictFor() owns the wording so the map card, the request form
+and the server action no longer drift. The forbidden verdict is decided
+from the local airspace layer alone and shown immediately, instead of
+waiting on the slow OSM/building checks -- which is also why a point near
+Hatzor could read as "special authorization needed" for several seconds.
+The server action re-checks it and rejects.
+
+Data (0088): the official CAAI drone map KMZ was compared layer by layer
+against production. Its 48 "הגבלות בסיסי חיל אוויר" polygons left real
+gaps outside the CTR/ATZ rows (east of Hatzor, north of Palmachim, Tel
+Nof, Ovda); 6 of its 35 prohibited polygons had no counterpart. Added as
+12+2 PROHIBITED rows, dissolved per base. Idempotent.
+
+Radius crash: clearing the radius field pushed 0 into the store, and
+buildFlightFootprint threw "Either radiusMeters or polygon must be
+provided" out of a render. New BoundedNumberInput keeps a local draft and
+only commits in-range numbers; the footprint builder no longer throws on a
+transient empty radius. Regression test added.
+
+Request form (0089): camera type (vertical / horizontal / aerial survey /
+none) and pilot-declared takedown response time; flight altitude is now
+entered in meters (it is stored as max_altitude_meters as before) with a
+live feet / feet-AMSL (מעפ"י) readout, and the coordinator sees the same
+conversion (ground elevation from the existing altitude API) in the
+detail panel and in the forwarded message.
+
+Coordinator (0090): coordination_authorities.whatsapp_phone, shown as a
+link that opens the WhatsApp chat; Hatzor tower row set to 0586726900.
+
+Rename: user-visible app name MetisOps -> Metisim (title, login/signup,
+PDF report, SMS sender fallback, embeds, share footer, menu label, CSV
+names). Left alone: component/identifier names, storage keys, the
+metis-ops.com domain/User-Agent, and the Academy copy that points at the
+separate metis-ops.com course site.

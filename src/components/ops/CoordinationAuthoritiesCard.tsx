@@ -33,6 +33,7 @@ interface FormState {
   unit_type: string;
   phone: string;
   backup_phone: string;
+  whatsapp_phone: string;
   notes: string;
   center_lat: string;
   center_lng: string;
@@ -44,6 +45,7 @@ const EMPTY_FORM: FormState = {
   unit_type: "",
   phone: "",
   backup_phone: "",
+  whatsapp_phone: "",
   notes: "",
   center_lat: "",
   center_lng: "",
@@ -56,6 +58,7 @@ function toFormState(a: CoordinationAuthority): FormState {
     unit_type: a.unit_type,
     phone: a.phone,
     backup_phone: a.backup_phone ?? "",
+    whatsapp_phone: a.whatsapp_phone ?? "",
     notes: a.notes ?? "",
     center_lat: String(a.center_lat),
     center_lng: String(a.center_lng),
@@ -161,6 +164,7 @@ function AuthorityDialog({
       unit_type: form.unit_type.trim(),
       phone: form.phone.trim(),
       backup_phone: form.backup_phone.trim() || null,
+      whatsapp_phone: form.whatsapp_phone.trim() || null,
       notes: form.notes.trim() || null,
       center_lat: lat,
       center_lng: lng,
@@ -207,6 +211,17 @@ function AuthorityDialog({
               <Label htmlFor="ca-backup-phone">טלפון גיבוי (אופציונלי)</Label>
               <Input id="ca-backup-phone" dir="ltr" value={form.backup_phone} onChange={(e) => set("backup_phone", e.target.value)} />
             </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ca-whatsapp">מספר וואטסאפ לתיאום (אופציונלי)</Label>
+            <Input
+              id="ca-whatsapp"
+              dir="ltr"
+              value={form.whatsapp_phone}
+              onChange={(e) => set("whatsapp_phone", e.target.value)}
+              placeholder="05X-XXXXXXX"
+            />
+            <p className="text-xs text-muted-foreground">מוצג למתאם כקישור שפותח ישירות את הצ&apos;אט.</p>
           </div>
           <AuthorityLocationPicker
             lat={form.center_lat.trim() ? Number(form.center_lat) : null}

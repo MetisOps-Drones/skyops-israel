@@ -30,3 +30,32 @@ test("pilot can open the flight-request drawer from the map", async ({ page }) =
     page.getByText("כדי לתאם טיסה יש לרשום רחפן").or(page.getByLabel("כלי טיס"))
   ).toBeVisible();
 });
+
+/**
+ * Regression: clearing the radius field (the only way to type a different
+ * number) used to push 0 into state, which threw out of the airspace check's
+ * render and crashed the whole app. The field must survive being emptied,
+ * half-typed and out of range.
+ */
+test("emptying the radius field does not crash the request form", async ({ page }) => {
+  const creds = readCredentials("E2E_HOBBY");
+  test.skip(!creds, "Set E2E_HOBBY_EMAIL / E2E_HOBBY_PASSWORD to run this spec");
+  if (!creds) return;
+
+  await login(page, creds);
+  await page.getByRole("button", { name: "דקירת מרחב אווירי לתיאום" }).click();
+  const map = page.getByRole("region", { name: "Map" });
+  await map.click({ position: { x: 400, y: 350 } });
+  await map.click({ position: { x: 400, y: 350 } });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("פרטי בקשת טיסה")).toBeVisible({ timeout: 10_000 });
+
+  const radius = dialog.locator("#radius");
+  await radius.fill("");
+  await expect(dialog.getByText("פרטי בקשת טיסה")).toBeVisible();
+  await radius.fill("3");
+  await expect(dialog.getByText("הרדיוס חייב להיות בין")).toBeVisible();
+  await radius.fill("250");
+  await expect(dialog.getByText("הרדיוס חייב להיות בין")).toBeHidden();
+  await expect(dialog.getByText("פרטי בקשת טיסה")).toBeVisible();
+});

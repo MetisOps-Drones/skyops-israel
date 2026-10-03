@@ -124,7 +124,7 @@ export function EmbedMap({ apiKey }: { apiKey: string }) {
         rel="noopener noreferrer"
         className="absolute bottom-2 start-2 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-medium text-slate-600 shadow"
       >
-        מופעל על ידי MetisOps
+        מופעל על ידי Metisim
       </a>
     </div>
   );

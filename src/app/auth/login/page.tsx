@@ -9,7 +9,7 @@ export default function LoginPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <MetisOpsLogo className="h-7 w-7" />
           </div>
-          <h1 className="text-xl font-bold">MetisOps</h1>
+          <h1 className="text-xl font-bold">Metisim</h1>
           <p className="text-sm text-muted-foreground">
             ניהול תפעול, מרחב אווירי ורישוי מטיסי רחפנים
           </p>

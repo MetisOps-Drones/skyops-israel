@@ -18,6 +18,9 @@ export interface SpatialCheckResult {
   requestGeometry: GeoJSON.Feature<GeoJSON.Polygon>;
 }
 
+/** Smallest bubble the app draws or checks — same floor BubbleMap uses when dragging a radius. */
+export const MIN_FOOTPRINT_RADIUS_M = 10;
+
 /** Builds the flight footprint (circle or drawn polygon) as a single GeoJSON Feature. */
 export function buildFlightFootprint(
   input: Pick<SpatialCheckInput, "center" | "radiusMeters" | "polygon">
@@ -25,8 +28,11 @@ export function buildFlightFootprint(
   if (input.polygon) {
     return turf.feature(input.polygon);
   }
-  if (input.radiusMeters) {
-    return turf.circle(input.center, input.radiusMeters / 1000, { units: "kilometers" });
+  if (input.radiusMeters !== undefined) {
+    // An empty/zero/NaN radius is a transient state while someone is mid-edit in the radius field
+    // (clearing it to type a new number) — it must never throw out of a render and take the app down.
+    const safeRadius = Number.isFinite(input.radiusMeters) ? Math.max(input.radiusMeters, MIN_FOOTPRINT_RADIUS_M) : MIN_FOOTPRINT_RADIUS_M;
+    return turf.circle(input.center, safeRadius / 1000, { units: "kilometers" });
   }
   throw new Error("Either radiusMeters or polygon must be provided");
 }

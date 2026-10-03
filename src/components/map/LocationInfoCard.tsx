@@ -20,6 +20,7 @@ import {
   PROXIMITY_CATEGORY_REGULATION,
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
 import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, formatAltitudeRangeMeters } from "@/lib/geo/aip";
@@ -113,8 +114,8 @@ export function LocationInfoCard({
   // request here (the dispatcher will need to chase the director's sign-off
   // manually before it can be approved); a hobby/solo-pro account cannot.
   const zoneBlockLevel = aipCheck?.blockLevel ?? "none";
-  const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
+  const zoneVerdict = zoneVerdictFor(zoneBlockLevel, hasOrg);
+  const zoneHardBlocked = !zoneVerdict.canSubmit;
 
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
@@ -152,6 +153,12 @@ export function LocationInfoCard({
     groundBlockedByAltitude ||
     buildingCheckUnavailable;
   const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+  // Decided from the airspace layer alone (local, instant) — never held
+  // back behind the slower building/OSM checks. A point inside a CTR or an
+  // air-force-base restriction is forbidden no matter what those find, and
+  // waiting for them first let a "special authorization needed" provisional
+  // read show up on a spot where no authorization can help.
+  const forbiddenByAirspace = !aipZonesLoading && (groundBlockedByAltitude || zoneHardBlocked);
   const hasDetails = Boolean(
     (aipCheck && aipCheck.reasons.length > 0) ||
       notamCheck?.inside ||
@@ -184,7 +191,35 @@ export function LocationInfoCard({
                 gets an immediate provisional read the moment *it* resolves, clearly marked as
                 still pending the airspace-zone check — it can only escalate from there, never
                 silently drop a restriction it already found. */}
-            {!buildingsOnlyReady ? (
+            {forbiddenByAirspace ? (
+              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-base font-semibold">
+                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                      ? zoneVerdictFor("forbidden", hasOrg).headline
+                      : zoneVerdict.headline}
+                  </p>
+                  {aipCheck && aipCheck.reasons.length > 0 && (
+                    <ul className="mt-1 list-inside list-disc text-sm">
+                      {aipCheck.reasons.map((reason, i) => (
+                        <li key={i}>{reason.label}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-1 text-sm">
+                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                      ? zoneVerdictFor("forbidden", hasOrg).detail
+                      : zoneVerdict.detail}
+                  </p>
+                  {zoneVerdict.upgradeHelps && (
+                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
+                      מה כן אפשר: לשדרג לחשבון ארגון ←
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : !buildingsOnlyReady ? (
               <div className="flex items-center gap-3 rounded-xl bg-muted p-4 text-muted-foreground">
                 <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
                 <p className="text-base font-medium">בודק את הנקודה...</p>
@@ -213,59 +248,21 @@ export function LocationInfoCard({
                   </p>
                 </div>
               </div>
-            ) : groundBlockedByAltitude ? (
-              // Checked before every zone/NOTAM branch below on purpose: a 0m
-              // legal ceiling from the ground is an unconditional block that
-              // no zone type or NOTAM review can change — showing "requires
-              // manual review" or "you can submit" above this at the same
-              // time as "cannot request" further down (in the action section)
-              // read as directly contradicting each other, which is exactly
-              // what a real pilot flagged after seeing both on screen at once.
-              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
-                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold">לא ניתן לבקש תיאום לנקודה זו</p>
-                  <p className="mt-0.5 text-sm">
-                    תקרת הגובה החוקית כאן היא 0 מ&apos; מהקרקע — אין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון.
-                  </p>
-                </div>
-              </div>
-            ) : zoneBlockLevel === "controlled_airspace" ? (
-              <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
-                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold">קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית</p>
-                  <p className="mt-0.5 text-sm">
-                    ניתן להגיש בקשת תיאום — המוקדן יאמת מול NOTAM עדכני לפני אישור.
-                  </p>
-                </div>
-              </div>
-            ) : zoneBlockLevel === "director_approval_only" ? (
+            ) : zoneVerdict.tone !== "none" ? (
+              // controlled_airspace (TMA/CTA), director_approval_only for an org account, and
+              // coordination_ok (restricted) — each says which *type* of zone it is, because
+              // מוגבל / מסוכן / אסור are different legal outcomes. The two hard-block cases
+              // (forbidden, solo account in a dangerous area) never get here: forbiddenByAirspace above.
               <div
                 className={cn(
                   "flex items-start gap-3 rounded-xl p-4",
-                  zoneRequiresDirectorApproval ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
+                  zoneVerdict.tone === "conditions" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"
                 )}
               >
-                {zoneRequiresDirectorApproval ? (
-                  <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                ) : (
-                  <Ban className="mt-0.5 h-5 w-5 shrink-0" />
-                )}
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="text-base font-semibold">
-                    {zoneRequiresDirectorApproval ? 'כן, אך בכפוף לאישור מנהל רת"א' : "לא ניתן לתאם דרך המערכת"}
-                  </p>
-                  <p className="mt-0.5 text-sm">
-                    {zoneRequiresDirectorApproval
-                      ? "אזור אסור/מסוכן לטיסה — ניתן להגיש בקשה כחשבון ארגון."
-                      : "אזור אסור/מסוכן לטיסה — זמין רק לחשבונות ארגון."}
-                  </p>
-                  {!zoneRequiresDirectorApproval && (
-                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
-                      מה כן אפשר: לשדרג לחשבון ארגון ←
-                    </Link>
-                  )}
+                  <p className="text-base font-semibold">{zoneVerdict.headline}</p>
+                  <p className="mt-0.5 text-sm">{zoneVerdict.detail}</p>
                 </div>
               </div>
             ) : notamCheck?.inside ? (
@@ -317,7 +314,7 @@ export function LocationInfoCard({
                 "residential" way in OSM can read as 2+ km away from a point that's
                 visibly ~200m from the nearest houses, because Overpass's `center` is the
                 polygon's centroid, not its nearest edge. */}
-            {buildingProximity.isLoading ? (
+            {forbiddenByAirspace ? null : buildingProximity.isLoading ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 בודק מרחק ממבנים בסביבה...
@@ -389,21 +386,26 @@ export function LocationInfoCard({
                               * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת
                             </p>
                           )}
-                          {(zone.kind === "DANGER" || zone.kind === "PROHIBITED") && (
+                          {(zone.kind === "PROHIBITED" || zone.kind === "CTR" || zone.kind === "ATZ") && (
+                            <p className="mt-1 text-xs text-destructive">
+                              אסור להטיס כאן — אין מסלול בקשת תיאום דרך המערכת, בכל סוג חשבון
+                            </p>
+                          )}
+                          {zone.kind === "DANGER" && (
                             <p className="mt-1 text-xs text-destructive">
                               {hasOrg
                                 ? 'נדרש אישור פרטני של מנהל רת"א — תיאום זמין לחשבון ארגון בלבד'
                                 : 'נדרש אישור פרטני של מנהל רת"א — לא ניתן לתאם דרך המערכת מחשבון פרטי'}
                             </p>
                           )}
-                          {(zone.kind === "CTR" || zone.kind === "ATZ" || zone.kind === "TMA" || zone.kind === "CTA") && (
+                          {(zone.kind === "TMA" || zone.kind === "CTA") && (
                             <p className="mt-1 text-xs text-warning">
                               אין כאן עדכוני NOTAM בזמן אמת — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
                             </p>
                           )}
                           {zone.kind === "RESTRICTED" && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן
+                              אזור מוגבל — ניתן לתאם בכפוף לתנאים שפורסמו לאזור או באישור הגורם השולט; הבקשה תיבדק ע&quot;י המוקדן
                             </p>
                           )}
                         </div>
@@ -460,7 +462,7 @@ export function LocationInfoCard({
                   </div>
                 )}
 
-                {needsSpecialAuthorization && (
+                {needsSpecialAuthorization && !forbiddenByAirspace && (
                   <div className="flex flex-col gap-2">
                     <p className="text-sm font-medium">
                       {matchingRegulations.length > 1 ? "הרשאות רלוונטיות למגבלות שנמצאו" : "הרשאה רלוונטית למגבלה שנמצאה"}
@@ -514,33 +516,25 @@ export function LocationInfoCard({
             {/* Same reasoning as the verdict banner above: cannotSubmit/requiresAttention are
                 derived from the same not-yet-loaded checks, so no action (or "can't request")
                 signal should render until isChecking clears either. */}
-            {!isChecking &&
+            {/* A zone-forbidden point is already fully explained by the banner at the top
+                (and answers immediately) — repeating it here would just be a second copy of
+                the same red box. This section only covers the "blocked for hobby by a special
+                authorization" case plus the submit button for everything submittable. */}
+            {!forbiddenByAirspace &&
+              !isChecking &&
               (cannotSubmit ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
                   <div className="flex items-center gap-2 font-medium text-destructive">
-                    {/* groundBlockedByAltitude checked first everywhere below: a 0m legal
-                        ceiling from the ground is unfixable by any account tier, so it must
-                        never be shadowed by (or shown alongside a CTA for) the hobby/org
-                        upgrade messaging — upgrading changes nothing about this case. */}
-                    {groundBlockedByAltitude || zoneHardBlocked ? <Ban className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                    {groundBlockedByAltitude
-                      ? "לא ניתן לבקש תיאום לנקודה זו"
-                      : zoneHardBlocked
-                        ? "לא ניתן לתאם דרך המערכת"
-                        : "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"}
+                    <Lock className="h-4 w-4" />
+                    לא ניתן לתאם טיסה באזור זה מחשבון פרטי
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {groundBlockedByAltitude
-                      ? "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון."
-                      : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
-                        ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
-                        : "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."}
+                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
+                    ופנאי) אינו זכאי לה.
                   </p>
-                  {!groundBlockedByAltitude && (
-                    <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                      {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
-                    </Link>
-                  )}
+                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
+                    שדרוג לחשבון עסקי מהפרופיל שלכם ←
+                  </Link>
                 </div>
               ) : requiresAttention ? (
                 <Button size="lg" onClick={() => onRequestCoordination(point)}>

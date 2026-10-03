@@ -238,8 +238,8 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
           <button
             type="button"
             onClick={() => setRingOpen(!ringOpen)}
-            aria-label="תפריט MetisOps"
-            title="תפריט MetisOps"
+            aria-label="תפריט Metisim"
+            title="תפריט Metisim"
             aria-expanded={ringOpen}
             className={cn(
               "relative z-20 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 hover:scale-110 hover:shadow-2xl active:scale-95",

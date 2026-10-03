@@ -293,7 +293,7 @@ export function AnalyticsPageClient() {
   const { data: ctx } = useMyOrgContext();
 
   if (globalRole === "dispatcher_admin") {
-    return <AnalyticsDashboard orgId={null} title="כל הפלטפורמה — MetisOps" />;
+    return <AnalyticsDashboard orgId={null} title="כל הפלטפורמה — Metisim" />;
   }
 
   if (ctx?.isFleetManager && ctx.orgId) {

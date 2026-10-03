@@ -19,22 +19,19 @@ import { useDrones } from "@/hooks/useDrones";
 import { useQueryClient } from "@tanstack/react-query";
 import { updateFlightRequest } from "@/actions/flight-requests";
 import { flightRequestEditEligibility, FLIGHT_REQUEST_EDIT_WINDOW_MINUTES } from "@/lib/validations/flight-request-edit-window";
-import { ALTITUDE_BAND_METERS, type FlightAltitudeBand } from "@/lib/validations/flight-request";
+import {
+  altitudeBandForMeters,
+  CAMERA_TYPE_LABELS,
+  MIN_TAKEDOWN_SECONDS,
+  MAX_TAKEDOWN_SECONDS,
+  type CameraType,
+} from "@/lib/validations/flight-request";
+import { COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
+import { mToFt } from "@/lib/geo/aip";
+import { BoundedNumberInput, MIN_RADIUS_M, MAX_RADIUS_M } from "@/components/map/BoundedNumberInput";
 import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
 import type { FlightPurpose } from "@/lib/types/database.types";
-
-const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
-  { value: "under_50m", label: "עד 50 מטר" },
-  { value: "under_100m", label: "עד 100 מטר" },
-  { value: "over_100m", label: "מעל 100 מטר" },
-];
-
-function bandForAltitude(m: number): FlightAltitudeBand {
-  if (m <= 50) return "under_50m";
-  if (m <= 100) return "under_100m";
-  return "over_100m";
-}
 
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -56,7 +53,9 @@ export function EditFlightRequestDialog({ request }: { request: FlightRequestWit
   const queryClient = useQueryClient();
 
   const [droneId, setDroneId] = useState(request.drone_id ?? "");
-  const [altitudeBand, setAltitudeBand] = useState<FlightAltitudeBand>(bandForAltitude(request.max_altitude_meters));
+  const [altitudeM, setAltitudeM] = useState<number>(Number(request.max_altitude_meters));
+  const [cameraType, setCameraType] = useState<CameraType | null>((request.camera_type as CameraType | null) ?? null);
+  const [takedownSeconds, setTakedownSeconds] = useState<number | null>(request.takedown_response_seconds ?? null);
   const [flightPurpose, setFlightPurpose] = useState<FlightPurpose>(request.flight_purpose);
   const [radiusMeters, setRadiusMeters] = useState(request.radius_meters ?? 100);
   const [startTime, setStartTime] = useState(toDatetimeLocal(request.start_time));
@@ -86,6 +85,10 @@ export function EditFlightRequestDialog({ request }: { request: FlightRequestWit
   const centerPoint = request.center_point_geojson as unknown as GeoJSON.Point;
 
   async function handleSubmit() {
+    if (!cameraType || takedownSeconds === null) {
+      toast.error("יש לבחור סוג מצלמה ולהזין זמן תגובה לבקשת הורדה");
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await updateFlightRequest(request.id, {
@@ -93,8 +96,10 @@ export function EditFlightRequestDialog({ request }: { request: FlightRequestWit
         request_type: "basic_auto_100m",
         center_point: { type: "Point", coordinates: centerPoint.coordinates as [number, number] },
         radius_meters: radiusMeters,
-        altitude_band: altitudeBand,
-        max_altitude_meters: ALTITUDE_BAND_METERS[altitudeBand],
+        altitude_band: altitudeBandForMeters(altitudeM),
+        max_altitude_meters: altitudeM,
+        camera_type: cameraType,
+        takedown_response_seconds: takedownSeconds,
         flight_purpose: flightPurpose,
         start_time: new Date(startTime),
         end_time: new Date(endTime),
@@ -152,31 +157,56 @@ export function EditFlightRequestDialog({ request }: { request: FlightRequestWit
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-radius">רדיוס (מטרים)</Label>
-            <Input
+            <BoundedNumberInput
               id="edit-radius"
-              type="number"
-              min={10}
-              max={5000}
               value={radiusMeters}
-              onChange={(e) => setRadiusMeters(Number(e.target.value))}
-              dir="ltr"
+              onChange={setRadiusMeters}
+              min={MIN_RADIUS_M}
+              max={MAX_RADIUS_M}
+              errorText={`הרדיוס חייב להיות בין ${MIN_RADIUS_M} ל-${MAX_RADIUS_M.toLocaleString("he-IL")} מטרים`}
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>גובה מרבי</Label>
-            <Select value={altitudeBand} onValueChange={(v) => setAltitudeBand(v as FlightAltitudeBand)}>
+            <Label htmlFor="edit-altitude">גובה טיסה מרבי (מטרים מעל הקרקע)</Label>
+            <BoundedNumberInput
+              id="edit-altitude"
+              value={altitudeM}
+              onChange={setAltitudeM}
+              min={1}
+              max={COMMERCIAL_GENERAL_CEILING_M}
+              errorText={`הגובה חייב להיות בין 1 ל-${COMMERCIAL_GENERAL_CEILING_M} מטרים (לחשבון פרטי התקרה 50 מ')`}
+            />
+            <p className="text-xs text-muted-foreground">= {mToFt(altitudeM).toLocaleString("he-IL")} רגל מעל הקרקע</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>סוג מצלמה</Label>
+            <Select value={cameraType ?? undefined} onValueChange={(v) => setCameraType(v as CameraType)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="בחר סוג מצלמה" />
               </SelectTrigger>
               <SelectContent>
-                {ALTITUDE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                {(Object.entries(CAMERA_TYPE_LABELS) as [CameraType, string][]).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-takedown">זמן תגובה לבקשת הורדה (שניות)</Label>
+            <BoundedNumberInput
+              id="edit-takedown"
+              value={takedownSeconds}
+              onChange={setTakedownSeconds}
+              min={MIN_TAKEDOWN_SECONDS}
+              max={MAX_TAKEDOWN_SECONDS}
+              placeholder="לדוגמה: 60"
+              errorText={`יש להזין בין ${MIN_TAKEDOWN_SECONDS} ל-${MAX_TAKEDOWN_SECONDS.toLocaleString("he-IL")} שניות`}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">

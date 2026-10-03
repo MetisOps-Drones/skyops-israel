@@ -102,7 +102,7 @@ export async function publishNotam(input: PublishNotamInput): Promise<NotamActio
     if (pilot.phone) {
       await sendSms({
         toPhone: pilot.phone,
-        message: `MetisOps: ה-NOTAM שלך אושר. קוד: ${data.notam_code.toUpperCase()}. חירום בקרה: ${data.atc_emergency_phone}`,
+        message: `Metisim: ה-NOTAM שלך אושר. קוד: ${data.notam_code.toUpperCase()}. חירום בקרה: ${data.atc_emergency_phone}`,
       });
     }
 

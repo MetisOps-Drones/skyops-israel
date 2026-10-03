@@ -7,5 +7,5 @@ test("pilot can log in and lands on the map", async ({ page }) => {
   if (!creds) return;
 
   await login(page, creds);
-  await expect(page.getByRole("button", { name: "תפריט MetisOps" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "תפריט Metisim" })).toBeVisible();
 });

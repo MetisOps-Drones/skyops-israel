@@ -24,6 +24,10 @@ import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replie
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
 import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { checkFlightAuthorizationRequirement } from "@/lib/geo/flight-rules";
+import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
+import { altitudeAmslFt } from "@/lib/geo/aip";
+import { describeFlightAltitude } from "@/lib/coordination/message";
+import { CAMERA_TYPE_LABELS, formatTakedownSeconds, type CameraType } from "@/lib/validations/flight-request";
 import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
 import { AIP_ZONE_KIND_LABELS, AIP_ZONE_KIND_DISPATCHER_REQUIREMENT } from "@/lib/constants/aip-reference-zones";
 
@@ -89,8 +93,13 @@ export function RequestDetailPanel({
     [requestLng, requestLat, liveNotams]
   );
 
+  // The pilot enters meters above the ground; ATC/the AIP work in feet above sea level (מעפ"י) —
+  // so the coordinator sees both, converted with the ground elevation under the point.
+  const terrain = useAltitudeCeiling(request ? [requestLng, requestLat] : null);
+
   if (!request) return null;
 
+  const altitudeAmsl = altitudeAmslFt(Number(request.max_altitude_meters), terrain.data?.terrainElevationM ?? null);
   const centerPoint = request.center_point_geojson as unknown as GeoJSON.Point;
   const lng = centerPoint.coordinates[0] ?? 0;
   const lat = centerPoint.coordinates[1] ?? 0;
@@ -313,7 +322,18 @@ export function RequestDetailPanel({
             <span className="text-muted-foreground">סוג הטסה</span>
             <span>{FLIGHT_PURPOSE_LABELS[request.flight_purpose]}</span>
             <span className="text-muted-foreground">גובה מרבי</span>
-            <span>{request.max_altitude_meters} מ׳</span>
+            <span>
+              {describeFlightAltitude(Number(request.max_altitude_meters), altitudeAmsl)}
+              {altitudeAmsl === null && terrain.isLoading && (
+                <span className="text-xs text-muted-foreground"> · מחשב גובה מעפ״י...</span>
+              )}
+            </span>
+            <span className="text-muted-foreground">סוג מצלמה</span>
+            <span>{request.camera_type ? CAMERA_TYPE_LABELS[request.camera_type as CameraType] ?? request.camera_type : "לא צוין"}</span>
+            <span className="text-muted-foreground">זמן הורדה מבקשה</span>
+            <span>
+              {request.takedown_response_seconds ? formatTakedownSeconds(request.takedown_response_seconds) : "לא צוין"}
+            </span>
             {request.radius_meters && (
               <>
                 <span className="text-muted-foreground">רדיוס</span>

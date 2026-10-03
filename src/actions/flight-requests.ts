@@ -16,6 +16,7 @@ import {
   requiredInfrastructureDistanceM,
   checkFlightAuthorizationRequirement,
   findingsRequiringAuthorization,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
 import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
 import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
@@ -70,17 +71,34 @@ async function evaluateFlightRequestSafety(
     return { error: `בדיקת אזורי AIP נכשלה: ${aipError.message}` };
   }
   const aipZones = (aipZonesRaw ?? []) as AipReferenceZone[];
-  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones);
+
+  // The footprint (not just its centre) is what must stay out of a
+  // forbidden zone — a 300 m bubble centred 100 m outside a CTR still
+  // flies inside it.
+  const footprint =
+    data.request_type === "manual_notam_bubble" && data.polygon
+      ? data.polygon
+      : turf.circle(data.center_point.coordinates, (data.radius_meters ?? 100) / 1000, {
+          units: "kilometers",
+        }).geometry;
+
+  const authCheck = checkFlightAuthorizationRequirement(
+    centerPoint,
+    aipZones,
+    footprint as GeoJSON.Polygon,
+    data.request_type === "basic_auto_100m" ? data.radius_meters ?? 100 : 0
+  );
   const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
 
-  if (altitudeAtPoint.blockedFromGround) {
+  if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {
+    const why = authCheck.reasons.map((r) => r.label).join("; ");
     return {
-      error: "תקרת הגובה החוקית בנקודה זו היא 0 מ' מהקרקע (מרחב אווירי חופף מהקרקע) — לא ניתן לבקש תיאום לנקודה זו, גם לחשבון ארגון.",
+      error: `${zoneVerdictFor("forbidden", hasOrg).headline} — ${why || "מרחב אווירי חופף מהקרקע"}. לא ניתן לבקש תיאום לנקודה זו, בכל סוג חשבון.`,
     };
   }
 
   if (authCheck.blockLevel === "director_approval_only" && !hasOrg) {
-    return { error: 'אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת"א. תיאום כזה זמין רק לחשבונות ארגון.' };
+    return { error: `${zoneVerdictFor("director_approval_only", false).headline}. ${zoneVerdictFor("director_approval_only", false).detail}` };
   }
 
   // Never trust a client-supplied "no active NOTAM" claim — fetched fresh
@@ -97,15 +115,6 @@ async function evaluateFlightRequestSafety(
     notamCheckFailed = true;
     console.error("fetchLiveNotams failed during flight request evaluation:", err);
   }
-
-  const aipRequiresDispatcher = authCheck.blockLevel !== "none" || notamCheck.inside || notamCheckFailed;
-
-  const footprint =
-    data.request_type === "manual_notam_bubble" && data.polygon
-      ? data.polygon
-      : turf.circle(data.center_point.coordinates, (data.radius_meters ?? 100) / 1000, {
-          units: "kilometers",
-        }).geometry;
 
   const { data: intersectingZones, error: rpcError } = await supabase.rpc("find_intersecting_zones", {
     candidate_geom_geojson: footprint as never,
@@ -292,6 +301,8 @@ export async function createFlightRequest(
           : null,
       max_altitude_meters: data.max_altitude_meters,
       flight_purpose: data.flight_purpose,
+      camera_type: data.camera_type,
+      takedown_response_seconds: data.takedown_response_seconds,
       start_time: data.start_time.toISOString(),
       end_time: data.end_time.toISOString(),
       status: autoCleared ? "auto_cleared" : "pending_dispatcher",
@@ -392,6 +403,8 @@ export async function updateFlightRequest(
           : null,
       max_altitude_meters: data.max_altitude_meters,
       flight_purpose: data.flight_purpose,
+      camera_type: data.camera_type,
+      takedown_response_seconds: data.takedown_response_seconds,
       start_time: data.start_time.toISOString(),
       end_time: data.end_time.toISOString(),
       status: autoCleared ? "auto_cleared" : "pending_dispatcher",
