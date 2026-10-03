@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import Map, { Source, Layer, Marker, type MapLayerMouseEvent } from "react-map-gl";
 import * as turf from "@turf/turf";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Phone, Plus, Pencil, Trash2, ShieldQuestion, MapPin } from "lucide-react";
+import { Phone, Plus, Pencil, Trash2, ShieldQuestion, MapPin, MessageCircle } from "lucide-react";
+import { whatsAppChatLink } from "@/lib/coordination/message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -323,10 +324,21 @@ export function CoordinationAuthoritiesCard() {
                 <p className="truncate text-sm font-medium">
                   {a.name} <span className="text-xs font-normal text-muted-foreground">· {a.unit_type}</span>
                 </p>
-                <p className="flex items-center gap-1 text-xs text-muted-foreground" dir="ltr">
-                  <Phone className="h-3 w-3 shrink-0" />
-                  {a.phone}
-                </p>
+                {a.whatsapp_phone ? (
+                  // Coordination with this authority runs over WhatsApp — a button that opens the chat
+                  // replaces the phone number.
+                  <Button size="sm" variant="outline" asChild className="mt-1 border-success/40 text-success hover:bg-success/10 hover:text-success">
+                    <a href={whatsAppChatLink(a.whatsapp_phone)} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      פתיחת שיחה בוואטסאפ
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground" dir="ltr">
+                    <Phone className="h-3 w-3 shrink-0" />
+                    {a.phone}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button size="icon" variant="ghost" aria-label={`עריכת ${a.name}`} onClick={() => openEdit(a)}>
