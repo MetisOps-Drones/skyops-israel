@@ -1,0 +1,24 @@
+Sport/leisure pilot near infrastructure: a declaration, not a wall
+
+Per the hobby regulation (הפעלת טיסן): within 150 m of infrastructure the
+pilot may fly if the owner agreed (or it is his own), and a micro drone
+(250 g or less) may fly over infrastructure under the regulation's
+conditions. The app wrongly told every private account "you cannot
+coordinate here" (the commercial regulation's special authorization).
+
+- lib/geo/infrastructure-rule.ts: the decision, pure and tested.
+- Request form: a hobby pilot near a building ticks a declaration (owner
+  consent; or, for a micro drone, the micro-drone conditions). The submit
+  button waits for it. Only the micro-drone declaration can be approved at
+  once; owner consent goes to a dispatcher, never auto-approved.
+- Server action: re-checks it (drone weight read from the drones table),
+  rejects a missing/invalid declaration, stores it
+  (flight_requests.infrastructure_declaration, migration 0096 - only written
+  when used, so the app works before the migration is run).
+- Dispatcher view shows the declaration; the edit dialog keeps it.
+- Location card: no more "private account cannot coordinate"; says what is
+  allowed and that a declaration is asked for.
+
+Also: playwright workers pinned to 2 (the UI specs share one dev server and
+one account), docs/HANDOFF.md for continuing on another machine, and the
+zone-data generator scripts under scripts/zone-data.

@@ -21,7 +21,7 @@ async function inspectPoint(page: Page, lng: number, lat: number, label: string)
 
 test("a helicopter area: 'you may fly, but only up to 60 m' on a weekday; on a Saturday it is coming, not in force", async ({ page }) => {
   const creds = readCredentials("E2E_HOBBY");
-  test.setTimeout(120_000); // the card waits on terrain, building and proximity lookups
+  test.setTimeout(240_000); // the card waits on terrain, building and proximity lookups
   test.skip(!creds || !hasServiceKey, "Set E2E_HOBBY_* and SUPABASE_SERVICE_ROLE_KEY to run this spec");
   const heli = (await loadAipZones()).find((z) => z.weekdays_only && z.code?.startsWith("CAAI-HELI") && z.name.includes("חרמון"));
   test.skip(!heli, "Migration 0093 has not been run yet");
@@ -31,7 +31,7 @@ test("a helicopter area: 'you may fly, but only up to 60 m' on a weekday; on a S
   await login(page, creds!);
   const card = await inspectPoint(page, lng!, lat!, "נקחרמון");
 
-  await expect(card.getByText("מותר להטיס במיקומך, אך יש לשים לב:")).toBeVisible({ timeout: 45_000 });
+  await expect(card.getByText("מותר להטיס במיקומך, אך יש לשים לב:")).toBeVisible({ timeout: 120_000 });
   await expect(card.getByText(/מותר להטיס עד 60 מ' מעל הקרקע בלבד/)).toBeVisible();
   await expect(card.getByText(/תקרת טיסה: עד 50 מ'/)).toBeVisible(); // hobby: the general 50 m is already under the 60 m cap
 

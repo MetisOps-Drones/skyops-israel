@@ -25,6 +25,12 @@ import { fetchTerrainElevationM } from "@/lib/geo/terrain";
 import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { checkProximity } from "@/lib/geo/proximity-check";
+import {
+  INFRASTRUCTURE_DECLARATION_LABELS,
+  MICRO_DRONE_MAX_GRAMS,
+  resolveInfrastructureRule,
+  type InfrastructureOutcome,
+} from "@/lib/geo/infrastructure-rule";
 import { resolveCoordinationLimit, periodStart, fetchMyCoordinationOverride } from "@/lib/coordination-quota";
 import { flightRequestEditEligibility } from "@/lib/validations/flight-request-edit-window";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
@@ -41,6 +47,8 @@ interface SafetyEvalOk {
   autoCleared: boolean;
   dispatcherNotes: string | null;
   activeZones: Tables<"airspace_zones">[];
+  /** The sport/leisure pilot's declaration that was relied on (null when none was needed) — stored with the request. */
+  infrastructureDeclaration: string | null;
 }
 interface SafetyEvalError {
   error: string;
@@ -140,6 +148,7 @@ async function evaluateFlightRequestSafety(
 
   let autoCleared = false;
   let dispatcherNotes: string | null = null;
+  let infrastructureDeclaration: string | null = null;
 
   if (notamCheck.inside) {
     const notamIds = notamCheck.notams.map((n) => n.id).join(", ");
@@ -182,9 +191,40 @@ async function evaluateFlightRequestSafety(
       console.error("checkProximity failed during flight request evaluation:", err);
     }
 
-    if (buildingCheckAvailable && !nearBuilding && osmCheckAvailable && !osmNeedsAuthorization) {
+    // A sport/leisure pilot near infrastructure: the regulation asks for a declaration, not a special authorization
+    // (the owner agreed, or a micro drone under the regulation's conditions) — see lib/geo/infrastructure-rule.ts.
+    const infrastructureNearby = (buildingCheckAvailable && nearBuilding) || (osmCheckAvailable && osmNeedsAuthorization);
+    let infraOutcome: InfrastructureOutcome = { outcome: "not_applicable" };
+    if (isHobby && infrastructureNearby) {
+      const { data: droneRow } = await supabase.from("drones").select("mtow_grams").eq("id", data.drone_id).maybeSingle();
+      infraOutcome = resolveInfrastructureRule({
+        isHobby,
+        infrastructureNearby,
+        mtowGrams: droneRow?.mtow_grams ?? null,
+        declaration: data.infrastructure_declaration ?? null,
+      });
+      if (infraOutcome.outcome === "declaration_required") {
+        return {
+          error: `יש מבנה/אתר בטווח ${requiredDistanceM} מ' מהנקודה — יש להצהיר: ${infraOutcome.options
+            .map((o) => INFRASTRUCTURE_DECLARATION_LABELS[o])
+            .join(" / ")}.`,
+        };
+      }
+      infrastructureDeclaration = infraOutcome.outcome === "exempt_micro" ? "micro_drone_conditions" : "owner_consent";
+    }
+
+    if (infraOutcome.outcome === "owner_consent") {
+      dispatcherNotes = `נשלח לבדיקת מוקדן: מבנה/אתר בטווח ${requiredDistanceM} מ' — המטיס הצהיר שבעל התשתית הסכים לטיסה (או שהיא בבעלותו). נדרש לוודא מול המטיס.`;
+    } else if (
+      buildingCheckAvailable &&
+      osmCheckAvailable &&
+      (infraOutcome.outcome === "exempt_micro" || (!nearBuilding && !osmNeedsAuthorization))
+    ) {
       autoCleared = true;
-      dispatcherNotes = "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה/אתר רגיש ידוע בטווח המרחק החוקי מהנקודה.";
+      dispatcherNotes =
+        infraOutcome.outcome === "exempt_micro"
+          ? `אושר אוטומטית: טיסן זעיר (עד ${MICRO_DRONE_MAX_GRAMS} גרם) — המטיס הצהיר על תנאי התקנות להטסה ליד תשתית (ללא חלקים נעים גלויים, ללא שהייה מעל אדם או רכב), ואין חפיפה עם מרחב אווירי מוגבל.`
+          : "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה/אתר רגיש ידוע בטווח המרחק החוקי מהנקודה.";
     } else if (!buildingCheckAvailable) {
       dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת קרבה למבנים לא הייתה זמינה כרגע, יש לאמת קרבה למבנים באופן ידני.";
     } else if (nearBuilding) {
@@ -196,7 +236,7 @@ async function evaluateFlightRequestSafety(
     }
   }
 
-  return { autoCleared, dispatcherNotes, activeZones };
+  return { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration };
 }
 
 /**
@@ -295,7 +335,7 @@ export async function createFlightRequest(
   if ("error" in evaluation) {
     return { success: false, error: evaluation.error };
   }
-  const { autoCleared, dispatcherNotes, activeZones } = evaluation;
+  const { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration } = evaluation;
 
   const { data: flightRequest, error: insertError } = await supabase
     .from("flight_requests")
@@ -319,6 +359,8 @@ export async function createFlightRequest(
       emergency_contact_phone: data.emergency_contact_phone,
       intersecting_zone_ids: activeZones.map((z) => z.id),
       dispatcher_notes: dispatcherNotes,
+      // Only sent when used, so a database without migration 0096 keeps working for every other request.
+      ...(infrastructureDeclaration ? { infrastructure_declaration: infrastructureDeclaration } : {}),
     })
     .select()
     .single();
@@ -398,7 +440,7 @@ export async function updateFlightRequest(
   if ("error" in evaluation) {
     return { success: false, error: evaluation.error };
   }
-  const { autoCleared, dispatcherNotes, activeZones } = evaluation;
+  const { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration } = evaluation;
 
   const { data: flightRequest, error: updateError } = await supabase
     .from("flight_requests")
@@ -421,6 +463,8 @@ export async function updateFlightRequest(
       emergency_contact_phone: data.emergency_contact_phone,
       intersecting_zone_ids: activeZones.map((z) => z.id),
       dispatcher_notes: dispatcherNotes,
+      // Only sent when used, so a database without migration 0096 keeps working for every other request.
+      ...(infrastructureDeclaration ? { infrastructure_declaration: infrastructureDeclaration } : {}),
     })
     .eq("id", flightRequestId)
     .select()

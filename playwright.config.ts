@@ -20,6 +20,8 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   retries: 0,
+  // One shared dev server and one shared hobby account: more parallel workers make the UI specs race and time out.
+  workers: 2,
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:3000",

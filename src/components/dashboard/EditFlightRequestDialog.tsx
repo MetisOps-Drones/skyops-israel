@@ -99,6 +99,8 @@ export function EditFlightRequestDialog({ request }: { request: FlightRequestWit
         altitude_band: altitudeBandForMeters(altitudeM),
         max_altitude_meters: altitudeM,
         camera_type: cameraType,
+        // Keeps the declaration made when the request was filed — an edit re-runs every check, including this one.
+        infrastructure_declaration: (request.infrastructure_declaration as "owner_consent" | "micro_drone_conditions" | null) ?? null,
         takedown_response_seconds: takedownSeconds,
         flight_purpose: flightPurpose,
         start_time: new Date(startTime),

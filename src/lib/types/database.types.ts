@@ -1090,6 +1090,7 @@ export type Database = {
         Row: {
           booking_id: string | null
           camera_type: string | null
+          infrastructure_declaration: string | null
           center_point: unknown
           center_point_geojson: Json
           created_at: string
@@ -1118,6 +1119,7 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           camera_type?: string | null
+          infrastructure_declaration?: string | null
           center_point: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -1146,6 +1148,7 @@ export type Database = {
         Update: {
           booking_id?: string | null
           camera_type?: string | null
+          infrastructure_declaration?: string | null
           center_point?: unknown
           center_point_geojson?: Json
           created_at?: string

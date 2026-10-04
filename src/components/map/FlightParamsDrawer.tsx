@@ -21,6 +21,13 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import {
+  INFRASTRUCTURE_DECLARATION_LABELS,
+  MICRO_DRONE_MAX_GRAMS,
+  isMicroDrone,
+  resolveInfrastructureRule,
+  type InfrastructureDeclaration,
+} from "@/lib/geo/infrastructure-rule";
 import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useBuildingProximity } from "@/hooks/useBuildingProximity";
@@ -92,6 +99,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
   const { data: hasValidInsurance, isLoading: insuranceLoading } = useHasValidInsurance();
   const selectedDrone = drones.find((d) => d.id === droneId) ?? null;
+  const [infraDeclaration, setInfraDeclaration] = useState<InfrastructureDeclaration | null>(null);
   const requestType = shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble";
   const licenseCheck = selectedDrone
     ? resolveLicenseRequirement(licenses, selectedDrone.mtow_grams, requestType)
@@ -204,7 +212,23 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
-  const blockedForHobby = needsSpecialAuthorization && isHobby;
+  // A sport/leisure pilot near infrastructure isn't blocked: the regulation asks for a declaration — the
+  // owner agreed, or a micro drone (≤250 g) under its conditions (lib/geo/infrastructure-rule.ts). Only the
+  // micro-drone declaration can be approved at once; the owner's consent goes to a dispatcher.
+  const infraDeclarationNeeded = isHobby && needsSpecialAuthorization;
+  const infraOutcome = resolveInfrastructureRule({
+    isHobby,
+    infrastructureNearby: needsSpecialAuthorization,
+    mtowGrams: selectedDrone?.mtow_grams ?? null,
+    declaration: infraDeclaration,
+  });
+  const infraDeclared = infraOutcome.outcome === "owner_consent" || infraOutcome.outcome === "exempt_micro";
+  const infraOptions: InfrastructureDeclaration[] =
+    infraOutcome.outcome === "declaration_required"
+      ? infraOutcome.options
+      : isMicroDrone(selectedDrone?.mtow_grams)
+        ? ["micro_drone_conditions", "owner_consent"]
+        : ["owner_consent"];
   // Independent of zone-based blocking — the legal altitude ceiling at this exact point can be 0
   // from the ground even when the zone itself would otherwise allow a coordination request.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
@@ -214,7 +238,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     needsSpecialAuthorization ||
     groundBlockedByAltitude ||
     buildingCheckUnavailable;
-  const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+  const blockedForSolo = zoneHardBlocked || groundBlockedByAltitude;
   // Airspace alone (local data, instant) already forbids this point — see the same note in
   // LocationInfoCard: the slower building/OSM checks can't change that, and a purchasable
   // special authorization can't legalize flying inside a CTR or a base restriction.
@@ -250,6 +274,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     !complexExhausted &&
     !licenseBlocked &&
     !(isChecking && isHobby) &&
+    (!infraDeclarationNeeded || infraDeclared) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
     Boolean(cameraType) &&
@@ -274,6 +299,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
         flight_purpose: flightPurpose,
         max_altitude_meters: maxAltitudeMeters,
         camera_type: cameraType,
+        infrastructure_declaration: infraDeclarationNeeded && infraDeclared ? infraDeclaration : null,
         takedown_response_seconds: takedownResponseSeconds,
         start_time: new Date(startTime),
         end_time: new Date(endTime),
@@ -291,6 +317,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           : "הבקשה נשלחה לתור המוקדן לתיאום."
       );
       reset();
+      setInfraDeclaration(null);
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -375,14 +402,14 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                 )}
               >
                 {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                {blockedForHobby
-                  ? "לא ניתן לתאם באזור זה מחשבון פרטי"
-                  : zoneVerdict.tone !== "none"
-                    ? zoneVerdict.headline
+                {zoneVerdict.tone !== "none"
+                  ? zoneVerdict.headline
                     : notamCheck?.inside
                       ? `נוטאם פעיל בנקודה זו${notamsValidUntilLabel(notamCheck.notams) ? ` · בתוקף עד ${notamsValidUntilLabel(notamCheck.notams)}` : ""} — נדרש תיאום`
                       : needsSpecialAuthorization
-                        ? "אזור זה דורש הרשאת הפעלה מיוחדת"
+                        ? isHobby
+                          ? `מבנה/אתר בטווח ${requiredDistanceM} מ' — נדרשת הצהרה לפי התקנות`
+                          : "אזור זה דורש הרשאת הפעלה מיוחדת"
                         : buildingCheckUnavailable
                           ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
                           : "אזור זה דורש תיאום בכפוף לתנאים"}
@@ -415,12 +442,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     </li>
                   ))}
                 </ul>
-                {blockedForHobby ? (
-                  <p className="text-xs text-muted-foreground">
-                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                    ופנאי) אינו זכאי לה.
-                  </p>
-                ) : zoneVerdict.tone !== "none" ? (
+                {zoneVerdict.tone !== "none" ? (
                   <p className="text-xs text-muted-foreground">{zoneVerdict.detail}</p>
                 ) : notamCheck?.inside ? (
                   <p className="text-xs text-muted-foreground">
@@ -428,7 +450,9 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                   </p>
                 ) : needsSpecialAuthorization ? (
                   <p className="text-xs text-muted-foreground">
-                    ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
+                    {isHobby
+                      ? "לפי תקנות המטיסן אין להטיס במרחק הקטן מ-150 מ' מתשתית, אלא אם בעל התשתית הסכים (או שהיא בבעלותכם), או שמדובר בטיסן זעיר (עד 250 גרם) שעומד בתנאי התקנות. סמנו את ההצהרה המתאימה למטה."
+                      : "ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן."}
                   </p>
                 ) : buildingCheckUnavailable ? (
                   <p className="text-xs text-muted-foreground">
@@ -440,11 +464,45 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
                     ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
                   </p>
                 )}
-                {matchingRegulations.map((reg) => (
-                  <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
-                ))}
+                {!isHobby &&
+                  matchingRegulations.map((reg) => (
+                    <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable />
+                  ))}
               </Disclosure>
             </div>
+          )}
+
+          {/* Sport/leisure pilot near a building or site: no wall, a declaration. A micro drone under the
+              regulation's conditions can be approved at once; the owner's consent goes to a dispatcher. */}
+          {!forbiddenByAirspace && !isChecking && infraDeclarationNeeded && (
+            <fieldset className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
+              <legend className="px-1 text-xs font-semibold text-warning">הצהרה נדרשת — תשתית בטווח {requiredDistanceM} מ&apos;</legend>
+              {infraOptions.map((option) => (
+                <label key={option} className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="infrastructure-declaration"
+                    className="mt-1"
+                    checked={infraDeclaration === option}
+                    onChange={() => setInfraDeclaration(option)}
+                  />
+                  <span>
+                    {INFRASTRUCTURE_DECLARATION_LABELS[option]}
+                    <span className="block text-xs text-muted-foreground">
+                      {option === "micro_drone_conditions"
+                        ? "הבקשה יכולה להיות מאושרת מיד, אם אין מגבלה נוספת בנקודה."
+                        : "הבקשה תועבר למוקדן לבדיקה."}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              {!isMicroDrone(selectedDrone?.mtow_grams) && selectedDrone && (
+                <p className="text-xs text-muted-foreground">
+                  אישור מיידי אפשרי רק לטיסן זעיר (עד {MICRO_DRONE_MAX_GRAMS} גרם) — לכלי הטיס שנבחר ({selectedDrone.mtow_grams} גרם) נדרשת הסכמת בעל התשתית.
+                </p>
+              )}
+              {!infraDeclared && <p className="text-xs font-medium text-destructive">יש לסמן הצהרה כדי לשלוח את הבקשה</p>}
+            </fieldset>
           )}
 
           <div className="grid grid-cols-2 gap-2">

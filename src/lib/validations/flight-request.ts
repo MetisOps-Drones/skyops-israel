@@ -78,6 +78,8 @@ export const createFlightRequestSchema = z
     max_altitude_meters: z.number().min(1, "יש להזין גובה טיסה במטרים").max(2000),
     flight_purpose: flightPurposeSchema,
     camera_type: cameraTypeSchema,
+    /** A sport/leisure pilot's declaration for flying within 150 m of infrastructure — see lib/geo/infrastructure-rule.ts. */
+    infrastructure_declaration: z.enum(["owner_consent", "micro_drone_conditions"]).nullish(),
     takedown_response_seconds: z
       .number({ invalid_type_error: "יש להזין זמן תגובה לבקשת הורדה" })
       .int()

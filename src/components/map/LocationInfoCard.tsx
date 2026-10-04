@@ -176,7 +176,9 @@ export function LocationInfoCard({
     ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
-  const blockedForHobby = needsSpecialAuthorization && isHobby;
+  // A sport/leisure pilot near infrastructure isn't blocked — the regulation asks for a declaration (the owner
+  // agreed, or a micro drone ≤250 g under its conditions), made when the coordination request is filed.
+  const hobbyNeedsDeclaration = needsSpecialAuthorization && isHobby;
   // A zone can allow a coordination request in principle while the legal altitude ceiling at
   // this exact point is still 0 from the ground — the two checks are independent. Without this,
   // the "request coordination" button could stay active for a point that can never be approved.
@@ -187,7 +189,7 @@ export function LocationInfoCard({
     needsSpecialAuthorization ||
     groundBlockedByAltitude ||
     buildingCheckUnavailable;
-  const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+  const cannotSubmit = zoneHardBlocked || groundBlockedByAltitude;
   // Decided from the airspace layer alone (local, instant) — never held
   // back behind the slower building/OSM checks. A point inside a CTR or an
   // air-force-base restriction is forbidden no matter what those find, and
@@ -324,7 +326,9 @@ export function LocationInfoCard({
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="text-base font-semibold">
-                    {needsSpecialAuthorization
+                    {hobbyNeedsDeclaration
+                      ? `מבנה/אתר בטווח ${requiredDistanceM} מ' — מותר בהסכמת בעל התשתית, או בטיסן זעיר (עד 250 גרם)`
+                      : needsSpecialAuthorization
                       ? "אפשרי, בכפוף להרשאה מיוחדת"
                       : buildingCheckUnavailable
                         ? "בדיקת קרבה למבנים לא זמינה כרגע"
@@ -333,13 +337,10 @@ export function LocationInfoCard({
                   <p className="mt-0.5 text-sm">
                     {buildingCheckUnavailable && !needsSpecialAuthorization
                       ? "לא ניתן לאשר אוטומטית — יש לתאם עם מוקדן שיבדוק קרבה למבנים ידנית."
-                      : "יש לתאם לפני הטיסה — הפרטים המלאים למטה."}
+                      : hobbyNeedsDeclaration
+                        ? "בבקשת התיאום תתבקשו להצהיר. טיסן זעיר שעומד בתנאים יכול לקבל אישור מיידי."
+                        : "יש לתאם לפני הטיסה — הפרטים המלאים למטה."}
                   </p>
-                  {blockedForHobby && (
-                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
-                      מה כן אפשר: לשדרג לחשבון עסקי ←
-                    </Link>
-                  )}
                 </div>
               </div>
             ) : (
@@ -390,27 +391,11 @@ export function LocationInfoCard({
                 zone-forbidden point is fully explained by the red banner above — no second
                 box; this covers the "blocked for hobby by a special authorization" case plus
                 the submit button for everything submittable. */}
-            {!forbiddenByAirspace &&
-              !isChecking &&
-              (cannotSubmit ? (
-                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
-                    <Lock className="h-4 w-4" />
-                    לא ניתן לתאם טיסה באזור זה מחשבון פרטי
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                    ופנאי) אינו זכאי לה.
-                  </p>
-                  <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                    שדרוג לחשבון עסקי מהפרופיל שלכם ←
-                  </Link>
-                </div>
-              ) : requiresAttention ? (
-                <Button size="lg" onClick={() => onRequestCoordination(point)}>
-                  בקשת תיאום לנקודה זו
-                </Button>
-              ) : null)}
+            {!forbiddenByAirspace && !isChecking && !cannotSubmit && requiresAttention && (
+              <Button size="lg" onClick={() => onRequestCoordination(point)}>
+                בקשת תיאום לנקודה זו
+              </Button>
+            )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
                 (/api/building-proximity — the R2 bitmap grid built from the same
@@ -437,7 +422,9 @@ export function LocationInfoCard({
                   <ShieldCheck className="h-4 w-4 shrink-0" />
                 )}
                 {buildingProximity.data.isNearBuilding
-                  ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
+                  ? isHobby
+                    ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הסכמת בעל המבנה, או טיסן זעיר (עד 250 גרם)`
+                    : `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
                   : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
               </p>
             ) : (
@@ -622,19 +609,24 @@ export function LocationInfoCard({
                   </div>
                 )}
 
-                {needsSpecialAuthorization && !forbiddenByAirspace && (
+                {hobbyNeedsDeclaration && !forbiddenByAirspace && (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-medium">הטסה ליד תשתית — מטיסן (ספורט ופנאי)</p>
+                    <p className="text-xs text-muted-foreground">
+                      לפי תקנות הטיס (הפעלת טיסן): אין להטיס במרחק הקטן מ-150 מ&apos; מתשתית (מבנה, אזור מאוכלס, אתר שפגיעה בו
+                      מסכנת חיים או רכוש), אלא אם בעל התשתית הסכים לכך או שהיא בבעלותך. טיסן זעיר (עד 250 גרם) רשאי לטוס מעל
+                      תשתית בתנאי שאין בו חלקים נעים גלויים ואינו שוהה מעל אדם או רכב בתנועה. בבקשת התיאום תתבקש להצהיר —
+                      טיסן זעיר יכול לקבל אישור מיידי, וטיסן כבד יותר יועבר למוקדן.
+                    </p>
+                  </div>
+                )}
+                {needsSpecialAuthorization && !isHobby && !forbiddenByAirspace && (
                   <div className="flex flex-col gap-2">
                     <p className="text-sm font-medium">
                       {matchingRegulations.length > 1 ? "הרשאות רלוונטיות למגבלות שנמצאו" : "הרשאה רלוונטית למגבלה שנמצאה"}
                     </p>
-                    {blockedForHobby && (
-                      <p className="text-xs text-muted-foreground">
-                        חשבון פרטי (ספורט ופנאי) אינו זכאי להרשאת הפעלה מיוחדת — התקנות מגדירות אותה רק עבור הפעלה
-                        מסחרית/כללית של כטב&quot;ם. הכרטיסים למטה מוצגים לעיון בלבד.
-                      </p>
-                    )}
                     {matchingRegulations.map((reg) => (
-                      <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
+                      <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable />
                     ))}
                   </div>
                 )}

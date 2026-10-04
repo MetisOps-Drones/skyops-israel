@@ -21,6 +21,7 @@ import { CoordinationPanel } from "./CoordinationPanel";import { DispatcherCheck
 import { DecisionHistory } from "./DecisionHistory";
 import { REJECT_REASON_TEMPLATES } from "@/lib/constants/dispatcher-quick-replies";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { INFRASTRUCTURE_DECLARATION_LABELS, type InfrastructureDeclaration } from "@/lib/geo/infrastructure-rule";
 import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { checkFlightAuthorizationRequirement } from "@/lib/geo/flight-rules";
 import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
@@ -341,6 +342,15 @@ export function RequestDetailPanel({
             </span>
             <span className="text-muted-foreground">סוג מצלמה</span>
             <span>{request.camera_type ? CAMERA_TYPE_LABELS[request.camera_type as CameraType] ?? request.camera_type : "לא צוין"}</span>
+            {request.infrastructure_declaration && (
+              <>
+                <span className="text-muted-foreground">הצהרת מטיסן (תשתית בטווח)</span>
+                <span className="font-medium">
+                  {INFRASTRUCTURE_DECLARATION_LABELS[request.infrastructure_declaration as InfrastructureDeclaration] ??
+                    request.infrastructure_declaration}
+                </span>
+              </>
+            )}
             <span className="text-muted-foreground">זמן הורדה מבקשה</span>
             <span>
               {request.takedown_response_seconds ? formatTakedownSeconds(request.takedown_response_seconds) : "לא צוין"}
