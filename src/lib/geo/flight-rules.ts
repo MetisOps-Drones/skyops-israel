@@ -141,6 +141,8 @@ function blockLevelForKind(kind: string): ZoneBlockLevel {
 
 export interface ZoneVerdict {
   tone: "forbidden" | "approval" | "warning" | "conditions" | "none";
+  /** One short phrase for tight spaces (the map's top bar) — same verdict as the headline, never a different one. */
+  shortLabel: string;
   headline: string;
   detail: string;
   /** Whether a coordination request may still be submitted for this account. */
@@ -161,6 +163,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "forbidden":
       return {
         tone: "forbidden",
+        shortLabel: "אסור לטיסה במיקומך",
         headline: "אסור להטיס באזור זה",
         detail:
           'לפי הפמ"ת והתקנות: אזור אסור, או מרחק קטן מ-2 ק"מ ממסלול של שדה תעופה (3 ק"מ משדה צבאי למפעיל מסחרי). הטסה כאן אפשרית רק באישור מראש של הגורם השולט מחוץ למערכת — אין מסלול בקשת תיאום עבור נקודה זו.',
@@ -171,6 +174,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
       return hasOrg
         ? {
             tone: "approval",
+            shortLabel: 'אזור מסוכן — נדרש אישור מנהל רת"א',
             headline: 'אזור מסוכן — אסור להטיס אלא באישור מנהל רת"א',
             detail: "ניתן להגיש בקשה כחשבון ארגון — המוקדן ישיג את האישור הפרטני לפני כל אישור.",
             canSubmit: true,
@@ -178,6 +182,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
           }
         : {
             tone: "forbidden",
+            shortLabel: "אזור מסוכן — אסור לטיסה",
             headline: "אזור מסוכן — אסור להטיס",
             detail: 'נדרש אישור פרטני של מנהל רת"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג אותו.',
             canSubmit: false,
@@ -186,6 +191,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "controlled_airspace":
       return {
         tone: "warning",
+        shortLabel: "מרחב מבוקר — נדרש תיאום",
         headline: "בתוך מרחב מבוקר (CTR/ATZ) — נדרש תיאום מול מגדל הפיקוח",
         detail:
           'מעבר למרחק האסור מהמסלול (2 ק"מ, ו-3 ק"מ משדה צבאי למפעיל מסחרי), טיסה בתוך המרחב המבוקר מותרת רק באישור מראש של מגדל הפיקוח. ניתן להגיש בקשת תיאום — המוקדן יתאם מול המגדל ויאמת מול NOTAM עדכני לפני אישור.',
@@ -195,13 +201,14 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "coordination_ok":
       return {
         tone: "conditions",
+        shortLabel: "אזור מוגבל — נדרש תיאום",
         headline: "אזור מוגבל — טיסה רק לפי תנאי האזור או באישור הגורם השולט",
         detail: "ניתן להגיש בקשת תיאום — המוקדן יתאם מול הגורם השולט באזור ויבדוק את התנאים שפורסמו.",
         canSubmit: true,
         upgradeHelps: false,
       };
     default:
-      return { tone: "none", headline: "", detail: "", canSubmit: true, upgradeHelps: false };
+      return { tone: "none", shortLabel: "", headline: "", detail: "", canSubmit: true, upgradeHelps: false };
   }
 }
 

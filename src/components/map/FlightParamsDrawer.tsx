@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Disclosure } from "@/components/ui/disclosure";
 import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
@@ -35,7 +34,6 @@ import {
 import { checkLiveNotamOverlap, notamsValidUntilLabel } from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, mToFt, altitudeAmslFt } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
-import { ClearanceBadge } from "./ClearanceBadge";
 import { PreFlightChecklist } from "./PreFlightChecklist";
 import { WeatherPanel } from "./WeatherPanel";
 import { BoundedNumberInput, MIN_RADIUS_M, MAX_RADIUS_M } from "./BoundedNumberInput";
@@ -338,6 +336,115 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             </div>
           )}
 
+          {/* The verdict on this point comes first — the pilot should know whether this request can work
+              before filling in the form, not discover it below the fold. */}
+          {!forbiddenByAirspace && !buildingsOnlyReady && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              בודק את הנקודה...
+            </p>
+          )}
+
+          {!forbiddenByAirspace && buildingsOnlyReady && isChecking && (
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                isNearBuildingLocally ? "text-warning" : "text-muted-foreground"
+              )}
+            >
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              {isNearBuildingLocally
+                ? "נמצא מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."
+                : "אין מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."}
+            </p>
+          )}
+
+          {!forbiddenByAirspace && !isChecking && requiresAttention && (
+            <div
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border p-3 text-sm",
+                blockedForSolo ? "border-destructive/40 bg-destructive/5" : "border-warning/40 bg-warning/10"
+              )}
+            >
+              <div
+                className={cn(
+                  "flex items-center gap-2 font-medium",
+                  blockedForSolo ? "text-destructive" : "text-warning"
+                )}
+              >
+                {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                {blockedForHobby
+                  ? "לא ניתן לתאם באזור זה מחשבון פרטי"
+                  : zoneVerdict.tone !== "none"
+                    ? zoneVerdict.headline
+                    : notamCheck?.inside
+                      ? `נוטאם פעיל בנקודה זו${notamsValidUntilLabel(notamCheck.notams) ? ` · בתוקף עד ${notamsValidUntilLabel(notamCheck.notams)}` : ""} — נדרש תיאום`
+                      : needsSpecialAuthorization
+                        ? "אזור זה דורש הרשאת הפעלה מיוחדת"
+                        : buildingCheckUnavailable
+                          ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
+                          : "אזור זה דורש תיאום בכפוף לתנאים"}
+              </div>
+              <Disclosure label="למה? — פירוט מלא">
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
+                  {buildingCheckUnavailable && (
+                    <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
+                  )}
+                  {authCheck?.reasons.map((reason, i) => (
+                    <li key={`aip-${i}`}>
+                      {reason.label}
+                      {reason.zone && !reason.zone.geometry_precise && (
+                        <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
+                      )}
+                    </li>
+                  ))}
+                  {notamCheck?.notams.map((notam) => (
+                    <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
+                      {notam.id}: {notam.eText}
+                    </li>
+                  ))}
+                  {isNearBuildingLocally && (
+                    <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
+                  )}
+                  {relevantProximityFindings.map((f, i) => (
+                    <li key={`prox-${i}`}>
+                      {f.label}
+                      {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
+                    </li>
+                  ))}
+                </ul>
+                {blockedForHobby ? (
+                  <p className="text-xs text-muted-foreground">
+                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
+                    ופנאי) אינו זכאי לה.
+                  </p>
+                ) : zoneVerdict.tone !== "none" ? (
+                  <p className="text-xs text-muted-foreground">{zoneVerdict.detail}</p>
+                ) : notamCheck?.inside ? (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
+                  </p>
+                ) : needsSpecialAuthorization ? (
+                  <p className="text-xs text-muted-foreground">
+                    ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
+                  </p>
+                ) : buildingCheckUnavailable ? (
+                  <p className="text-xs text-muted-foreground">
+                    לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
+                    אוטומטי.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
+                  </p>
+                )}
+                {matchingRegulations.map((reg) => (
+                  <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
+                ))}
+              </Disclosure>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -549,123 +656,9 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             />
           </div>
 
-          <Separator />
-
-          <div>
-            <p className="mb-2 text-sm font-medium">סטטוס בדיקת מרחב אווירי</p>
-            <ClearanceBadge result={spatialCheck} hasAdvisoryWarning={isChecking || requiresAttention} />
-          </div>
-
           <WeatherPanel center={center} />
 
           {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
-
-          {!forbiddenByAirspace && !buildingsOnlyReady && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              בודק את הנקודה...
-            </p>
-          )}
-
-          {!forbiddenByAirspace && buildingsOnlyReady && isChecking && (
-            <p
-              className={cn(
-                "flex items-center gap-1.5 text-xs",
-                isNearBuildingLocally ? "text-warning" : "text-muted-foreground"
-              )}
-            >
-              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-              {isNearBuildingLocally
-                ? "נמצא מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."
-                : "אין מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."}
-            </p>
-          )}
-
-          {!forbiddenByAirspace && !isChecking && requiresAttention && (
-            <div
-              className={cn(
-                "flex flex-col gap-2 rounded-lg border p-3 text-sm",
-                blockedForSolo ? "border-destructive/40 bg-destructive/5" : "border-warning/40 bg-warning/10"
-              )}
-            >
-              <div
-                className={cn(
-                  "flex items-center gap-2 font-medium",
-                  blockedForSolo ? "text-destructive" : "text-warning"
-                )}
-              >
-                {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                {blockedForHobby
-                  ? "לא ניתן לתאם באזור זה מחשבון פרטי"
-                  : zoneVerdict.tone !== "none"
-                    ? zoneVerdict.headline
-                    : notamCheck?.inside
-                      ? `נוטאם פעיל בנקודה זו${notamsValidUntilLabel(notamCheck.notams) ? ` · בתוקף עד ${notamsValidUntilLabel(notamCheck.notams)}` : ""} — נדרש תיאום`
-                      : needsSpecialAuthorization
-                        ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                        : buildingCheckUnavailable
-                          ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
-                          : "אזור זה דורש תיאום בכפוף לתנאים"}
-              </div>
-              <Disclosure label="למה? — פירוט מלא">
-                <ul className="list-inside list-disc text-xs text-muted-foreground">
-                  {buildingCheckUnavailable && (
-                    <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
-                  )}
-                  {authCheck?.reasons.map((reason, i) => (
-                    <li key={`aip-${i}`}>
-                      {reason.label}
-                      {reason.zone && !reason.zone.geometry_precise && (
-                        <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
-                      )}
-                    </li>
-                  ))}
-                  {notamCheck?.notams.map((notam) => (
-                    <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
-                      {notam.id}: {notam.eText}
-                    </li>
-                  ))}
-                  {isNearBuildingLocally && (
-                    <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
-                  )}
-                  {relevantProximityFindings.map((f, i) => (
-                    <li key={`prox-${i}`}>
-                      {f.label}
-                      {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
-                    </li>
-                  ))}
-                </ul>
-                {blockedForHobby ? (
-                  <p className="text-xs text-muted-foreground">
-                    התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                    ופנאי) אינו זכאי לה.
-                  </p>
-                ) : zoneVerdict.tone !== "none" ? (
-                  <p className="text-xs text-muted-foreground">{zoneVerdict.detail}</p>
-                ) : notamCheck?.inside ? (
-                  <p className="text-xs text-muted-foreground">
-                    ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
-                  </p>
-                ) : needsSpecialAuthorization ? (
-                  <p className="text-xs text-muted-foreground">
-                    ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
-                  </p>
-                ) : buildingCheckUnavailable ? (
-                  <p className="text-xs text-muted-foreground">
-                    לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
-                    אוטומטי.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
-                  </p>
-                )}
-                {matchingRegulations.map((reg) => (
-                  <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
-                ))}
-              </Disclosure>
-            </div>
-          )}
 
           {(quotaExhausted || complexExhausted) && (
             <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
