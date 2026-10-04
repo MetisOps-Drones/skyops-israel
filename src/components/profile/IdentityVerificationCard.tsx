@@ -47,6 +47,7 @@ export function IdentityVerificationCard() {
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
   const [uploadingIdCard, setUploadingIdCard] = useState(false);
   const [comparingFace, setComparingFace] = useState(false);
+  const [retryingFace, setRetryingFace] = useState(false);
 
   const hasLicense = licenseDocs.length > 0;
   const latestIdCard = idCardDocs[0];
@@ -109,6 +110,7 @@ export function IdentityVerificationCard() {
       const { similarity, result } = compareFaceDescriptors(idCardFace.descriptor, selfieFace.descriptor);
       await recordFaceMatchResult(latestVerification.id, similarity, result);
       toast.success(`השוואת הפנים הסתיימה: ${FACE_RESULT_LABEL[result]} (${Math.round(similarity * 100)}% דמיון)`);
+      setRetryingFace(false);
       invalidate();
     } catch {
       toast.error("השוואת הפנים נכשלה — יש לנסות שוב");
@@ -136,6 +138,11 @@ export function IdentityVerificationCard() {
         {hasLicense && (
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">שלב 1: תעודת זהות</p>
+            {latestVerification && (
+              <p className="text-xs text-muted-foreground">
+                לא ניתן לערוך אימות קיים ישירות — צילום מחדש מריץ את כל תהליך האימות (שלב 1 ו-2) מההתחלה.
+              </p>
+            )}
             <DocumentCameraCapture
               facingMode="environment"
               guideShape="card"
@@ -161,14 +168,7 @@ export function IdentityVerificationCard() {
         {latestVerification && latestIdCard && (
           <div className="flex flex-col gap-2 border-t pt-3">
             <p className="text-sm font-medium">שלב 2: זיהוי פנים</p>
-            {latestVerification.face_match_result === "not_run" ? (
-              <DocumentCameraCapture
-                facingMode="user"
-                guideShape="circle"
-                label="מבט ישיר למצלמה, באור טוב"
-                onCapture={handleFaceMatch}
-              />
-            ) : (
+            {latestVerification.face_match_result !== "not_run" && (
               <Badge
                 variant={
                   latestVerification.face_match_result === "match"
@@ -183,6 +183,18 @@ export function IdentityVerificationCard() {
                 {latestVerification.face_similarity !== null &&
                   ` (${Math.round(latestVerification.face_similarity * 100)}% דמיון)`}
               </Badge>
+            )}
+            {latestVerification.face_match_result === "not_run" || retryingFace ? (
+              <DocumentCameraCapture
+                facingMode="user"
+                guideShape="circle"
+                label="מבט ישיר למצלמה, באור טוב"
+                onCapture={handleFaceMatch}
+              />
+            ) : (
+              <Button size="sm" variant="outline" className="w-fit" onClick={() => setRetryingFace(true)}>
+                התוצאה לא נראית נכון? נסו שוב
+              </Button>
             )}
             {comparingFace && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

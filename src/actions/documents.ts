@@ -93,7 +93,11 @@ export async function uploadPilotLicenseDocument(formData: FormData): Promise<Up
         ocr_extracted_at: new Date().toISOString(),
         ocr_raw_text: ocrResult.rawText,
       },
-      { onConflict: "user_id,license_type,license_number" }
+      // One license per type per pilot (0098) — re-uploading, even to correct
+      // a mistyped license_number, replaces the prior record rather than
+      // leaving a stale duplicate the pilot has no way to remove (there's
+      // deliberately no direct field-edit UI; re-verifying is the only path).
+      { onConflict: "user_id,license_type" }
     )
     .select()
     .single();

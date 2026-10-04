@@ -245,7 +245,7 @@ export default async function DashboardPage() {
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>רישיונות</CardTitle>
-                <LicenseUploadDialog />
+                <LicenseUploadDialog hasExistingLicense={(licenses?.length ?? 0) > 0} />
               </CardHeader>
               <CardContent>
                 <Table>

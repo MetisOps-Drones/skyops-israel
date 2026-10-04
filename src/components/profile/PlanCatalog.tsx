@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMyOrgContext, useSwitchToProAccount } from "@/hooks/useOrgContext";
-import { useCreateOrganization } from "@/hooks/useOrgMembership";
 import { useUpdateProfileDetails } from "@/hooks/useProfileSettings";
+import { initiateCheckout } from "@/actions/billing";
 import { cn } from "@/lib/utils";
 import {
   PRIVATE_PLANS,
@@ -31,7 +31,6 @@ import {
   type PlanCategory,
 } from "@/lib/constants/plans";
 import type { Tables } from "@/lib/types/database.types";
-import { DemoModeNotice } from "@/components/shared/DemoModeNotice";
 
 function priceLabel(plan: Plan) {
   if (plan.priceIls === null) return "צור קשר לתמחור";
@@ -89,27 +88,30 @@ function PlanColumn({ plan, isCurrent, children }: { plan: Plan; isCurrent: bool
   );
 }
 
-function CreateOrgButton({ plan, fullName }: { plan: Plan; fullName: string }) {
-  const createOrg = useCreateOrganization();
-  const update = useUpdateProfileDetails();
+function CreateOrgButton({ plan }: { plan: Plan }) {
   const [open, setOpen] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function handleCreate() {
+  async function handleCheckout() {
     if (!orgName.trim()) {
       toast.error("יש להזין שם לארגון");
       return;
     }
+    if (plan.priceIls === null) {
+      toast.error("תוכנית זו דורשת יצירת קשר לתמחור");
+      return;
+    }
     setBusy(true);
     try {
-      await createOrg.mutateAsync(orgName.trim());
-      await update.mutateAsync({ fullName, planCode: plan.code });
-      toast.success(`הארגון נוצר בתוכנית "${plan.name}" (מצב הדגמה) — יש לחבר ספק סליקה אמיתי לפני עלייה לייצור`);
-      setOpen(false);
-      setOrgName("");
+      const result = await initiateCheckout({ planCode: plan.code, orgName: orgName.trim() });
+      if (!result.success || !result.redirectUrl) {
+        toast.error(result.error ?? "יצירת עמוד התשלום נכשלה");
+        return;
+      }
+      window.location.href = result.redirectUrl;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "יצירת הארגון נכשלה");
+      toast.error(err instanceof Error ? err.message : "יצירת עמוד התשלום נכשלה");
     } finally {
       setBusy(false);
     }
@@ -127,7 +129,8 @@ function CreateOrgButton({ plan, fullName }: { plan: Plan; fullName: string }) {
         <DialogHeader>
           <DialogTitle>יצירת ארגון — {plan.name}</DialogTitle>
           <DialogDescription>
-            {priceLabel(plan)} / {plan.billingPeriod ?? "מותאם אישית"}. זהו כפתור הדגמה — יש לחבר ספק סליקה אמיתי לפני עלייה לייצור.
+            {priceLabel(plan)} / {plan.billingPeriod ?? "מותאם אישית"}. הארגון ייווצר רק לאחר תשלום מאושר — תועברו לעמוד
+            סליקה מאובטח.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
@@ -135,9 +138,9 @@ function CreateOrgButton({ plan, fullName }: { plan: Plan; fullName: string }) {
           <Input id="org-name" placeholder="לדוגמה: רחפני הצפון בע״מ" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
         </div>
         <DialogFooter>
-          <Button onClick={handleCreate} disabled={busy}>
+          <Button onClick={handleCheckout} disabled={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            הפעלת שדרוג (הדגמה)
+            מעבר לתשלום
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -163,11 +166,20 @@ export function PlanCatalog({ profile }: { profile: Tables<"profiles"> }) {
   async function selectPlan(plan: Plan) {
     setSelecting(plan.code);
     try {
-      if (plan.category === "business" && currentCategory === "private") {
-        await switchToPro.mutateAsync("pilot_pro");
+      const switchingToPro = plan.category === "business" && currentCategory === "private";
+      if (plan.priceIls === 0) {
+        // Free tier — no payment step, matches the price shown.
+        if (switchingToPro) await switchToPro.mutateAsync("pilot_pro");
+        await update.mutateAsync({ fullName: profile.full_name, planCode: plan.code });
+        toast.success(`נבחרה תוכנית "${plan.name}"`);
+        return;
       }
-      await update.mutateAsync({ fullName: profile.full_name, planCode: plan.code });
-      toast.success(`נבחרה תוכנית "${plan.name}" (מצב הדגמה)`);
+      const result = await initiateCheckout({ planCode: plan.code, switchToPro: switchingToPro });
+      if (!result.success || !result.redirectUrl) {
+        toast.error(result.error ?? "יצירת עמוד התשלום נכשלה");
+        return;
+      }
+      window.location.href = result.redirectUrl;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "בחירת התוכנית נכשלה");
     } finally {
@@ -178,18 +190,17 @@ export function PlanCatalog({ profile }: { profile: Tables<"profiles"> }) {
   function renderAction(plan: Plan) {
     const isCurrent = profile.plan_code === plan.code;
     if (isCurrent) return null;
-    if (plan.category === "org" && !hasOrg) return <CreateOrgButton plan={plan} fullName={profile.full_name} />;
+    if (plan.category === "org" && !hasOrg) return <CreateOrgButton plan={plan} />;
     return (
       <Button size="sm" variant="outline" className="mt-1 w-full" onClick={() => selectPlan(plan)} disabled={selecting === plan.code}>
         {selecting === plan.code && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {plan.category === "business" && currentCategory === "private" ? "שדרוג ובחירה (ללא עלות)" : "בחירת תוכנית"}
+        {plan.priceIls === 0 ? "בחירת תוכנית" : "מעבר לתשלום"}
       </Button>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <DemoModeNotice>אין חיבור לספק סליקה אמיתי — בחירת/שדרוג תוכנית כאן היא תיעוד כוונה בלבד, לא עסקה בפועל.</DemoModeNotice>
       <Tabs value={activeTab} onValueChange={(v) => setUserSelectedTab(v as PlanCategory)} dir="rtl">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="private">לקוח פרטי</TabsTrigger>
