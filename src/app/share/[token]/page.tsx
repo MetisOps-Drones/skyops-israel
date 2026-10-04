@@ -72,7 +72,7 @@ export default async function SharedFlightReportPage({ params }: { params: { tok
         </div>
       )}
 
-      <p className="mt-auto pt-6 text-center text-xs text-muted-foreground">הופק על ידי MetisOps</p>
+      <p className="mt-auto pt-6 text-center text-xs text-muted-foreground">הופק על ידי Metisim</p>
     </div>
   );
 }

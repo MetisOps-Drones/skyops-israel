@@ -1,0 +1,25 @@
+Open a pending request inside the ops panel, not as a second overlay on top of it
+
+Ohad's report: clicking a pending request opened it "full screen" instead
+of inside the /ops panel that was already open.
+
+Root cause: RequestDetailDrawer was a Sheet (Radix Dialog under the hood),
+and Sheet is viewport-fixed -- it doesn't respect its parent's bounds the
+way normal DOM nesting does. /ops itself is already rendered as an overlay
+panel by AppShell (also a Dialog). So clicking a request stacked a second,
+viewport-spanning Dialog on top of the first one instead of feeling like
+part of the queue view underneath it -- exactly the "full screen instead
+of the already-open panel" Ohad flagged.
+
+Renamed RequestDetailDrawer.tsx -> RequestDetailPanel.tsx and dropped the
+Sheet wrapper entirely -- it's now plain content with its own small
+back-button header (mirroring AppShell's own header-bar convention).
+OpsPageClient swaps its rendered content between the queue view (map +
+table + authorities card) and this detail view based on `selected`,
+instead of layering the detail view on top of the queue view. Moved the
+page's own title into OpsPageClient too, gated on the same `selected`
+check, so the "מוקד תיאום" heading doesn't sit redundantly above the
+detail view's own per-request header.
+
+Verified: page loads clean (network 200s, no console errors past the
+transient mid-edit HMR noise). npx tsc --noEmit and npx eslint clean.

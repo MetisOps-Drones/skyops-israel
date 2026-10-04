@@ -16,12 +16,22 @@ import {
   requiredInfrastructureDistanceM,
   checkFlightAuthorizationRequirement,
   findingsRequiringAuthorization,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
 import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
+import { checkLiveNotamOverlap } from "@/lib/geo/live-notams";
+import { fetchLiveNotams } from "@/lib/notams/live-feed";
+import { fetchTerrainElevationM } from "@/lib/geo/terrain";
 import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { isNearBuilding, nearestSupportedBufferM } from "@/lib/geo/proximity-grid";
 import { checkProximity } from "@/lib/geo/proximity-check";
-import { resolveCoordinationLimit, periodStart } from "@/lib/coordination-quota";
+import {
+  INFRASTRUCTURE_DECLARATION_LABELS,
+  MICRO_DRONE_MAX_GRAMS,
+  resolveInfrastructureRule,
+  type InfrastructureOutcome,
+} from "@/lib/geo/infrastructure-rule";
+import { resolveCoordinationLimit, periodStart, fetchMyCoordinationOverride } from "@/lib/coordination-quota";
 import { flightRequestEditEligibility } from "@/lib/validations/flight-request-edit-window";
 import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 
@@ -37,6 +47,8 @@ interface SafetyEvalOk {
   autoCleared: boolean;
   dispatcherNotes: string | null;
   activeZones: Tables<"airspace_zones">[];
+  /** The sport/leisure pilot's declaration that was relied on (null when none was needed) — stored with the request. */
+  infrastructureDeclaration: string | null;
 }
 interface SafetyEvalError {
   error: string;
@@ -68,20 +80,6 @@ async function evaluateFlightRequestSafety(
     return { error: `בדיקת אזורי AIP נכשלה: ${aipError.message}` };
   }
   const aipZones = (aipZonesRaw ?? []) as AipReferenceZone[];
-  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones);
-  const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones);
-
-  if (altitudeAtPoint.blockedFromGround) {
-    return {
-      error: "תקרת הגובה החוקית בנקודה זו היא 0 מ' מהקרקע (מרחב אווירי חופף מהקרקע) — לא ניתן לבקש תיאום לנקודה זו, גם לחשבון ארגון.",
-    };
-  }
-
-  if (authCheck.blockLevel === "director_approval_only" && !hasOrg) {
-    return { error: 'אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת"א. תיאום כזה זמין רק לחשבונות ארגון.' };
-  }
-
-  const aipRequiresDispatcher = authCheck.blockLevel !== "none";
 
   const footprint =
     data.request_type === "manual_notam_bubble" && data.polygon
@@ -89,6 +87,52 @@ async function evaluateFlightRequestSafety(
       : turf.circle(data.center_point.coordinates, (data.radius_meters ?? 100) / 1000, {
           units: "kilometers",
         }).geometry;
+
+  // Zone and runway-distance rules are judged on the requested point, not
+  // on the bubble drawn around it.
+  // Ground elevation lets a zone whose floor is above anything the drone can reach (e.g. the 9,000 ft Tel
+  // Aviv upper sector) be ignored. If the elevation lookup fails every zone counts — never a guessed ground.
+  const terrainM = await fetchTerrainElevationM(centerPoint[1], centerPoint[0], 4_000);
+  // Weekday-only areas (ranges, helicopter areas) are checked against the weekdays inside the requested window.
+  const flightWindow = { start: data.start_time, end: data.end_time };
+  const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby, {
+    maxAltitudeAmslM: terrainM === null ? null : terrainM + data.max_altitude_meters,
+    window: flightWindow,
+  });
+  // Height-limited areas (helicopter areas, the 100-ft area) cap the flight for every account.
+  if (authCheck.altitudeCapM !== null && data.max_altitude_meters > authCheck.altitudeCapM) {
+    return {
+      error: `באזור זה (${authCheck.capZones.map((z) => z.name).join(", ")}) מותר להטיס עד ${authCheck.altitudeCapM} מ' מעל הקרקע בלבד — לא ניתן לבקש גובה של ${data.max_altitude_meters} מ'.`,
+    };
+  }
+  const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones, flightWindow);
+
+  if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {
+    const why = authCheck.reasons.map((r) => r.label).join("; ");
+    return {
+      error: `${zoneVerdictFor("forbidden", hasOrg).headline} — ${why || "מרחב אווירי חופף מהקרקע"}. לא ניתן לבקש תיאום לנקודה זו, בכל סוג חשבון.`,
+    };
+  }
+
+  if (authCheck.blockLevel === "director_approval_only" && !hasOrg) {
+    return { error: `${zoneVerdictFor("director_approval_only", false).headline}. ${zoneVerdictFor("director_approval_only", false).detail}` };
+  }
+
+  // Never trust a client-supplied "no active NOTAM" claim — fetched fresh
+  // here regardless of what the client's own check (FlightParamsDrawer)
+  // showed, same "authoritative, re-verified" policy as the AIP check
+  // above. A fetch failure fails toward "requires dispatcher review", never
+  // toward auto-clear — see src/lib/notams/live-feed.ts for the source.
+  let notamCheck: { inside: boolean; notams: { id: string }[] } = { inside: false, notams: [] };
+  let notamCheckFailed = false;
+  try {
+    const liveNotams = await fetchLiveNotams();
+    // Judged on the requested flight window: a NOTAM that starts tomorrow still counts for a flight tomorrow.
+    notamCheck = checkLiveNotamOverlap(centerPoint, liveNotams, { start: data.start_time, end: data.end_time });
+  } catch (err) {
+    notamCheckFailed = true;
+    console.error("fetchLiveNotams failed during flight request evaluation:", err);
+  }
 
   const { data: intersectingZones, error: rpcError } = await supabase.rpc("find_intersecting_zones", {
     candidate_geom_geojson: footprint as never,
@@ -104,8 +148,14 @@ async function evaluateFlightRequestSafety(
 
   let autoCleared = false;
   let dispatcherNotes: string | null = null;
+  let infrastructureDeclaration: string | null = null;
 
-  if (aipRequiresDispatcher) {
+  if (notamCheck.inside) {
+    const notamIds = notamCheck.notams.map((n) => n.id).join(", ");
+    dispatcherNotes = `נשלח לבדיקת מוקדן: נוטאם פעיל חופף לנקודה — ${notamIds}.`;
+  } else if (notamCheckFailed) {
+    dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת נוטאמים פעילים לא הייתה זמינה כרגע.";
+  } else if (authCheck.blockLevel !== "none") {
     const zoneNames = authCheck.reasons.map((r) => r.label).join("; ");
     dispatcherNotes = `נשלח לבדיקת מוקדן: חפיפה/קרבה לאזור AIP — ${zoneNames || "ראו פרטי האזור בבקשה"}.`;
   } else if (data.request_type === "basic_auto_100m" && activeZones.length === 0) {
@@ -141,9 +191,40 @@ async function evaluateFlightRequestSafety(
       console.error("checkProximity failed during flight request evaluation:", err);
     }
 
-    if (buildingCheckAvailable && !nearBuilding && osmCheckAvailable && !osmNeedsAuthorization) {
+    // A sport/leisure pilot near infrastructure: the regulation asks for a declaration, not a special authorization
+    // (the owner agreed, or a micro drone under the regulation's conditions) — see lib/geo/infrastructure-rule.ts.
+    const infrastructureNearby = (buildingCheckAvailable && nearBuilding) || (osmCheckAvailable && osmNeedsAuthorization);
+    let infraOutcome: InfrastructureOutcome = { outcome: "not_applicable" };
+    if (isHobby && infrastructureNearby) {
+      const { data: droneRow } = await supabase.from("drones").select("mtow_grams").eq("id", data.drone_id).maybeSingle();
+      infraOutcome = resolveInfrastructureRule({
+        isHobby,
+        infrastructureNearby,
+        mtowGrams: droneRow?.mtow_grams ?? null,
+        declaration: data.infrastructure_declaration ?? null,
+      });
+      if (infraOutcome.outcome === "declaration_required") {
+        return {
+          error: `יש מבנה/אתר בטווח ${requiredDistanceM} מ' מהנקודה — יש להצהיר: ${infraOutcome.options
+            .map((o) => INFRASTRUCTURE_DECLARATION_LABELS[o])
+            .join(" / ")}.`,
+        };
+      }
+      infrastructureDeclaration = infraOutcome.outcome === "exempt_micro" ? "micro_drone_conditions" : "owner_consent";
+    }
+
+    if (infraOutcome.outcome === "owner_consent") {
+      dispatcherNotes = `נשלח לבדיקת מוקדן: מבנה/אתר בטווח ${requiredDistanceM} מ' — המטיס הצהיר שבעל התשתית הסכים לטיסה (או שהיא בבעלותו). נדרש לוודא מול המטיס.`;
+    } else if (
+      buildingCheckAvailable &&
+      osmCheckAvailable &&
+      (infraOutcome.outcome === "exempt_micro" || (!nearBuilding && !osmNeedsAuthorization))
+    ) {
       autoCleared = true;
-      dispatcherNotes = "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה/אתר רגיש ידוע בטווח המרחק החוקי מהנקודה.";
+      dispatcherNotes =
+        infraOutcome.outcome === "exempt_micro"
+          ? `אושר אוטומטית: טיסן זעיר (עד ${MICRO_DRONE_MAX_GRAMS} גרם) — המטיס הצהיר על תנאי התקנות להטסה ליד תשתית (ללא חלקים נעים גלויים, ללא שהייה מעל אדם או רכב), ואין חפיפה עם מרחב אווירי מוגבל.`
+          : "אושר אוטומטית: אין חפיפה עם מרחב אווירי מוגבל ואין מבנה/אתר רגיש ידוע בטווח המרחק החוקי מהנקודה.";
     } else if (!buildingCheckAvailable) {
       dispatcherNotes = "נשלח לבדיקת מוקדן: בדיקת קרבה למבנים לא הייתה זמינה כרגע, יש לאמת קרבה למבנים באופן ידני.";
     } else if (nearBuilding) {
@@ -155,7 +236,7 @@ async function evaluateFlightRequestSafety(
     }
   }
 
-  return { autoCleared, dispatcherNotes, activeZones };
+  return { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration };
 }
 
 /**
@@ -215,6 +296,7 @@ export async function createFlightRequest(
     role: profile?.role ?? null,
     hasOrg: Boolean(profile?.org_id),
     planCode: profile?.plan_code ?? null,
+    override: await fetchMyCoordinationOverride(supabase),
   });
   if (coordinationLimit) {
     const since = periodStart(coordinationLimit.period);
@@ -253,7 +335,7 @@ export async function createFlightRequest(
   if ("error" in evaluation) {
     return { success: false, error: evaluation.error };
   }
-  const { autoCleared, dispatcherNotes, activeZones } = evaluation;
+  const { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration } = evaluation;
 
   const { data: flightRequest, error: insertError } = await supabase
     .from("flight_requests")
@@ -269,12 +351,16 @@ export async function createFlightRequest(
           : null,
       max_altitude_meters: data.max_altitude_meters,
       flight_purpose: data.flight_purpose,
+      camera_type: data.camera_type,
+      takedown_response_seconds: data.takedown_response_seconds,
       start_time: data.start_time.toISOString(),
       end_time: data.end_time.toISOString(),
       status: autoCleared ? "auto_cleared" : "pending_dispatcher",
       emergency_contact_phone: data.emergency_contact_phone,
       intersecting_zone_ids: activeZones.map((z) => z.id),
       dispatcher_notes: dispatcherNotes,
+      // Only sent when used, so a database without migration 0096 keeps working for every other request.
+      ...(infrastructureDeclaration ? { infrastructure_declaration: infrastructureDeclaration } : {}),
     })
     .select()
     .single();
@@ -354,7 +440,7 @@ export async function updateFlightRequest(
   if ("error" in evaluation) {
     return { success: false, error: evaluation.error };
   }
-  const { autoCleared, dispatcherNotes, activeZones } = evaluation;
+  const { autoCleared, dispatcherNotes, activeZones, infrastructureDeclaration } = evaluation;
 
   const { data: flightRequest, error: updateError } = await supabase
     .from("flight_requests")
@@ -369,12 +455,16 @@ export async function updateFlightRequest(
           : null,
       max_altitude_meters: data.max_altitude_meters,
       flight_purpose: data.flight_purpose,
+      camera_type: data.camera_type,
+      takedown_response_seconds: data.takedown_response_seconds,
       start_time: data.start_time.toISOString(),
       end_time: data.end_time.toISOString(),
       status: autoCleared ? "auto_cleared" : "pending_dispatcher",
       emergency_contact_phone: data.emergency_contact_phone,
       intersecting_zone_ids: activeZones.map((z) => z.id),
       dispatcher_notes: dispatcherNotes,
+      // Only sent when used, so a database without migration 0096 keeps working for every other request.
+      ...(infrastructureDeclaration ? { infrastructure_declaration: infrastructureDeclaration } : {}),
     })
     .eq("id", flightRequestId)
     .select()

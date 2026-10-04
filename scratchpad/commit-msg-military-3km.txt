@@ -1,0 +1,10 @@
+Apply the 3 km military-airfield distance for commercial operators
+
+The commercial regulation (הפעלת כטב"ם קטן, תשפ"ד 2024) reads "...קטן מ-2
+קילומטרים (או אם נקבע מרחק גדול יותר בפמ"ת), או צבאית במרחק שקטן מ-3
+קילומטרים"; the hobby regulation (הפעלת מטיסן) has only the 2 km. The
+runway-distance rule now uses 3 km for a military airfield when the
+requester is not a hobby pilot, and 2 km otherwise. nearestRunway() ranks by
+distance minus each runway's own radius so a base's 3 km outranks a closer
+civil strip. Callers that know the licence type pass it (map card, request
+form, server action); the rest default to the stricter commercial rule.

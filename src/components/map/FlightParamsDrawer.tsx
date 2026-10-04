@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as turf from "@turf/turf";
 import { Loader2, Radius, Waypoints, ShieldAlert, Lock, Gauge } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { Disclosure } from "@/components/ui/disclosure";
 import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useDrones } from "@/hooks/useDrones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import {
+  INFRASTRUCTURE_DECLARATION_LABELS,
+  MICRO_DRONE_MAX_GRAMS,
+  isMicroDrone,
+  resolveInfrastructureRule,
+  type InfrastructureDeclaration,
+} from "@/lib/geo/infrastructure-rule";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useBuildingProximity } from "@/hooks/useBuildingProximity";
 import {
@@ -28,30 +36,31 @@ import {
   PROXIMITY_CATEGORY_REGULATION,
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
-import { maxLegalAltitudeAtPoint } from "@/lib/geo/aip";
+import { checkLiveNotamOverlap, notamsValidUntilLabel } from "@/lib/geo/live-notams";
+import { maxLegalAltitudeAtPoint, mToFt, altitudeAmslFt } from "@/lib/geo/aip";
 import { InlineAuthorizationPurchase } from "./InlineAuthorizationPurchase";
-import { ClearanceBadge } from "./ClearanceBadge";
 import { PreFlightChecklist } from "./PreFlightChecklist";
 import { WeatherPanel } from "./WeatherPanel";
+import { BoundedNumberInput, MIN_RADIUS_M, MAX_RADIUS_M } from "./BoundedNumberInput";
 import { createFlightRequest } from "@/actions/flight-requests";
 import { DroneQuickRegisterCard } from "@/components/onboarding/DroneQuickRegisterCard";
-import { ALTITUDE_BAND_METERS, type FlightAltitudeBand } from "@/lib/validations/flight-request";
+import {
+  altitudeBandForMeters,
+  CAMERA_TYPE_LABELS,
+  MIN_TAKEDOWN_SECONDS,
+  MAX_TAKEDOWN_SECONDS,
+  type CameraType,
+} from "@/lib/validations/flight-request";
+import { HOBBY_GENERAL_CEILING_M, COMMERCIAL_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
+import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
 import { FLIGHT_PURPOSE_OPTIONS } from "@/lib/constants/flight-purpose";
 import { cn } from "@/lib/utils";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useCoordinationQuota } from "@/hooks/useCoordinationQuota";
 import { useMyLicenses, useHasValidInsurance } from "@/hooks/useLicenses";
 import { resolveLicenseRequirement } from "@/lib/validations/flight-request-requirements";
-
-const ALTITUDE_OPTIONS: { value: FlightAltitudeBand; label: string }[] = [
-  { value: "under_50m", label: "עד 50 מטר" },
-  { value: "under_100m", label: "עד 100 מטר" },
-  { value: "over_100m", label: "מעל 100 מטר (דורש אישור מיוחד)" },
-];
-
-/** תקנות הטיס (הפעלת מטיסן), תשפ"ד 2024: תקרת הגובה למטיסן היא 50 מ' קבועים — אין ל"ספורט ופנאי" מסלול חוקי לגובה גבוה יותר, לא רק "מעל 100 מ' דורש אישור" כמו בכטב"ם המסחרי. */
-const HOBBY_ALTITUDE_OPTIONS = ALTITUDE_OPTIONS.filter((opt) => opt.value === "under_50m");
 
 export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const {
@@ -61,14 +70,18 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     radiusMeters,
     setRadiusMeters,
     polygon,
-    altitudeBand,
-    setAltitudeBand,
+    maxAltitudeMeters,
+    setMaxAltitudeMeters,
     flightPurpose,
     setFlightPurpose,
     droneId,
     setDroneId,
     emergencyContactPhone,
     setEmergencyContactPhone,
+    cameraType,
+    setCameraType,
+    takedownResponseSeconds,
+    setTakedownResponseSeconds,
     reset,
   } = useMapDrawStore();
 
@@ -77,13 +90,16 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
+  const { data: liveNotams = [], isLoading: liveNotamsLoading } = useLiveNotamZones();
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
-  const altitudeOptions = isHobby ? HOBBY_ALTITUDE_OPTIONS : ALTITUDE_OPTIONS;
+  // תקנות הטיס (הפעלת מטיסן), תשפ"ד 2024: 50 מ' קבועים למטיסן — אין ל"ספורט ופנאי" מסלול חוקי לגובה גבוה יותר; לכטב"ם קטן 100 מ'.
+  const altitudeCeilingM = isHobby ? HOBBY_GENERAL_CEILING_M : COMMERCIAL_GENERAL_CEILING_M;
 
   const { data: licenses = [], isLoading: licensesLoading } = useMyLicenses();
   const { data: hasValidInsurance, isLoading: insuranceLoading } = useHasValidInsurance();
   const selectedDrone = drones.find((d) => d.id === droneId) ?? null;
+  const [infraDeclaration, setInfraDeclaration] = useState<InfrastructureDeclaration | null>(null);
   const requestType = shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble";
   const licenseCheck = selectedDrone
     ? resolveLicenseRequirement(licenses, selectedDrone.mtow_grams, requestType)
@@ -116,13 +132,40 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     return null;
   }, [shapeType, center, polygon]);
 
+  // Zone and 2 km runway-distance rules are judged on the requested point
+  // (the pin / the polygon's centre), not on the size of the bubble.
+  const terrain = useAltitudeCeiling(checkPoint);
+  const terrainM = terrain.data?.terrainElevationM ?? null;
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  // Once the pilot has picked a flight window, a NOTAM only counts if it overlaps that window (including ones that start later).
+  // Weekday-only areas follow the same window: a Saturday flight isn't held up by a weekday firing range.
+  const notamWindow = useMemo(() => {
+    if (!startTime || !endTime) return null;
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start ? null : { start, end };
+  }, [startTime, endTime]);
   const authCheck = useMemo(
-    () => (checkPoint ? checkFlightAuthorizationRequirement(checkPoint, aipZones) : null),
-    [checkPoint, aipZones]
+    () =>
+      checkPoint
+        ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby, {
+            maxAltitudeAmslM: terrainM === null ? null : terrainM + maxAltitudeMeters,
+            window: notamWindow,
+          })
+        : null,
+    [checkPoint, aipZones, isHobby, terrainM, maxAltitudeMeters, notamWindow]
   );
+  // A height-limited area at the point (helicopter areas, the 100-ft area) caps the flight for every account.
+  const areaCapM = authCheck?.altitudeCapM ?? null;
+  const maxAllowedAltitudeM = areaCapM === null ? altitudeCeilingM : Math.min(altitudeCeilingM, areaCapM);
   const altitudeResult = useMemo(
-    () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones) : null),
-    [checkPoint, aipZones]
+    () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones, notamWindow) : null),
+    [checkPoint, aipZones, notamWindow]
+  );
+  const notamCheck = useMemo(
+    () => (checkPoint ? checkLiveNotamOverlap(checkPoint, liveNotams, notamWindow) : null),
+    [checkPoint, liveNotams, notamWindow]
   );
   const proximity = useProximityCheck(checkPoint);
   const proximityFindings = proximity.data?.findings ?? [];
@@ -130,7 +173,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // already chosen here — the legal minimum distance from infrastructure for a מטיס (commercial)
   // is the flight altitude itself (תקנה 32), so this uses the real selected altitude, not a
   // conservative placeholder.
-  const plannedAltitudeM = ALTITUDE_BAND_METERS[altitudeBand];
+  const plannedAltitudeM = maxAltitudeMeters;
   const requiredDistanceM = requiredInfrastructureDistanceM(isHobby, plannedAltitudeM);
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, plannedAltitudeM);
   // Primary signal, same reasoning as LocationInfoCard: OSM's "residential"
@@ -158,8 +201,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // approval — only an organization account may submit here (the dispatcher
   // still has to chase that approval manually); hobby/solo-pro cannot.
   const zoneBlockLevel = authCheck?.blockLevel ?? "none";
-  const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
+  const zoneVerdict = zoneVerdictFor(zoneBlockLevel, hasOrg);
+  const zoneHardBlocked = !zoneVerdict.canSubmit;
   const matchingRegulations = Array.from(
     new Set([
       ...relevantProximityFindings
@@ -169,37 +212,61 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
-  const blockedForHobby = needsSpecialAuthorization && isHobby;
+  // A sport/leisure pilot near infrastructure isn't blocked: the regulation asks for a declaration — the
+  // owner agreed, or a micro drone (≤250 g) under its conditions (lib/geo/infrastructure-rule.ts). Only the
+  // micro-drone declaration can be approved at once; the owner's consent goes to a dispatcher.
+  const infraDeclarationNeeded = isHobby && needsSpecialAuthorization;
+  const infraOutcome = resolveInfrastructureRule({
+    isHobby,
+    infrastructureNearby: needsSpecialAuthorization,
+    mtowGrams: selectedDrone?.mtow_grams ?? null,
+    declaration: infraDeclaration,
+  });
+  const infraDeclared = infraOutcome.outcome === "owner_consent" || infraOutcome.outcome === "exempt_micro";
+  const infraOptions: InfrastructureDeclaration[] =
+    infraOutcome.outcome === "declaration_required"
+      ? infraOutcome.options
+      : isMicroDrone(selectedDrone?.mtow_grams)
+        ? ["micro_drone_conditions", "owner_consent"]
+        : ["owner_consent"];
   // Independent of zone-based blocking — the legal altitude ceiling at this exact point can be 0
   // from the ground even when the zone itself would otherwise allow a coordination request.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
   const requiresAttention =
-    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
-  const blockedForSolo = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+    zoneBlockLevel !== "none" ||
+    Boolean(notamCheck?.inside) ||
+    needsSpecialAuthorization ||
+    groundBlockedByAltitude ||
+    buildingCheckUnavailable;
+  const blockedForSolo = zoneHardBlocked || groundBlockedByAltitude;
+  // Airspace alone (local data, instant) already forbids this point — see the same note in
+  // LocationInfoCard: the slower building/OSM checks can't change that, and a purchasable
+  // special authorization can't legalize flying inside a CTR or a base restriction.
+  const forbiddenByAirspace = !aipZonesLoading && (groundBlockedByAltitude || zoneHardBlocked);
   // Same reasoning as LocationInfoCard: requiresAttention is derived from
   // aipZones/proximity/buildingProximity, all async — while any is still
   // loading, don't show (or let a hobby pilot act on) a premature "fine to
   // submit" state.
-  const isChecking = aipZonesLoading || proximity.isLoading || buildingProximity.isLoading;
+  const isChecking = aipZonesLoading || liveNotamsLoading || proximity.isLoading || buildingProximity.isLoading;
   // Same fast-path as LocationInfoCard: the building-footprint check alone
   // is a GIST-indexed spatial query, so once *it* resolves (even while
   // aipZones/proximity are still loading) show that read immediately
   // instead of the generic spinner.
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Coordination is arbitrarily capped for hobby pilots — if the store still
-  // holds a band they're no longer allowed to pick (e.g. left over from a
-  // previous session), pull it back down instead of silently submitting a
-  // request the server will reject anyway.
+  // The ceiling differs by licence type — if the store still holds an altitude above what this
+  // account may legally request (e.g. left over from a previous session), pull it back down
+  // instead of silently submitting a request the server will reject anyway.
   useEffect(() => {
-    if (isHobby && altitudeBand !== "under_50m") {
-      setAltitudeBand("under_50m");
-    }
-  }, [isHobby, altitudeBand, setAltitudeBand]);
+    if (maxAltitudeMeters > maxAllowedAltitudeM) setMaxAltitudeMeters(maxAllowedAltitudeM);
+  }, [maxAltitudeMeters, maxAllowedAltitudeM, setMaxAltitudeMeters]);
+
+  // The pilot thinks in meters above the ground; ATC and the AIP in feet above sea level (מעפ"י).
+  // Shown live so the conversion the coordinator will see is never a surprise.
+  const altitudeFt = mToFt(maxAltitudeMeters);
+  const altitudeAmsl = altitudeAmslFt(maxAltitudeMeters, terrain.data?.terrainElevationM ?? null);
 
   const canSubmit =
     !blockedForSolo &&
@@ -207,17 +274,18 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
     !complexExhausted &&
     !licenseBlocked &&
     !(isChecking && isHobby) &&
+    (!infraDeclarationNeeded || infraDeclared) &&
     Boolean(droneId) &&
     Boolean(emergencyContactPhone) &&
+    Boolean(cameraType) &&
+    takedownResponseSeconds !== null &&
     Boolean(startTime && endTime) &&
     ((shapeType === "circle" && Boolean(center)) || (shapeType === "polygon" && Boolean(polygon)));
 
   async function handleSubmit() {
-    if (!canSubmit || !center) return;
+    if (!canSubmit || !center || !cameraType || takedownResponseSeconds === null) return;
     setSubmitting(true);
     try {
-      const altitudeMeters = ALTITUDE_BAND_METERS[altitudeBand];
-
       const result = await createFlightRequest({
         drone_id: droneId!,
         request_type: shapeType === "circle" ? "basic_auto_100m" : "manual_notam_bubble",
@@ -227,9 +295,12 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           shapeType === "polygon" && polygon
             ? { type: "Polygon", coordinates: polygon.coordinates as [number, number][][] }
             : undefined,
-        altitude_band: altitudeBand,
+        altitude_band: altitudeBandForMeters(maxAltitudeMeters),
         flight_purpose: flightPurpose,
-        max_altitude_meters: altitudeMeters,
+        max_altitude_meters: maxAltitudeMeters,
+        camera_type: cameraType,
+        infrastructure_declaration: infraDeclarationNeeded && infraDeclared ? infraDeclaration : null,
+        takedown_response_seconds: takedownResponseSeconds,
         start_time: new Date(startTime),
         end_time: new Date(endTime),
         emergency_contact_phone: emergencyContactPhone,
@@ -246,6 +317,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           : "הבקשה נשלחה לתור המוקדן לתיאום."
       );
       reset();
+      setInfraDeclaration(null);
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -253,13 +325,186 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>פרטי בקשת טיסה</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] w-[92vw] max-w-md overflow-y-auto rounded-xl">
+        <DialogHeader>
+          <DialogTitle>פרטי בקשת טיסה</DialogTitle>
+          <DialogDescription className="sr-only">טופס הגשת בקשת תיאום טיסה לנקודה שנבחרה על המפה</DialogDescription>
+        </DialogHeader>
 
         <div className="mt-4 flex flex-col gap-5">
+          {forbiddenByAirspace && (
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+              <Lock className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-base font-semibold">
+                  {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                    ? zoneVerdictFor("forbidden", hasOrg).headline
+                    : zoneVerdict.headline}
+                </p>
+                <Disclosure label="למה? — פירוט מלא">
+                  {authCheck && authCheck.reasons.length > 0 && (
+                    <ul className="list-inside list-disc text-sm">
+                      {authCheck.reasons.map((reason, i) => (
+                        <li key={i}>{reason.label}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-sm">
+                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                      ? zoneVerdictFor("forbidden", hasOrg).detail
+                      : zoneVerdict.detail}
+                  </p>
+                </Disclosure>
+                {zoneVerdict.upgradeHelps && (
+                  <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
+                    מה כן אפשר: לשדרג לחשבון ארגון ←
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* The verdict on this point comes first — the pilot should know whether this request can work
+              before filling in the form, not discover it below the fold. */}
+          {!forbiddenByAirspace && !buildingsOnlyReady && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              בודק את הנקודה...
+            </p>
+          )}
+
+          {!forbiddenByAirspace && buildingsOnlyReady && isChecking && (
+            <p
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                isNearBuildingLocally ? "text-warning" : "text-muted-foreground"
+              )}
+            >
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              {isNearBuildingLocally
+                ? "נמצא מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."
+                : "אין מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."}
+            </p>
+          )}
+
+          {!forbiddenByAirspace && !isChecking && requiresAttention && (
+            <div
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border p-3 text-sm",
+                blockedForSolo ? "border-destructive/40 bg-destructive/5" : "border-warning/40 bg-warning/10"
+              )}
+            >
+              <div
+                className={cn(
+                  "flex items-center gap-2 font-medium",
+                  blockedForSolo ? "text-destructive" : "text-warning"
+                )}
+              >
+                {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                {zoneVerdict.tone !== "none"
+                  ? zoneVerdict.headline
+                    : notamCheck?.inside
+                      ? `נוטאם פעיל בנקודה זו${notamsValidUntilLabel(notamCheck.notams) ? ` · בתוקף עד ${notamsValidUntilLabel(notamCheck.notams)}` : ""} — נדרש תיאום`
+                      : needsSpecialAuthorization
+                        ? isHobby
+                          ? `מבנה/אתר בטווח ${requiredDistanceM} מ' — נדרשת הצהרה לפי התקנות`
+                          : "אזור זה דורש הרשאת הפעלה מיוחדת"
+                        : buildingCheckUnavailable
+                          ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
+                          : "אזור זה דורש תיאום בכפוף לתנאים"}
+              </div>
+              <Disclosure label="למה? — פירוט מלא">
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
+                  {buildingCheckUnavailable && (
+                    <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
+                  )}
+                  {authCheck?.reasons.map((reason, i) => (
+                    <li key={`aip-${i}`}>
+                      {reason.label}
+                      {reason.zone && !reason.zone.geometry_precise && (
+                        <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
+                      )}
+                    </li>
+                  ))}
+                  {notamCheck?.notams.map((notam) => (
+                    <li key={`notam-${notam.id}`} dir="ltr" className="text-right">
+                      {notam.id}: {notam.eText}
+                    </li>
+                  ))}
+                  {isNearBuildingLocally && (
+                    <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
+                  )}
+                  {relevantProximityFindings.map((f, i) => (
+                    <li key={`prox-${i}`}>
+                      {f.label}
+                      {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
+                    </li>
+                  ))}
+                </ul>
+                {zoneVerdict.tone !== "none" ? (
+                  <p className="text-xs text-muted-foreground">{zoneVerdict.detail}</p>
+                ) : notamCheck?.inside ? (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לשלוח בקשה — המוקדן יבדוק את הנוטאם הפעיל לפני אישור. מקור: רשות שדות התעופה, לא רשמי.
+                  </p>
+                ) : needsSpecialAuthorization ? (
+                  <p className="text-xs text-muted-foreground">
+                    {isHobby
+                      ? "לפי תקנות המטיסן אין להטיס במרחק הקטן מ-150 מ' מתשתית, אלא אם בעל התשתית הסכים (או שהיא בבעלותכם), או שמדובר בטיסן זעיר (עד 250 גרם) שעומד בתנאי התקנות. סמנו את ההצהרה המתאימה למטה."
+                      : "ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן."}
+                  </p>
+                ) : buildingCheckUnavailable ? (
+                  <p className="text-xs text-muted-foreground">
+                    לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
+                    אוטומטי.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
+                  </p>
+                )}
+                {!isHobby &&
+                  matchingRegulations.map((reg) => (
+                    <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable />
+                  ))}
+              </Disclosure>
+            </div>
+          )}
+
+          {/* Sport/leisure pilot near a building or site: no wall, a declaration. A micro drone under the
+              regulation's conditions can be approved at once; the owner's consent goes to a dispatcher. */}
+          {!forbiddenByAirspace && !isChecking && infraDeclarationNeeded && (
+            <fieldset className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
+              <legend className="px-1 text-xs font-semibold text-warning">הצהרה נדרשת — תשתית בטווח {requiredDistanceM} מ&apos;</legend>
+              {infraOptions.map((option) => (
+                <label key={option} className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="infrastructure-declaration"
+                    className="mt-1"
+                    checked={infraDeclaration === option}
+                    onChange={() => setInfraDeclaration(option)}
+                  />
+                  <span>
+                    {INFRASTRUCTURE_DECLARATION_LABELS[option]}
+                    <span className="block text-xs text-muted-foreground">
+                      {option === "micro_drone_conditions"
+                        ? "הבקשה יכולה להיות מאושרת מיד, אם אין מגבלה נוספת בנקודה."
+                        : "הבקשה תועבר למוקדן לבדיקה."}
+                    </span>
+                  </span>
+                </label>
+              ))}
+              {!isMicroDrone(selectedDrone?.mtow_grams) && selectedDrone && (
+                <p className="text-xs text-muted-foreground">
+                  אישור מיידי אפשרי רק לטיסן זעיר (עד {MICRO_DRONE_MAX_GRAMS} גרם) — לכלי הטיס שנבחר ({selectedDrone.mtow_grams} גרם) נדרשת הסכמת בעל התשתית.
+                </p>
+              )}
+              {!infraDeclared && <p className="text-xs font-medium text-destructive">יש לסמן הצהרה כדי לשלוח את הבקשה</p>}
+            </fieldset>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -302,32 +547,77 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           {shapeType === "circle" && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="radius">רדיוס (מטרים)</Label>
-              <Input
+              <BoundedNumberInput
                 id="radius"
-                type="number"
-                min={10}
-                max={5000}
                 value={radiusMeters}
-                onChange={(e) => setRadiusMeters(Number(e.target.value))}
-                dir="ltr"
+                onChange={setRadiusMeters}
+                min={MIN_RADIUS_M}
+                max={MAX_RADIUS_M}
+                errorText={`הרדיוס חייב להיות בין ${MIN_RADIUS_M} ל-${MAX_RADIUS_M.toLocaleString("he-IL")} מטרים`}
               />
             </div>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="altitude">גובה מרבי</Label>
-            <Select value={altitudeBand} onValueChange={(v) => setAltitudeBand(v as FlightAltitudeBand)}>
-              <SelectTrigger id="altitude">
-                <SelectValue />
+            <Label htmlFor="altitude">גובה טיסה מרבי (מטרים מעל הקרקע)</Label>
+            <BoundedNumberInput
+              id="altitude"
+              value={maxAltitudeMeters}
+              onChange={setMaxAltitudeMeters}
+              min={1}
+              max={maxAllowedAltitudeM}
+              errorText={
+                areaCapM !== null && areaCapM < altitudeCeilingM
+                  ? `באזור זה מותר להטיס עד ${areaCapM} מטרים בלבד`
+                  : `הגובה חייב להיות בין 1 ל-${altitudeCeilingM} מטרים (התקרה החוקית ${isHobby ? "למטיסן" : "לכטב״ם קטן"})`
+              }
+            />
+            {areaCapM !== null && areaCapM < altitudeCeilingM && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                {`באזור זה (${authCheck?.capZones.map((z) => z.name).join(", ")}) מותר להטיס עד ${areaCapM} מ' מעל הקרקע בלבד`}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground" dir="rtl">
+              = {altitudeFt.toLocaleString("he-IL")} רגל מעל הקרקע
+              {altitudeAmsl !== null
+                ? ` · כ-${altitudeAmsl.toLocaleString("he-IL")} רגל מעל פני הים (מעפ״י) — כך יוצג למתאם`
+                : terrain.isLoading
+                  ? " · מחשב גובה מעל פני הים..."
+                  : ""}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cameraType">סוג מצלמה</Label>
+            <Select value={cameraType ?? undefined} onValueChange={(v) => setCameraType(v as CameraType)}>
+              <SelectTrigger id="cameraType">
+                <SelectValue placeholder="בחר סוג מצלמה" />
               </SelectTrigger>
               <SelectContent>
-                {altitudeOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                {(Object.entries(CAMERA_TYPE_LABELS) as [CameraType, string][]).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="takedown">זמן תגובה לבקשת הורדה (שניות)</Label>
+            <BoundedNumberInput
+              id="takedown"
+              value={takedownResponseSeconds}
+              onChange={setTakedownResponseSeconds}
+              min={MIN_TAKEDOWN_SECONDS}
+              max={MAX_TAKEDOWN_SECONDS}
+              placeholder="לדוגמה: 60"
+              errorText={`יש להזין בין ${MIN_TAKEDOWN_SECONDS} ל-${MAX_TAKEDOWN_SECONDS.toLocaleString("he-IL")} שניות`}
+            />
+            <p className="text-xs text-muted-foreground">
+              כמה זמן ייקח להוריד את הרחפן לקרקע מהרגע שהתקבלה בקשת הורדה מהמתאם.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -371,6 +661,22 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
 
           {drones.length === 0 && !hasOrg ? (
             <DroneQuickRegisterCard />
+          ) : drones.length === 0 ? (
+            // An org pilot/fleet manager with zero org drones — registering
+            // one inline here (like DroneQuickRegisterCard does for a solo
+            // pilot) would bypass fleet management, which lives under
+            // "יומן טיסות" (see OrgPageClient.tsx's own note on this same
+            // split). A bare empty <Select> with nothing to pick and no
+            // explanation read as broken, not as "nothing registered yet".
+            <div className="rounded-lg border border-dashed p-4 text-sm">
+              <p className="font-medium">לארגון שלך עדיין אין כלי טיס רשום</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                יש לרשום כלי טיס תחת ניהול הצי לפני שאפשר לבקש תיאום.
+              </p>
+              <Link href="/logs" className="mt-2 inline-block text-xs font-medium text-primary hover:underline">
+                מעבר לניהול הצי
+              </Link>
+            </div>
           ) : (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="drone">כלי טיס</Label>
@@ -420,133 +726,9 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             />
           </div>
 
-          <Separator />
-
-          <div>
-            <p className="mb-2 text-sm font-medium">סטטוס בדיקת מרחב אווירי</p>
-            <ClearanceBadge result={spatialCheck} hasAdvisoryWarning={isChecking || requiresAttention} />
-          </div>
-
           <WeatherPanel center={center} />
 
           {spatialCheck?.clear && !isChecking && !requiresAttention && <PreFlightChecklist />}
-
-          {!buildingsOnlyReady && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              בודק את הנקודה...
-            </p>
-          )}
-
-          {buildingsOnlyReady && isChecking && (
-            <p
-              className={cn(
-                "flex items-center gap-1.5 text-xs",
-                isNearBuildingLocally ? "text-warning" : "text-muted-foreground"
-              )}
-            >
-              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-              {isNearBuildingLocally
-                ? "נמצא מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."
-                : "אין מבנה בקרבת מקום (בדיקה מיידית) — בודק גם מרחב אווירי..."}
-            </p>
-          )}
-
-          {!isChecking && requiresAttention && (
-            <div
-              className={cn(
-                "flex flex-col gap-2 rounded-lg border p-3 text-sm",
-                blockedForSolo ? "border-destructive/40 bg-destructive/5" : "border-warning/40 bg-warning/10"
-              )}
-            >
-              <div
-                className={cn(
-                  "flex items-center gap-2 font-medium",
-                  blockedForSolo ? "text-destructive" : "text-warning"
-                )}
-              >
-                {blockedForSolo ? <Lock className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                {zoneHardBlocked
-                  ? "לא ניתן לתאם דרך המערכת"
-                  : blockedForHobby
-                    ? "לא ניתן לתאם באזור זה מחשבון פרטי"
-                    : groundBlockedByAltitude
-                      ? "לא ניתן לבקש תיאום לנקודה זו"
-                      : zoneBlockLevel === "controlled_airspace"
-                        ? "קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית"
-                        : zoneRequiresDirectorApproval
-                          ? 'כן — בכפוף לאישור פרטני של מנהל רת"א'
-                          : needsSpecialAuthorization
-                            ? "אזור זה דורש הרשאת הפעלה מיוחדת"
-                            : buildingCheckUnavailable
-                              ? "בדיקת קרבה למבנים לא הייתה זמינה — נדרש תיאום עם מוקדן"
-                              : "אזור זה דורש תיאום בכפוף לתנאים"}
-              </div>
-              <ul className="list-inside list-disc text-xs text-muted-foreground">
-                {groundBlockedByAltitude && <li>תקרת גובה חוקית של 0 מ&apos; מהקרקע בנקודה זו</li>}
-                {buildingCheckUnavailable && (
-                  <li>בדיקת קרבה למבנים אוטומטית לא הייתה זמינה כרגע — לא ניתן לאשר אוטומטית</li>
-                )}
-                {authCheck?.reasons.map((reason, i) => (
-                  <li key={`aip-${i}`}>
-                    {reason.label}
-                    {reason.zone && !reason.zone.geometry_precise && (
-                      <span className="text-warning"> * גבול משוער — נדרשת בקשת תיאום לבדיקה מדויקת</span>
-                    )}
-                  </li>
-                ))}
-                {isNearBuildingLocally && (
-                  <li>נמצא מבנה בטווח {requiredDistanceM} מ&apos;</li>
-                )}
-                {relevantProximityFindings.map((f, i) => (
-                  <li key={`prox-${i}`}>
-                    {f.label}
-                    {f.name ? ` (${f.name})` : ""} — כ-{f.distanceM} מ&apos; (הסף החוקי בגובה שנבחר: {requiredDistanceM} מ&apos;)
-                  </li>
-                ))}
-              </ul>
-              {zoneBlockLevel === "controlled_airspace" ? (
-                <p className="text-xs text-muted-foreground">
-                  ניתן לשלוח בקשה — המוקדן יאמת מול NOTAM עדכני לפני אישור.
-                </p>
-              ) : blockedForHobby ? (
-                <p className="text-xs text-muted-foreground">
-                  התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב&quot;ם בלבד — חשבון פרטי (ספורט
-                  ופנאי) אינו זכאי לה.
-                </p>
-              ) : groundBlockedByAltitude ? (
-                <p className="text-xs text-muted-foreground">
-                  תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין
-                  גובה טיסה חוקי לבקש עליו תיאום, גם לחשבון ארגון.
-                </p>
-              ) : zoneRequiresDirectorApproval ? (
-                <p className="text-xs text-muted-foreground">
-                  אזור אסור/מסוכן לטיסה — האישור הסופי מותנה באישור פרטני של מנהל רת&quot;א שהמוקדן יצטרך להשיג מול
-                  הרשות לפני אישור הבקשה.
-                </p>
-              ) : zoneBlockLevel === "director_approval_only" ? (
-                <p className="text-xs text-muted-foreground">
-                  אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת&quot;א. תיאום כזה זמין רק לחשבונות ארגון.
-                </p>
-              ) : needsSpecialAuthorization ? (
-                <p className="text-xs text-muted-foreground">
-                  ודאו שברשותכם הרשאת הפעלה מיוחדת מתאימה לפני שליחה — הבקשה תסומן לבדיקה נוספת של המוקדן.
-                </p>
-              ) : buildingCheckUnavailable ? (
-                <p className="text-xs text-muted-foreground">
-                  לא ניתן היה לבדוק אוטומטית קרבה למבנים בנקודה זו — הבקשה תישלח לבדיקה ידנית של מוקדן במקום אישור
-                  אוטומטי.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן.
-                </p>
-              )}
-              {matchingRegulations.map((reg) => (
-                <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
-              ))}
-            </div>
-          )}
 
           {(quotaExhausted || complexExhausted) && (
             <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
@@ -564,8 +746,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
           )}
 
           <p className="text-[11px] text-muted-foreground">
-            המידע אינו כולל NOTAM בזמן אמת ואינו תחליף לבדיקה רשמית לפני טיסה. האחריות לביצוע הטיסה על פי כל דין
-            מוטלת על המטיס.
+            נוטאמים פעילים נבדקים מול פיד לא-רשמי של רשות שדות התעופה, לא תחליף לבדיקה רשמית לפני טיסה. האחריות
+            לביצוע הטיסה על פי כל דין מוטלת על המטיס.
           </p>
 
           <div className="flex gap-2">
@@ -584,7 +766,7 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

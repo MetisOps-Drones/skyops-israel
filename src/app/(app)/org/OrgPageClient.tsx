@@ -34,6 +34,7 @@ import {
   useSwitchActiveOrg,
   useDecideMembership,
   useRemoveMember,
+  useUpdateMemberPosition,
 } from "@/hooks/useOrgMembership";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
@@ -43,7 +44,13 @@ const STATUS_LABELS: Record<string, { label: string; variant: "success" | "warni
   removed: { label: "הוסר", variant: "secondary" },
 };
 
-const ROLE_LABELS: Record<string, string> = {
+// Deliberately its own map, not the shared ROLE_LABEL (lib/constants/roles.ts):
+// organization_members.role reuses the same user_role enum values, but here
+// they mean the caller's *permission level inside this one org* — a
+// pilot_pro membership role is "מטיס קבלן" (contractor pilot), not the
+// "לקוח פרטי עסקי" a global profiles.role of pilot_pro means elsewhere. Same
+// enum value, different real-world fact, so a different label on purpose.
+const ORG_ROLE_LABEL: Record<string, string> = {
   fleet_manager: "מנהל צי",
   pilot_pro: "מטיס קבלן",
   pilot_hobby: "מטיסן",
@@ -141,7 +148,10 @@ function MyMembershipsCard() {
               return (
                 <TableRow key={`${m.org_id}-${m.user_id}`}>
                   <TableCell>{m.organizations?.name ?? "—"}</TableCell>
-                  <TableCell>{m.role ? ROLE_LABELS[m.role] : "—"}</TableCell>
+                  <TableCell>
+                    {m.role ? ORG_ROLE_LABEL[m.role] : "—"}
+                    {m.position && <span className="text-muted-foreground"> · {m.position}</span>}
+                  </TableCell>
                   <TableCell>
                     {(() => {
                       const statusInfo = STATUS_LABELS[m.status] ?? { label: m.status, variant: "secondary" as const };
@@ -170,12 +180,14 @@ function PendingRequestsCard({ orgId }: { orgId: string }) {
   const { data: requests = [], isLoading } = usePendingMembershipRequests(orgId);
   const decide = useDecideMembership();
   const [roleChoice, setRoleChoice] = useState<Record<string, string>>({});
+  const [positionChoice, setPositionChoice] = useState<Record<string, string>>({});
 
   async function approve(orgId: string, userId: string) {
     const key = `${orgId}-${userId}`;
     const role = roleChoice[key] ?? "pilot_pro";
+    const position = positionChoice[key] ?? "";
     try {
-      await decide.mutateAsync({ org_id: orgId, user_id: userId, approve: true, role });
+      await decide.mutateAsync({ org_id: orgId, user_id: userId, approve: true, role, position });
       toast.success("הבקשה אושרה");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "האישור נכשל");
@@ -204,7 +216,8 @@ function PendingRequestsCard({ orgId }: { orgId: string }) {
             <TableRow>
               <TableHead>שם</TableHead>
               <TableHead>טלפון</TableHead>
-              <TableHead>תפקיד לאישור</TableHead>
+              <TableHead>הרשאה</TableHead>
+              <TableHead>תפקיד (אופציונלי)</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -230,6 +243,14 @@ function PendingRequestsCard({ orgId }: { orgId: string }) {
                         <SelectItem value="fleet_manager">מנהל צי</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      placeholder="לדוגמה: מגייסת, מטיס ניסוי"
+                      value={positionChoice[key] ?? ""}
+                      onChange={(e) => setPositionChoice((s) => ({ ...s, [key]: e.target.value }))}
+                      className="w-40"
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -304,6 +325,33 @@ function RemoveMemberDialog({
   );
 }
 
+/** Inline-editable free-text position — separate control from the role Select above (PendingRequestsCard), since this never touches the permission-bearing `role` field. Saves on blur, only when the value actually changed. */
+function PositionCell({ orgId, userId, position }: { orgId: string; userId: string; position: string | null }) {
+  const [value, setValue] = useState(position ?? "");
+  const updatePosition = useUpdateMemberPosition();
+
+  async function handleBlur() {
+    if (value.trim() === (position ?? "").trim()) return;
+    try {
+      await updatePosition.mutateAsync({ org_id: orgId, user_id: userId, position: value });
+      toast.success("התפקיד עודכן");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "העדכון נכשל");
+    }
+  }
+
+  return (
+    <Input
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={handleBlur}
+      placeholder="לדוגמה: מגייסת"
+      className="h-8 w-36 text-xs"
+      disabled={updatePosition.isPending}
+    />
+  );
+}
+
 function ActiveMembersCard({ orgId, myUserId }: { orgId: string; myUserId: string | null }) {
   const { data: members = [], isLoading } = useActiveOrgMembers(orgId);
 
@@ -318,6 +366,7 @@ function ActiveMembersCard({ orgId, myUserId }: { orgId: string; myUserId: strin
             <TableRow>
               <TableHead>שם</TableHead>
               <TableHead>טלפון</TableHead>
+              <TableHead>הרשאה</TableHead>
               <TableHead>תפקיד</TableHead>
               <TableHead></TableHead>
             </TableRow>
@@ -325,14 +374,14 @@ function ActiveMembersCard({ orgId, myUserId }: { orgId: string; myUserId: strin
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   טוען...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && members.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   אין חברים פעילים בארגון עדיין
                 </TableCell>
               </TableRow>
@@ -343,7 +392,10 @@ function ActiveMembersCard({ orgId, myUserId }: { orgId: string; myUserId: strin
                 <TableCell dir="ltr" className="text-end">
                   {m.profiles?.phone ?? "—"}
                 </TableCell>
-                <TableCell>{m.role ? ROLE_LABELS[m.role] : "—"}</TableCell>
+                <TableCell>{m.role ? ORG_ROLE_LABEL[m.role] : "—"}</TableCell>
+                <TableCell>
+                  <PositionCell orgId={m.org_id} userId={m.user_id} position={m.position} />
+                </TableCell>
                 <TableCell>
                   {m.user_id !== myUserId && (
                     <RemoveMemberDialog
@@ -387,7 +439,8 @@ function ActiveOrgCard() {
         ) : (
           <div className="flex flex-col gap-2">
             <p className="text-sm">
-              <span className="font-medium">{ctx.orgName}</span> · תפקידך: {ctx.orgRole ? ROLE_LABELS[ctx.orgRole] : "—"}
+              <span className="font-medium">{ctx.orgName}</span> · הרשאתך: {ctx.orgRole ? ORG_ROLE_LABEL[ctx.orgRole] : "—"}
+              {ctx.orgPosition && <> · תפקידך: {ctx.orgPosition}</>}
             </p>
             {ctx.isFleetManager && ctx.inviteCode && (
               <div className="flex items-center gap-2">

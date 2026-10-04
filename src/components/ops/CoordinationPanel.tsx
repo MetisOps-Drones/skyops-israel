@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, MessageCircle, Phone, Loader2 } from "lucide-react";
+import { Copy, MessageCircle, Loader2 } from "lucide-react";
+import { AuthorityContactList } from "@/components/ops/AuthorityContactList";
+import { authorityContacts, isMobileNumber } from "@/lib/coordination/authority-contacts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FlightRequestWithRelations } from "@/hooks/useFlightRequests";
+import { useAltitudeCeiling } from "@/hooks/useAltitudeCeiling";
+import { altitudeAmslFt } from "@/lib/geo/aip";
 import {
   useCoordinationAuthorityLookup,
   useFlightRequestCoordination,
@@ -19,6 +23,10 @@ import { COORDINATION_STATUS_LABEL, COORDINATION_STATUS_VARIANT } from "@/lib/co
 import type { CoordinationContactStatus } from "@/lib/types/database.types";
 
 function AuthorityRow({ authority, message }: { authority: CoordinationAuthority; message: string }) {
+  // The forwarded message goes to the first number WhatsApp can actually reach.
+  const contacts = authorityContacts(authority);
+  const messageTarget = contacts.find((c) => isMobileNumber(c.phone))?.phone ?? authority.phone;
+
   function handleCopy() {
     navigator.clipboard.writeText(message);
     toast.success("ההודעה הועתקה");
@@ -30,12 +38,8 @@ function AuthorityRow({ authority, message }: { authority: CoordinationAuthority
         <p className="text-sm font-semibold">
           {authority.name} <span className="text-xs font-normal text-muted-foreground">· {authority.unit_type}</span>
         </p>
-        <p className="flex items-center gap-1 text-sm text-muted-foreground" dir="ltr">
-          <Phone className="h-3.5 w-3.5 shrink-0" />
-          {authority.phone}
-          {authority.backup_phone && <span className="text-xs">(גיבוי: {authority.backup_phone})</span>}
-        </p>
-        {authority.notes && <p className="text-xs text-muted-foreground">{authority.notes}</p>}
+        <AuthorityContactList authority={authority} />
+        {authority.notes && <p className="mt-1 text-xs text-muted-foreground">{authority.notes}</p>}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={handleCopy}>
@@ -43,15 +47,9 @@ function AuthorityRow({ authority, message }: { authority: CoordinationAuthority
           העתקת הודעה
         </Button>
         <Button size="sm" asChild>
-          <a href={whatsAppLink(authority.phone, message)} target="_blank" rel="noopener noreferrer">
+          <a href={whatsAppLink(messageTarget, message)} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-3.5 w-3.5" />
-            שליחה בוואטסאפ
-          </a>
-        </Button>
-        <Button size="sm" variant="ghost" asChild>
-          <a href={`tel:${authority.phone}`}>
-            <Phone className="h-3.5 w-3.5" />
-            חיוג
+            שליחת ההודעה בוואטסאפ
           </a>
         </Button>
       </div>
@@ -90,7 +88,10 @@ export function CoordinationPanel({
     setNotes(coordination?.notes ?? "");
   }, [coordination?.status, coordination?.notes, request.id]);
 
-  const message = buildCoordinationMessage(request, dmsCoordinates);
+  const { data: terrain } = useAltitudeCeiling([lng, lat]);
+  const message = buildCoordinationMessage(request, dmsCoordinates, {
+    altitudeAmslFt: altitudeAmslFt(Number(request.max_altitude_meters), terrain?.terrainElevationM ?? null),
+  });
 
   async function handleSave(newStatus: CoordinationContactStatus) {
     setStatus(newStatus);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MapPinned, ShieldAlert, ShieldCheck, ArrowUpToLine, Lock, Ban, Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,6 +9,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { WeatherPanel } from "@/components/map/WeatherPanel";
 import { TermTooltip } from "@/components/map/TermTooltip";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import { useMyGlobalRole, useMyOrgContext } from "@/hooks/useOrgContext";
 import { useProximityCheck } from "@/hooks/useProximityCheck";
 import { useBuildingProximity } from "@/hooks/useBuildingProximity";
@@ -19,7 +21,16 @@ import {
   PROXIMITY_CATEGORY_REGULATION,
   findingsRequiringAuthorization,
   requiredInfrastructureDistanceM,
+  zoneVerdictFor,
 } from "@/lib/geo/flight-rules";
+import {
+  checkLiveNotamOverlap,
+  formatNotamSchedule,
+  formatNotamTime,
+  notamsActivityLabel,
+  notamsValidUntilLabel,
+  upcomingNotamsAt,
+} from "@/lib/geo/live-notams";
 import { maxLegalAltitudeAtPoint, formatAltitudeRangeMeters } from "@/lib/geo/aip";
 import {
   computeFullAltitudeCeiling,
@@ -27,6 +38,8 @@ import {
   COMMERCIAL_GENERAL_CEILING_M,
 } from "@/lib/geo/altitude-ceiling";
 import { toDMS } from "@/lib/geo/spatial";
+import { buildLocationBriefing } from "@/lib/geo/location-briefing";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function LocationInfoCard({
@@ -41,12 +54,15 @@ export function LocationInfoCard({
   onRequestCoordination: (point: [number, number]) => void;
 }) {
   const { data: aipZones = [], isLoading: aipZonesLoading } = useAipReferenceZones();
+  const { data: liveNotams = [], isLoading: liveNotamsLoading } = useLiveNotamZones();
   const { data: role } = useMyGlobalRole();
   const { data: orgContext } = useMyOrgContext();
   const proximity = useProximityCheck(point);
   const altitudeCeiling = useAltitudeCeiling(point);
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
+  // "" = now; otherwise a datetime-local value for the time the pilot is planning.
+  const [checkTime, setCheckTime] = useState("");
 
   // Altitude isn't chosen yet at this pre-planning stage (that happens in
   // FlightParamsDrawer) — use the role's flat general ceiling as the
@@ -67,7 +83,8 @@ export function LocationInfoCard({
   // too — it wasn't before (FlightParamsDrawer already got this right),
   // which meant isNearBuildingLocally silently defaulted to "not near" while
   // still loading and could flip the verdict after first paint.
-  const isChecking = aipZonesLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
+  const isChecking =
+    aipZonesLoading || liveNotamsLoading || proximity.isLoading || altitudeCeiling.isLoading || buildingProximity.isLoading;
   // The building-footprint check alone (/api/building-proximity, backed by
   // the R2 bitmap grid in proximity-grid.ts) is a flat O(1) bit lookup —
   // genuinely fast — so it doesn't need to wait on the slower
@@ -79,8 +96,32 @@ export function LocationInfoCard({
   // quietly retract one already shown.
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
-  const aipCheck = point ? checkFlightAuthorizationRequirement(point, aipZones) : null;
-  const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
+  const terrainM = altitudeCeiling.data?.terrainElevationM ?? null;
+  // Everything below is judged at the time the pilot asks about: "now" by default, or a later moment
+  // they pick — so what limits a flight tomorrow is shown for tomorrow, not for this minute.
+  const checkAt = useMemo(() => {
+    if (!checkTime) return null;
+    const d = new Date(checkTime);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }, [checkTime]);
+  const checkWindow = useMemo(() => (checkAt ? { start: checkAt, end: new Date(checkAt.getTime() + 60 * 60 * 1000) } : null), [checkAt]);
+  const aipCheck = point
+    ? checkFlightAuthorizationRequirement(point, aipZones, isHobby, {
+        maxAltitudeAmslM: terrainM === null ? null : terrainM + conservativeAltitudeM,
+        window: checkWindow,
+      })
+    : null;
+  const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams, checkWindow) : null;
+  const notamUntil = notamCheck?.inside ? notamsValidUntilLabel(notamCheck.notams) : null;
+  const notamHours = notamCheck?.inside ? notamsActivityLabel(notamCheck.notams) : null;
+  // Not in force yet, but will be within two weeks — shown so planning ahead isn't told "clear".
+  const upcomingNotams = point ? upcomingNotamsAt(point, liveNotams, 14, checkAt ?? undefined) : [];
+  const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones, checkWindow) : null;
+  const briefing = useMemo(
+    () => (point ? buildLocationBriefing({ point, zones: aipZones, notams: liveNotams, at: checkAt ?? new Date() }) : null),
+    [point, aipZones, liveNotams, checkAt]
+  );
+  const hasBriefing = Boolean(briefing && (briefing.ceiling || briefing.notes.length > 0 || briefing.upcoming.length > 0));
   const fullCeiling = altitudeResult
     ? computeFullAltitudeCeiling(
         altitudeResult,
@@ -108,8 +149,8 @@ export function LocationInfoCard({
   // request here (the dispatcher will need to chase the director's sign-off
   // manually before it can be approved); a hobby/solo-pro account cannot.
   const zoneBlockLevel = aipCheck?.blockLevel ?? "none";
-  const zoneRequiresDirectorApproval = zoneBlockLevel === "director_approval_only" && hasOrg;
-  const zoneHardBlocked = zoneBlockLevel === "director_approval_only" && !hasOrg;
+  const zoneVerdict = zoneVerdictFor(zoneBlockLevel, hasOrg);
+  const zoneHardBlocked = !zoneVerdict.canSubmit;
 
   const proximityFindings = proximity.data?.findings ?? [];
   const relevantProximityFindings = findingsRequiringAuthorization(proximityFindings, isHobby, conservativeAltitudeM);
@@ -135,16 +176,30 @@ export function LocationInfoCard({
     ])
   );
   const needsSpecialAuthorization = matchingRegulations.length > 0;
-  const blockedForHobby = needsSpecialAuthorization && isHobby;
+  // A sport/leisure pilot near infrastructure isn't blocked — the regulation asks for a declaration (the owner
+  // agreed, or a micro drone ≤250 g under its conditions), made when the coordination request is filed.
+  const hobbyNeedsDeclaration = needsSpecialAuthorization && isHobby;
   // A zone can allow a coordination request in principle while the legal altitude ceiling at
   // this exact point is still 0 from the ground — the two checks are independent. Without this,
   // the "request coordination" button could stay active for a point that can never be approved.
   const groundBlockedByAltitude = Boolean(altitudeResult?.blockedFromGround);
   const requiresAttention =
-    zoneBlockLevel !== "none" || needsSpecialAuthorization || groundBlockedByAltitude || buildingCheckUnavailable;
-  const cannotSubmit = zoneHardBlocked || blockedForHobby || groundBlockedByAltitude;
+    zoneBlockLevel !== "none" ||
+    Boolean(notamCheck?.inside) ||
+    needsSpecialAuthorization ||
+    groundBlockedByAltitude ||
+    buildingCheckUnavailable;
+  const cannotSubmit = zoneHardBlocked || groundBlockedByAltitude;
+  // Decided from the airspace layer alone (local, instant) — never held
+  // back behind the slower building/OSM checks. A point inside a CTR or an
+  // air-force-base restriction is forbidden no matter what those find, and
+  // waiting for them first let a "special authorization needed" provisional
+  // read show up on a spot where no authorization can help.
+  const forbiddenByAirspace = !aipZonesLoading && (groundBlockedByAltitude || zoneHardBlocked);
   const hasDetails = Boolean(
     (aipCheck && aipCheck.reasons.length > 0) ||
+      notamCheck?.inside ||
+      upcomingNotams.length > 0 ||
       proximityFindings.length > 0 ||
       needsSpecialAuthorization ||
       buildingProximity.data?.available
@@ -166,6 +221,30 @@ export function LocationInfoCard({
               {toDMS(point[1], "lat")} {toDMS(point[0], "lng")}
             </p>
 
+            {/* The picture is for a moment in time — now by default; planning a flight for later shows what
+                limits it then (weekday-only areas, NOTAMs that start or end by that time). */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label htmlFor="check-time" className="font-medium">
+                {checkAt ? "מצב המרחב למועד:" : "מצב המרחב עכשיו —"}
+              </label>
+              <Input
+                id="check-time"
+                type="datetime-local"
+                value={checkTime}
+                onChange={(e) => setCheckTime(e.target.value)}
+                dir="ltr"
+                className="h-8 w-auto text-xs"
+                aria-label="בדיקה למועד אחר"
+              />
+              {checkAt ? (
+                <button type="button" onClick={() => setCheckTime("")} className="font-medium text-primary underline">
+                  חזרה לעכשיו
+                </button>
+              ) : (
+                <span className="text-muted-foreground">לבדיקה למועד אחר — בחרו תאריך ושעה</span>
+              )}
+            </div>
+
             {/* The answer, first — everything below this is "why", collapsed by default so a
                 pilot who just wants a yes/no doesn't have to read a legal brief to get it.
                 While any of the checks feeding that answer are still in flight, this slot
@@ -174,7 +253,23 @@ export function LocationInfoCard({
                 gets an immediate provisional read the moment *it* resolves, clearly marked as
                 still pending the airspace-zone check — it can only escalate from there, never
                 silently drop a restriction it already found. */}
-            {!buildingsOnlyReady ? (
+            {forbiddenByAirspace ? (
+              <div className="flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive">
+                <Ban className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-base font-semibold">
+                    {zoneBlockLevel === "forbidden" || !zoneHardBlocked
+                      ? zoneVerdictFor("forbidden", hasOrg).headline
+                      : zoneVerdict.headline}
+                  </p>
+                  {zoneVerdict.upgradeHelps && (
+                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
+                      מה כן אפשר: לשדרג לחשבון ארגון ←
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : !buildingsOnlyReady ? (
               <div className="flex items-center gap-3 rounded-xl bg-muted p-4 text-muted-foreground">
                 <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
                 <p className="text-base font-medium">בודק את הנקודה...</p>
@@ -203,50 +298,37 @@ export function LocationInfoCard({
                   </p>
                 </div>
               </div>
-            ) : zoneBlockLevel === "controlled_airspace" ? (
-              <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
-                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="text-base font-semibold">קרוב למרחב פיקוח טיסה — נדרשת בדיקה ידנית</p>
-                  <p className="mt-0.5 text-sm">
-                    ניתן להגיש בקשת תיאום — המוקדן יאמת מול NOTAM עדכני לפני אישור.
-                  </p>
-                </div>
-              </div>
-            ) : zoneBlockLevel === "director_approval_only" ? (
+            ) : zoneVerdict.tone !== "none" ? (
+              // controlled_airspace (TMA/CTA), director_approval_only for an org account, and
+              // coordination_ok (restricted) — each says which *type* of zone it is, because
+              // מוגבל / מסוכן / אסור are different legal outcomes. The two hard-block cases
+              // (forbidden, solo account in a dangerous area) never get here: forbiddenByAirspace above.
               <div
                 className={cn(
                   "flex items-start gap-3 rounded-xl p-4",
-                  zoneRequiresDirectorApproval ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"
+                  zoneVerdict.tone === "conditions" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"
                 )}
               >
-                {zoneRequiresDirectorApproval ? (
-                  <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                ) : (
-                  <Ban className="mt-0.5 h-5 w-5 shrink-0" />
-                )}
-                <div>
-                  <p className="text-base font-semibold">
-                    {zoneRequiresDirectorApproval ? 'כן, אך בכפוף לאישור מנהל רת"א' : "לא ניתן לתאם דרך המערכת"}
-                  </p>
-                  <p className="mt-0.5 text-sm">
-                    {zoneRequiresDirectorApproval
-                      ? "אזור אסור/מסוכן לטיסה — ניתן להגיש בקשה כחשבון ארגון."
-                      : "אזור אסור/מסוכן לטיסה — זמין רק לחשבונות ארגון."}
-                  </p>
-                  {!zoneRequiresDirectorApproval && (
-                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
-                      מה כן אפשר: לשדרג לחשבון ארגון ←
-                    </Link>
-                  )}
-                </div>
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+                <p className="text-base font-semibold">{zoneVerdict.headline}</p>
+              </div>
+            ) : notamCheck?.inside ? (
+              <div className="flex items-start gap-3 rounded-xl p-4" style={{ backgroundColor: "rgb(234 88 12 / 0.1)", color: "#ea580c" }}>
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+                <p className="text-base font-semibold">
+                  נוטאם פעיל בנקודה זו
+                  {notamUntil ? ` · בתוקף עד ${notamUntil}` : ""}
+                  {notamHours ? ` · פעיל ${notamHours}` : ""} — נדרש תיאום
+                </p>
               </div>
             ) : requiresAttention ? (
               <div className="flex items-start gap-3 rounded-xl bg-warning/10 p-4 text-warning">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
                   <p className="text-base font-semibold">
-                    {needsSpecialAuthorization
+                    {hobbyNeedsDeclaration
+                      ? `מבנה/אתר בטווח ${requiredDistanceM} מ' — מותר בהסכמת בעל התשתית, או בטיסן זעיר (עד 250 גרם)`
+                      : needsSpecialAuthorization
                       ? "אפשרי, בכפוף להרשאה מיוחדת"
                       : buildingCheckUnavailable
                         ? "בדיקת קרבה למבנים לא זמינה כרגע"
@@ -255,20 +337,64 @@ export function LocationInfoCard({
                   <p className="mt-0.5 text-sm">
                     {buildingCheckUnavailable && !needsSpecialAuthorization
                       ? "לא ניתן לאשר אוטומטית — יש לתאם עם מוקדן שיבדוק קרבה למבנים ידנית."
-                      : "יש לתאם לפני הטיסה — הפרטים המלאים למטה."}
+                      : hobbyNeedsDeclaration
+                        ? "בבקשת התיאום תתבקשו להצהיר. טיסן זעיר שעומד בתנאים יכול לקבל אישור מיידי."
+                        : "יש לתאם לפני הטיסה — הפרטים המלאים למטה."}
                   </p>
-                  {blockedForHobby && (
-                    <Link href="/profile?open=subscription" className="mt-1.5 inline-block text-sm font-medium underline">
-                      מה כן אפשר: לשדרג לחשבון עסקי ←
-                    </Link>
-                  )}
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-3 rounded-xl bg-success/10 p-4 text-success">
                 <ShieldCheck className="h-5 w-5 shrink-0" />
-                <p className="text-base font-semibold">מותר לטיסה בנקודה זו</p>
+                <p className="text-base font-semibold">
+                  {hasBriefing ? "מותר להטיס במיקומך, אך יש לשים לב:" : "מותר לטיסה בנקודה זו"}
+                </p>
               </div>
+            )}
+
+            {/* What the law limits here at the time asked about, and what is about to start —
+                the same for every account (a height cap is what's permitted, not a licence matter). */}
+            {!forbiddenByAirspace && !isChecking && hasBriefing && briefing && (
+              <ul className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
+                {briefing.ceiling && (
+                  <li className="flex items-start gap-2 font-semibold">
+                    <ArrowUpToLine className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <span>
+                      {briefing.ceiling.text}
+                      {briefing.ceiling.detail && (
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{briefing.ceiling.detail}</span>
+                      )}
+                    </span>
+                  </li>
+                )}
+                {briefing.notes.map((n, i) => (
+                  <li key={`n-${i}`} className="flex items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>{n.text}</span>
+                  </li>
+                ))}
+                {briefing.upcoming.map((u, i) => (
+                  <li key={`u-${i}`} className="flex items-start gap-2 font-medium text-warning">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      בקרוב: {u.text}
+                      {u.detail && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{u.detail}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Right under the verdict, so what the pilot can DO about it is visible without
+                scrolling. cannotSubmit/requiresAttention come from the same not-yet-loaded
+                checks as the banner, so nothing renders until isChecking clears. A
+                zone-forbidden point is fully explained by the red banner above — no second
+                box; this covers the "blocked for hobby by a special authorization" case plus
+                the submit button for everything submittable. */}
+            {!forbiddenByAirspace && !isChecking && !cannotSubmit && requiresAttention && (
+              <Button size="lg" onClick={() => onRequestCoordination(point)}>
+                בקשת תיאום לנקודה זו
+              </Button>
             )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
@@ -278,7 +404,7 @@ export function LocationInfoCard({
                 "residential" way in OSM can read as 2+ km away from a point that's
                 visibly ~200m from the nearest houses, because Overpass's `center` is the
                 polygon's centroid, not its nearest edge. */}
-            {buildingProximity.isLoading ? (
+            {forbiddenByAirspace ? null : buildingProximity.isLoading ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 בודק מרחק ממבנים בסביבה...
@@ -296,7 +422,9 @@ export function LocationInfoCard({
                   <ShieldCheck className="h-4 w-4 shrink-0" />
                 )}
                 {buildingProximity.data.isNearBuilding
-                  ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
+                  ? isHobby
+                    ? `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הסכמת בעל המבנה, או טיסן זעיר (עד 250 גרם)`
+                    : `נמצא מבנה בטווח ${buildingProximity.data.bufferM} מ' — נדרשת הרשאת הפעלה מיוחדת`
                   : `אין מבנה ידוע בטווח ${buildingProximity.data.bufferM} מ'`}
               </p>
             ) : (
@@ -313,7 +441,12 @@ export function LocationInfoCard({
               {altitudeResult?.blockedFromGround
                 ? "אסור לטיסה מהקרקע בנקודה זו"
                 : fullCeiling?.combinedAglM !== null && fullCeiling?.combinedAglM !== undefined
-                  ? `תקרת טיסה: עד ${fullCeiling.combinedAglM.toLocaleString("he-IL")} מ' מעל פני הקרקע`
+                  ? `תקרת טיסה: עד ${(briefing?.ceilingM != null
+                      ? Math.min(fullCeiling.combinedAglM, briefing.ceilingM)
+                      : fullCeiling.combinedAglM
+                    ).toLocaleString("he-IL")} מ' מעל פני הקרקע${
+                      briefing?.ceilingM != null && briefing.ceilingM < fullCeiling.combinedAglM ? " (מגבלת האזור)" : ""
+                    }`
                   : altitudeResult?.maxAltitudeFt !== null && altitudeResult?.maxAltitudeFt !== undefined
                     ? `תקרת מרחב אווירי ידועה (AMSL): ${formatAltitudeRangeMeters(0, altitudeResult.maxAltitudeFt)}`
                     : "אין מגבלת מרחב אווירי ידועה בנקודה זו"}
@@ -323,6 +456,22 @@ export function LocationInfoCard({
 
             {(hasDetails || (!altitudeResult?.blockedFromGround && fullCeiling)) && (
               <Disclosure label="למה? — פירוט מלא ומקורות">
+                {(forbiddenByAirspace || zoneVerdict.tone !== "none") && (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm">
+                      {forbiddenByAirspace && (zoneBlockLevel === "forbidden" || !zoneHardBlocked)
+                        ? zoneVerdictFor("forbidden", hasOrg).detail
+                        : zoneVerdict.detail}
+                    </p>
+                    {aipCheck?.reasons
+                      .filter((reason) => !reason.zone)
+                      .map((reason, i) => (
+                        <p key={i} className="text-sm font-medium">
+                          {reason.label}
+                        </p>
+                      ))}
+                  </div>
+                )}
                 {aipCheck && aipCheck.reasons.length > 0 && (
                   <div className="flex flex-col gap-2">
                     <div>
@@ -345,31 +494,92 @@ export function LocationInfoCard({
                           <p className="text-xs font-medium">
                             {formatAltitudeRangeMeters(zone.min_altitude_ft, zone.max_altitude_ft)}
                           </p>
+                          {zone.weekdays_only && <p className="text-xs font-medium">בתוקף בימי חול בלבד</p>}
+                          {zone.note && <p className="mt-1 text-xs text-muted-foreground">{zone.note}</p>}
                           {!zone.geometry_precise && (
                             <p className="mt-1 text-xs text-warning">
                               * גבול האזור מבוסס הערכה — נדרשת הגשת בקשת תיאום לבדיקה מדויקת
                             </p>
                           )}
-                          {(zone.kind === "DANGER" || zone.kind === "PROHIBITED") && (
+                          {zone.kind === "PROHIBITED" && (
+                            <p className="mt-1 text-xs text-destructive">
+                              אסור להטיס כאן — אין מסלול בקשת תיאום דרך המערכת, בכל סוג חשבון
+                            </p>
+                          )}
+                          {(zone.kind === "CTR" || zone.kind === "ATZ") && (
+                            <p className="mt-1 text-xs text-warning">
+                              אסור להטיס במרחק קטן מ-2 ק&quot;מ ממסלול השדה (3 ק&quot;מ משדה צבאי למפעיל מסחרי); מעבר לכך — נדרש תיאום מול מגדל הפיקוח
+                            </p>
+                          )}
+                          {zone.kind === "DANGER" && (
                             <p className="mt-1 text-xs text-destructive">
                               {hasOrg
                                 ? 'נדרש אישור פרטני של מנהל רת"א — תיאום זמין לחשבון ארגון בלבד'
                                 : 'נדרש אישור פרטני של מנהל רת"א — לא ניתן לתאם דרך המערכת מחשבון פרטי'}
                             </p>
                           )}
-                          {(zone.kind === "CTR" || zone.kind === "ATZ" || zone.kind === "TMA" || zone.kind === "CTA") && (
+                          {(zone.kind === "TMA" || zone.kind === "CTA") && (
                             <p className="mt-1 text-xs text-warning">
                               אין כאן עדכוני NOTAM בזמן אמת — הבקשה תאומת מול המקור הרשמי ע&quot;י המוקדן
                             </p>
                           )}
                           {zone.kind === "RESTRICTED" && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              ניתן לתאם בכפוף לתנאים שפורסמו לאזור — הבקשה תיבדק ע&quot;י המוקדן
+                              אזור מוגבל — ניתן לתאם בכפוף לתנאים שפורסמו לאזור או באישור הגורם השולט; הבקשה תיבדק ע&quot;י המוקדן
                             </p>
                           )}
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {notamCheck && notamCheck.inside && (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <p className="text-sm font-medium">נוטאמים פעילים חופפים</p>
+                      <p className="text-xs text-muted-foreground">
+                        מקור: <a href="https://ext.iaa.gov.il/aeroinfo/AeroInfo.aspx?msgType=Notam" target="_blank" rel="noopener noreferrer" className="underline">רשות שדות התעופה</a>, לא רשמי — לא תחליף לבריפינג טרום-טיסה
+                      </p>
+                    </div>
+                    {notamCheck.notams.map((notam) => (
+                      <div key={notam.id} className="rounded-lg border p-3 text-sm" style={{ borderColor: "rgb(234 88 12 / 0.4)" }}>
+                        <p className="font-medium" dir="ltr">
+                          {notam.id}
+                        </p>
+                        <p className="mt-1 text-xs">{notam.eText}</p>
+                        <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                          {formatNotamTime(notam.fromDate)} – {formatNotamTime(notam.toDate)}
+                        </p>
+                        <p className="mt-0.5 text-xs font-medium">
+                          {notam.schedule
+                            ? `שעות פעילות: ${formatNotamSchedule(notam.schedule, notam.fromDate)}`
+                            : "ללא שעות פעילות מוגדרות — בתוקף ברצף לכל משך התוקף"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {upcomingNotams.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium">נוטאמים שיתחילו בקרוב בנקודה זו</p>
+                    {upcomingNotams.map((notam) => (
+                      <div key={notam.id} className="rounded-lg border p-3 text-sm">
+                        <p className="font-medium" dir="ltr">
+                          {notam.id}
+                        </p>
+                        <p className="mt-1 text-xs">{notam.eText}</p>
+                        <p className="mt-1 text-xs text-muted-foreground" dir="ltr">
+                          {formatNotamTime(notam.fromDate)} – {formatNotamTime(notam.toDate)}
+                        </p>
+                        {notam.schedule && (
+                          <p className="mt-0.5 text-xs font-medium">
+                            שעות פעילות: {formatNotamSchedule(notam.schedule, notam.fromDate)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -399,19 +609,24 @@ export function LocationInfoCard({
                   </div>
                 )}
 
-                {needsSpecialAuthorization && (
+                {hobbyNeedsDeclaration && !forbiddenByAirspace && (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-sm font-medium">הטסה ליד תשתית — מטיסן (ספורט ופנאי)</p>
+                    <p className="text-xs text-muted-foreground">
+                      לפי תקנות הטיס (הפעלת טיסן): אין להטיס במרחק הקטן מ-150 מ&apos; מתשתית (מבנה, אזור מאוכלס, אתר שפגיעה בו
+                      מסכנת חיים או רכוש), אלא אם בעל התשתית הסכים לכך או שהיא בבעלותך. טיסן זעיר (עד 250 גרם) רשאי לטוס מעל
+                      תשתית בתנאי שאין בו חלקים נעים גלויים ואינו שוהה מעל אדם או רכב בתנועה. בבקשת התיאום תתבקש להצהיר —
+                      טיסן זעיר יכול לקבל אישור מיידי, וטיסן כבד יותר יועבר למוקדן.
+                    </p>
+                  </div>
+                )}
+                {needsSpecialAuthorization && !isHobby && !forbiddenByAirspace && (
                   <div className="flex flex-col gap-2">
                     <p className="text-sm font-medium">
                       {matchingRegulations.length > 1 ? "הרשאות רלוונטיות למגבלות שנמצאו" : "הרשאה רלוונטית למגבלה שנמצאה"}
                     </p>
-                    {blockedForHobby && (
-                      <p className="text-xs text-muted-foreground">
-                        חשבון פרטי (ספורט ופנאי) אינו זכאי להרשאת הפעלה מיוחדת — התקנות מגדירות אותה רק עבור הפעלה
-                        מסחרית/כללית של כטב&quot;ם. הכרטיסים למטה מוצגים לעיון בלבד.
-                      </p>
-                    )}
                     {matchingRegulations.map((reg) => (
-                      <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable={!blockedForHobby} />
+                      <InlineAuthorizationPurchase key={reg} regulationNumber={reg} purchasable />
                     ))}
                   </div>
                 )}
@@ -449,43 +664,6 @@ export function LocationInfoCard({
                 </div>
               </Disclosure>
             )}
-
-            {/* Same reasoning as the verdict banner above: cannotSubmit/requiresAttention are
-                derived from the same not-yet-loaded checks, so no action (or "can't request")
-                signal should render until isChecking clears either. */}
-            {!isChecking &&
-              (cannotSubmit ? (
-                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
-                    {/* groundBlockedByAltitude checked first everywhere below: a 0m legal
-                        ceiling from the ground is unfixable by any account tier, so it must
-                        never be shadowed by (or shown alongside a CTA for) the hobby/org
-                        upgrade messaging — upgrading changes nothing about this case. */}
-                    {groundBlockedByAltitude || zoneHardBlocked ? <Ban className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                    {groundBlockedByAltitude
-                      ? "לא ניתן לבקש תיאום לנקודה זו"
-                      : zoneHardBlocked
-                        ? "לא ניתן לתאם דרך המערכת"
-                        : "לא ניתן לתאם טיסה באזור זה מחשבון פרטי"}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {groundBlockedByAltitude
-                      ? "תקרת הגובה החוקית בנקודה זו היא 0 מטר מעל פני הקרקע — מרחב אווירי חופף מתחיל ממש מהקרקע, כך שאין גובה טיסה חוקי לבקש עליו תיאום, בכל סוג חשבון."
-                      : zoneBlockLevel === "director_approval_only" && !zoneRequiresDirectorApproval
-                        ? "אזור אסור/מסוכן לטיסה — נדרש אישור פרטני של מנהל רת\"א. תיאום כזה זמין רק לחשבונות ארגון, שיש להם תהליך מול הרשות להשיג את האישור."
-                        : "התקנות מגדירות הרשאת הפעלה מיוחדת עבור הפעלה מסחרית/כללית של כטב\"ם בלבד — חשבון פרטי (ספורט ופנאי) אינו זכאי לה."}
-                  </p>
-                  {!groundBlockedByAltitude && (
-                    <Link href="/profile?open=subscription" className="text-xs font-medium text-primary underline">
-                      {zoneBlockLevel === "director_approval_only" ? "שדרוג לחשבון ארגון" : "שדרוג לחשבון עסקי"} מהפרופיל שלכם ←
-                    </Link>
-                  )}
-                </div>
-              ) : requiresAttention ? (
-                <Button size="lg" onClick={() => onRequestCoordination(point)}>
-                  בקשת תיאום לנקודה זו
-                </Button>
-              ) : null)}
 
             <p className="text-[11px] text-muted-foreground">
               לא לניווט — אינו תחליף לבדיקה רשמית לפני טיסה. האחריות על המטיס.

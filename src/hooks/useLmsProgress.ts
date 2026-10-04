@@ -10,8 +10,9 @@ export function useLmsProgress(courseId: LmsCourseId) {
     queryFn: async (): Promise<Tables<"lms_progress"> | null> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return null;
 
       const { data, error } = await supabase

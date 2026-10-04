@@ -1,16 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
 import { ProfilePageClient } from "./ProfilePageClient";
 
 export default async function ProfilePage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/auth/login");
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (!profile) redirect("/auth/login");
+  const current = await getCurrentUserProfile();
+  if (!current) redirect("/auth/login");
+  const { profile } = current;
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">

@@ -1,0 +1,22 @@
+Fix dead-end empty aircraft dropdown for org accounts with no drones
+
+Found by testing the flight-request form with a real fleet_manager
+account (ohad@gmail.com) that belongs to an org with zero registered
+drones. The existing empty-state only covered the solo-pilot case
+(drones.length === 0 && !hasOrg -> DroneQuickRegisterCard); an org
+account with no drones fell through to the plain <Select>, which
+rendered with nothing in it and no way to add one - looked exactly like
+a broken dropdown, not "your org hasn't registered a drone yet".
+
+Added a third branch for drones.length === 0 && hasOrg: a short
+explanation plus a link to /logs (fleet management, per OrgPageClient's
+own note that fleet management intentionally lives there, not on this
+form) instead of an inline register-a-drone form, since an org's drones
+are meant to be fleet-managed centrally rather than self-registered
+per-request the way a solo pilot's are.
+
+npx tsc --noEmit and npx eslint clean. Verified live end-to-end: opening
+the flight request form on the org account now shows the explanation and
+link instead of an empty dropdown; the link lands on /logs -> בריאות הצי,
+which does show the org's real empty state ("טרם נוספו כלי טיס") with a
+working "כלי טיס חדש" button to actually add one.

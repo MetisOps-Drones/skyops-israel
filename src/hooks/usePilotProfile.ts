@@ -11,8 +11,9 @@ export function useMyPilotProfile() {
     queryFn: async (): Promise<Tables<"pilot_profiles"> | null> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return null;
       const { data, error } = await supabase.from("pilot_profiles").select("*").eq("id", user.id).maybeSingle();
       if (error) throw error;

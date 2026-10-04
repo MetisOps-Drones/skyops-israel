@@ -1,0 +1,29 @@
+Audit the map and coordination desk against the AIP; fix what it found
+
+Test suites (Playwright, node-side for the logic, browser for the map):
+- airspace-rules: AIP layer integrity; the rule engine vs an independent
+  oracle written from the regulation text over 6,000 seeded points plus
+  rings around every aerodrome (hobby and commercial); exact 2/3 km
+  boundaries; zone floors; altitude-ceiling semantics; verdict matrix.
+- notam-logic: active/upcoming/window overlap, radius edge, expiry and
+  activity-hours formatting (DST-aware), live feed sanity.
+- coordination-desk: contact/WhatsApp formatting, feet/AMSL conversion, the
+  forwarded message, authority suggestions against the zone layer.
+- map-airspace-ui: what a pilot sees at the Hatzor runway, a prohibited
+  area and Shapir (geocoding stubbed to jump to exact coordinates).
+
+Fixes it surfaced:
+- A zone whose floor is above anything the drone can reach still counted
+  (the 9,000 ft Tel Aviv upper sector put every point over Tel Aviv in
+  "coordination"; four dangerous areas with 2,000-5,000 ft floors did the
+  same). checkFlightAuthorizationRequirement takes the highest possible
+  drone altitude AMSL (ground elevation + planned altitude); unknown ground
+  keeps every zone (conservative). Server action, card, request form and
+  dispatcher view all pass it; terrain lookup moved to lib/geo/terrain.ts.
+- Three junk OSM "runway" stubs (a 60 m piece 4 km from Herzliya, one at
+  Ben Gurion) would have drawn false 2 km circles: runways under 150 m are
+  dropped from the dataset.
+- find_coordination_authority tied on tier and radius, so the first
+  suggestion at the Hatzerim runway was a private airstrip and at Ramat
+  David another one instead of the base tower. 0092 orders by distance to
+  the authority's own location within a tier.

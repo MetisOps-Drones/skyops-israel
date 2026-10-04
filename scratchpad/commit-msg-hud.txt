@@ -1,0 +1,15 @@
+Map top bar and request form follow the location card
+
+UI audit follow-ups:
+- The top bar showed a red "forbidden" for anything that wasn't "none",
+  including a control zone that only needs the tower's coordination (now the
+  whole Gush Dan after 0094). It now reads the same verdict as the location
+  card (zoneVerdictFor, with a new shortLabel), judged for the account's
+  licence type and ground elevation, and no longer prints "up to 0 m".
+- The bar started at the map's left edge and covered the zoom buttons; it now
+  starts to their right.
+- The request form leads with the verdict on the point instead of showing it
+  below the drone-registration card, and the legacy airspace-status (demo)
+  block that contradicted it is gone.
+
+Tests: location-status.spec.ts (pure), map-hud-and-drawer.spec.ts (browser).

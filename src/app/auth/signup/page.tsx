@@ -10,7 +10,7 @@ export default function SignupPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <MetisOpsLogo className="h-7 w-7" />
           </div>
-          <h1 className="text-xl font-bold">הרשמה ל-MetisOps</h1>
+          <h1 className="text-xl font-bold">הרשמה ל-Metisim</h1>
           <p className="text-sm text-muted-foreground">כמה שאלות קצרות כדי להתאים לכם את החשבון הנכון</p>
         </div>
         <SignupWizard />

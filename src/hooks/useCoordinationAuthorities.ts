@@ -28,6 +28,8 @@ export function useCreateCoordinationAuthority() {
       unit_type: string;
       phone: string;
       backup_phone: string | null;
+      whatsapp_phone: string | null;
+      contacts: { label: string; phone: string }[];
       notes: string | null;
       center_lng: number;
       center_lat: number;
@@ -52,6 +54,8 @@ export function useUpdateCoordinationAuthority() {
       unit_type: string;
       phone: string;
       backup_phone: string | null;
+      whatsapp_phone: string | null;
+      contacts: { label: string; phone: string }[];
       notes: string | null;
       center_lng: number;
       center_lat: number;

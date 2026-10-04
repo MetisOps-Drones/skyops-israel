@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as turf from "@turf/turf";
+import { fetchTerrainElevationM } from "@/lib/geo/terrain";
 
 /**
  * Server-side ingredients for the full legal-altitude formula (see
@@ -28,21 +29,6 @@ interface MetarStation {
   reportTime: string;
   cover: string;
   clouds: { cover: string; base: number }[];
-}
-
-async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
-  try {
-    const res = await fetch(`https://api.opentopodata.org/v1/srtm30m?locations=${lat},${lon}`, {
-      headers: { "User-Agent": SHARED_USER_AGENT },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const elevation = data?.results?.[0]?.elevation;
-    return typeof elevation === "number" ? elevation : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Widens the search box on the first miss — Israel is small, but a tight box near the coast/desert edges can still come up empty. */

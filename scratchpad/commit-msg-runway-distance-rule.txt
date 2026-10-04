@@ -1,0 +1,30 @@
+Measure the 2 km rule from the runway, not the bubble or the CTR boundary
+
+Corrects the previous zone-enforcement pass, which got the rule wrong:
+- It measured the 2 km from the CTR/ATZ boundary and from the drawn
+  bubble's edge, and made everything inside a CTR forbidden.
+- The regulation measures from the aerodrome/base RUNWAY, and the intended
+  outcome is: within 2 km of the runway = forbidden; inside the CTR/ATZ
+  beyond 2 km = flyable with the tower's coordination; outside = no zone
+  restriction. Always judged on the requested point, never on the bubble.
+
+Changes:
+- aerodrome-runways.ts: runway centrelines of every Israeli aerodrome and
+  air force base (OpenStreetMap aeroway=runway, 69 runways; model-aircraft
+  fields and non-Israeli airfields excluded). Static, so the check stays
+  local and instant and the server action uses identical data.
+- flight-rules.ts: nearestRunway() + AERODROME_FORBIDDEN_RADIUS_KM; only
+  PROHIBITED and the runway distance are "forbidden"; CTR/ATZ/TMA/CTA are
+  "coordination with the tower"; footprint/radius parameters removed.
+- aip.ts: only PROHIBITED zeroes the ceiling from the ground; CTR/ATZ no
+  longer do (a whole control zone read as "אסור" even 10 km out).
+- 0088 rewritten: no longer imports the air-force-base restriction discs
+  (5-10 km, they would forbid the coordination band); keeps only the 6
+  missing official prohibited areas. Because it deletes by source tag it
+  also removes the 8 base discs if the first version was already run.
+- Dispatcher-facing zone text and the map card/request form wording
+  updated to match.
+
+Checked against production zone data: a point 4 km from the Hatzor runway
+and the Shapir settlement (3.1 km from the nearest runway) resolve to
+"coordination"; points under 2 km from the runway resolve to forbidden.

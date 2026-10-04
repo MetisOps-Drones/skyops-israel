@@ -1,0 +1,10 @@
+Mark LLBG CTR geometry as precise — confirmed by the user as AIP-sourced
+
+0083_llbg_ctr.sql flagged geometry_precise = false and source_sheet =
+'user_supplied_unverified', treating the boundary as an unconfirmed
+approximation pending independent verification. The user confirmed this
+is the actual published AIP CTR definition, not an estimate — updated the
+row to geometry_precise = true and source_sheet = 'aip_israel' to match,
+and removed the migration's provenance-doubt comment accordingly. This
+also drops the "boundary is estimated" footnote this zone would otherwise
+have shown in LocationInfoCard/FlightParamsDrawer.

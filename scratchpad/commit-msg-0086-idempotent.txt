@@ -1,0 +1,7 @@
+Make 0086 safe to re-run (same non-idempotency mistake as 0085)
+
+Ohad hit "relation already exists" -- create table without if not exists,
+same issue 0085 already ran into once this session. Applied the same fix:
+create table/index if not exists, drop policy if exists before create
+policy, so the whole file can be re-run start to finish regardless of
+what already landed from the first attempt.

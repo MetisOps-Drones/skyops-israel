@@ -1,0 +1,24 @@
+Cut panel-open latency (auth round-trips) + map-click picker for coordination authorities
+
+Panel-open speed:
+Every read hook resolved the signed-in user via supabase.auth.getUser(),
+which round-trips to Supabase's auth server to revalidate the JWT on
+every single call. FlightParamsDrawer alone mounts ~8 hooks that each
+did this independently, so opening it fired that many redundant
+identical network calls before any of their actual data queries could
+even start. Swapped all of them to supabase.auth.getSession(), which
+reads the already-validated session from local storage with no network
+round-trip -- the user id is only used to build query filters here;
+every table read is still authoritatively scoped by Postgres RLS
+against the real JWT regardless of what the client-side id is used
+for, so this doesn't weaken any actual access control. Verified live:
+auth/v1/user calls on a single /map load with the drawer opened went
+from 5+ down to 2 (the two hooks not on this hot path, left
+unconverted this round).
+
+Map-click picker (audit item 4):
+CoordinationAuthoritiesCard's authority dialog only had raw lat/lng/
+radius number inputs for setting an authority's coverage center --
+now backed by a small click-to-place react-map-gl picker (same pattern
+as OpsQueueMap) showing the coverage circle live; the numeric fields
+stay for precise entry/editing.

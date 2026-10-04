@@ -10,8 +10,9 @@ export function useMyDocumentsByKind(kind: Tables<"documents">["kind"]) {
     queryFn: async (): Promise<Tables<"documents">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       // "Dispatcher admins read all documents" is a separate permissive
       // SELECT policy — without this filter a dispatcher_admin's own
@@ -34,8 +35,9 @@ export function useMyIdentityVerifications() {
     queryFn: async (): Promise<Tables<"identity_verifications">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data, error } = await supabase
         .from("identity_verifications")

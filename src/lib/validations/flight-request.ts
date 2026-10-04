@@ -24,6 +24,39 @@ export const ALTITUDE_BAND_METERS: Record<FlightAltitudeBand, number> = {
   over_100m: 150,
 };
 
+/** The altitude is entered in meters now; the coarse band is only kept for legacy callers and is derived, never asked. */
+export function altitudeBandForMeters(meters: number): FlightAltitudeBand {
+  if (meters <= 50) return "under_50m";
+  if (meters <= 100) return "under_100m";
+  return "over_100m";
+}
+
+/**
+ * צילום אנכי (nadir — מצלמה כלפי מטה, חושף את הקרקע מתחת), אופקי (מצלמה קדימה/הצידה),
+ * צילום מרחבי (סקר/מיפוי לאורך שטח). The coordinator needs this because what the camera
+ * can see matters as much as where the drone is — especially near bases.
+ */
+export const cameraTypeSchema = z.enum(["vertical", "horizontal", "aerial_survey", "none"]);
+export type CameraType = z.infer<typeof cameraTypeSchema>;
+
+export const CAMERA_TYPE_LABELS: Record<CameraType, string> = {
+  vertical: "אנכית (מכוונת כלפי מטה)",
+  horizontal: "אופקית (קדימה / הצידה)",
+  aerial_survey: "צילום מרחבי (סקר / מיפוי)",
+  none: "ללא מצלמה",
+};
+
+export const MIN_TAKEDOWN_SECONDS = 5;
+export const MAX_TAKEDOWN_SECONDS = 3600;
+
+/** "90" → "דקה וחצי"-style is overkill; this just renders seconds as "2 דק' 30 שנ'" so a coordinator reads a duration, not a raw number. */
+export function formatTakedownSeconds(seconds: number): string {
+  if (seconds < 60) return `${seconds} שנ'`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0 ? `${minutes} דק'` : `${minutes} דק' ${rest} שנ'`;
+}
+
 const pointGeoJsonSchema = z.object({
   type: z.literal("Point"),
   coordinates: z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]),
@@ -41,9 +74,17 @@ export const createFlightRequestSchema = z
     center_point: pointGeoJsonSchema,
     radius_meters: z.number().min(10).max(5000).optional(),
     polygon: polygonGeoJsonSchema.optional(),
-    altitude_band: flightAltitudeBandSchema,
-    max_altitude_meters: z.number().min(1).max(2000),
+    altitude_band: flightAltitudeBandSchema.optional(),
+    max_altitude_meters: z.number().min(1, "יש להזין גובה טיסה במטרים").max(2000),
     flight_purpose: flightPurposeSchema,
+    camera_type: cameraTypeSchema,
+    /** A sport/leisure pilot's declaration for flying within 150 m of infrastructure — see lib/geo/infrastructure-rule.ts. */
+    infrastructure_declaration: z.enum(["owner_consent", "micro_drone_conditions"]).nullish(),
+    takedown_response_seconds: z
+      .number({ invalid_type_error: "יש להזין זמן תגובה לבקשת הורדה" })
+      .int()
+      .min(MIN_TAKEDOWN_SECONDS, `זמן ההורדה המינימלי הוא ${MIN_TAKEDOWN_SECONDS} שניות`)
+      .max(MAX_TAKEDOWN_SECONDS, "זמן ההורדה המרבי הוא שעה"),
     start_time: z.coerce.date(),
     end_time: z.coerce.date(),
     emergency_contact_phone: z
@@ -90,3 +131,10 @@ export const rejectFlightRequestSchema = z.object({
 });
 
 export type RejectFlightRequestInput = z.infer<typeof rejectFlightRequestSchema>;
+
+export const cancelNotamSchema = z.object({
+  flight_request_id: z.string().uuid(),
+  dispatcher_notes: z.string().min(3, "יש לציין סיבת ביטול").max(2000),
+});
+
+export type CancelNotamInput = z.infer<typeof cancelNotamSchema>;

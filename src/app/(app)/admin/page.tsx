@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LayoutGrid, KeyRound, BadgeCheck, MessagesSquare, ChevronLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile } from "@/lib/supabase/current-user";
 
 // מוקד תיאום (/ops) isn't here — it's the dispatcher's actual day-to-day
 // workflow (live queue, NOTAM publishing), so it's its own top-level bubble
@@ -16,16 +16,11 @@ const ADMIN_SECTIONS = [
 
 /** The admin bubble's landing screen — a small hub of the 4 remaining admin-only sections, mirroring the top-level bubble pattern one level deeper. */
 export default async function AdminHubPage() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const current = await getCurrentUserProfile();
+  if (!current) redirect("/auth/login");
+  const { profile } = current;
 
-  if (!user) redirect("/auth/login");
-
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-
-  if (profile?.role !== "dispatcher_admin") {
+  if (profile.role !== "dispatcher_admin") {
     redirect("/dashboard");
   }
 

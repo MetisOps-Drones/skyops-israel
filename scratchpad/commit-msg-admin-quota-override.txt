@@ -1,0 +1,37 @@
+Let dispatcher_admin set a user's plan and grant a hidden quota override
+
+Ohad's ask: before real billing exists, let admins put a user on a free
+"design partner" track -- a generous coordination quota above their plan's
+normal free-tier limit, with the admin's reasoning and full control, and
+critically NONE of that admin context visible to the user themselves.
+
+Two pieces:
+
+1. Admin can now set a user's plan_code directly from /admin/platform's
+   users tab (AdminUserPlanDialog), on top of the read-only display that
+   was already there. Plain update via the "Dispatcher admins update any
+   profile" RLS policy (0049) -- no new grant needed.
+
+2. A quota override, count/period/complexAllowed, that always wins over
+   whatever the plan says (resolveCoordinationLimit). This is deliberately
+   its OWN table (coordination_quota_overrides, migration 0085), not new
+   profiles columns: profiles RLS lets a user read their own row in full,
+   and several server components already do select("*") on it to hand to
+   client components (profile/page.tsx, layout.tsx) -- any admin note or
+   audit trail living there would ride along in that payload straight to
+   the browser. Postgres RLS is row-level only, so column-level secrecy
+   needs a separate table plus a security-definer function that controls
+   exactly what it returns -- same pattern 0049 already used to keep
+   marketplace_freelancers() from leaking phone numbers.
+
+   my_coordination_override() is the only way a user's own session ever
+   sees their own numbers, and it returns just the three enforcement
+   numbers -- never the note, who set it, or when. The admin dialog's note
+   field says as much inline. The user just sees a normal-looking quota in
+   the flight-request flow, never any hint it's an override.
+
+Wired into both enforcement points that already read the plan-based limit:
+actions/flight-requests.ts (the real, unskippable check) and
+useCoordinationQuota (the client-side display/soft-block).
+
+npx tsc --noEmit and npx eslint clean.

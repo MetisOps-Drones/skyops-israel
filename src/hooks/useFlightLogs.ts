@@ -15,8 +15,9 @@ export function useFlightLogs() {
     queryFn: async (): Promise<FlightLogWithDrone[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       // Explicit user_id filter: "Dispatcher admins read all flight logs" is
       // a separate permissive SELECT policy for admin views — without this,

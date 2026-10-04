@@ -7,15 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAdminOrganizations, useAdminUsers } from "@/hooks/useAdminPlatform";
+import { useAdminOrganizations, useAdminUsers, useAdminQuotaOverrides } from "@/hooks/useAdminPlatform";
 import { downloadCsv } from "@/lib/csv";
-
-const ROLE_LABELS: Record<string, string> = {
-  fleet_manager: "מנהל צי",
-  pilot_pro: "לקוח פרטי עסקי",
-  pilot_hobby: "לקוח פרטי",
-  dispatcher_admin: "מוקדן תיאום",
-};
+import { ROLE_LABEL } from "@/lib/constants/roles";
+import { AdminUserPlanDialog } from "./AdminUserPlanDialog";
 
 function OrganizationsTab() {
   const [search, setSearch] = useState("");
@@ -28,7 +23,7 @@ function OrganizationsTab() {
 
   function handleExport() {
     downloadCsv(
-      `metisops-organizations-${new Date().toISOString().slice(0, 10)}.csv`,
+      `metisim-organizations-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((o) => ({
         שם: o.name,
         "חברים פעילים": o.member_count,
@@ -100,6 +95,8 @@ function OrganizationsTab() {
 function UsersTab() {
   const [search, setSearch] = useState("");
   const { data: users = [], isLoading } = useAdminUsers(true);
+  const { data: overrides = [] } = useAdminQuotaOverrides(true);
+  const overrideByUserId = useMemo(() => new Map(overrides.map((o) => [o.user_id, o])), [overrides]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -114,10 +111,10 @@ function UsersTab() {
 
   function handleExport() {
     downloadCsv(
-      `metisops-users-${new Date().toISOString().slice(0, 10)}.csv`,
+      `metisim-users-${new Date().toISOString().slice(0, 10)}.csv`,
       filtered.map((u) => ({
         שם: u.full_name,
-        תפקיד: ROLE_LABELS[u.role] ?? u.role,
+        תפקיד: ROLE_LABEL[u.role] ?? u.role,
         ארגון: u.organizations?.name ?? "",
         טלפון: u.phone ?? "",
         תוכנית: u.plan_code ?? "",
@@ -155,19 +152,20 @@ function UsersTab() {
             <TableHead>טלפון</TableHead>
             <TableHead>תוכנית</TableHead>
             <TableHead>נוצר בתאריך</TableHead>
+            <TableHead></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 טוען...
               </TableCell>
             </TableRow>
           )}
           {!isLoading && filtered.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 אין משתמשים תואמים
               </TableCell>
             </TableRow>
@@ -181,14 +179,26 @@ function UsersTab() {
                 </div>
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                <Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge>
               </TableCell>
               <TableCell>{u.organizations?.name ?? "—"}</TableCell>
               <TableCell dir="ltr" className="text-end">
                 {u.phone ?? "—"}
               </TableCell>
-              <TableCell>{u.plan_code ?? "—"}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5">
+                  {u.plan_code ?? "—"}
+                  {overrideByUserId.has(u.id) && (
+                    <Badge variant="outline" className="text-xs">
+                      מכסה מותאמת
+                    </Badge>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>{new Date(u.created_at).toLocaleDateString("he-IL")}</TableCell>
+              <TableCell>
+                <AdminUserPlanDialog user={u} override={overrideByUserId.get(u.id)} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

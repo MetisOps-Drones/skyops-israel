@@ -14,8 +14,9 @@ export function useMaintenanceLog() {
     queryFn: async (): Promise<MaintenanceLogWithDrone[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
       // drone_maintenance_log has no user_id/org_id of its own — RLS scopes
@@ -66,8 +67,9 @@ export function useInventory() {
     queryFn: async (): Promise<Tables<"inventory_items">[]> => {
       const supabase = createClient();
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) return [];
       const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
       // Mirrors the RLS scope a non-admin pilot already gets ("own inventory"

@@ -100,6 +100,17 @@ export function MapHome() {
     toast.message("הציבו סיכה על המפה כדי לתאם מרחב אווירי לטיסה");
   }
 
+  // FlightParamsDrawer's own Cancel/submit buttons already call reset()
+  // before closing — but closing any other way (the header X, Escape,
+  // clicking the overlay) skips that button entirely and only ever called
+  // this setter, leaving the pin/circle stuck on the map until the pilot
+  // happened to start a fresh placement. Resetting here instead, on every
+  // close regardless of how it happened, covers all of them at once.
+  function handleDrawerOpenChange(next: boolean) {
+    setDrawerOpen(next);
+    if (!next) reset();
+  }
+
   function handleInspectPoint(point: [number, number]) {
     setInfoCardPoint(point);
     setInfoCardOpen(true);
@@ -184,12 +195,12 @@ export function MapHome() {
             aria-label="איפוס המפה למיקום הנוכחי"
             title="איפוס המפה למיקום הנוכחי"
             className={cn(
-              "flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-colors hover:bg-accent",
+              "flex h-14 w-14 items-center justify-center rounded-full bg-card text-foreground shadow-md transition-[background-color,box-shadow,transform] duration-150 hover:scale-110 hover:bg-accent hover:shadow-lg active:scale-95",
               highContrast ? "border-2 border-foreground" : "border border-input",
-              "disabled:opacity-60"
+              "disabled:opacity-60 disabled:hover:scale-100"
             )}
           >
-            {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Navigation className="h-5 w-5" />}
+            {locating ? <Loader2 className="h-6 w-6 animate-spin" /> : <Navigation className="h-6 w-6" />}
           </button>
         </div>
         <button
@@ -198,17 +209,17 @@ export function MapHome() {
           aria-label="דקירת מרחב אווירי לתיאום"
           title="דקירת מרחב אווירי לתיאום"
           className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-full shadow-md transition-colors",
+            "flex h-14 w-14 items-center justify-center rounded-full shadow-md transition-[background-color,box-shadow,transform] duration-150 hover:scale-110 hover:shadow-lg active:scale-95",
             drawMode !== "idle" && drawMode !== "done"
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : cn("bg-card text-foreground hover:bg-accent", highContrast ? "border-2 border-foreground" : "border border-input")
           )}
         >
-          <Pin className="h-5 w-5" />
+          <Pin className="h-6 w-6" />
         </button>
       </div>
 
-      <FlightParamsDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <FlightParamsDrawer open={drawerOpen} onOpenChange={handleDrawerOpenChange} />
 
       <LocationInfoCard
         point={infoCardPoint}

@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell } from "lucide-react";
+import { BookOpen, Store, ClipboardCheck, Radar, ShieldCheck, UserCircle, Bell, Loader2 } from "lucide-react";
 import { MetisOpsLogo } from "./MetisOpsLogo";
 import { NotificationsOverlay } from "./NotificationsOverlay";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
@@ -36,8 +36,13 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   const setRingOpen = useBubbleLauncherStore((s) => s.setRingOpen);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const router = useRouter();
+  // isPending stays true for the whole navigation, including the (app)
+  // layout's own server-side auth+profile check — not just the client-side
+  // route change — so this is a real signal, not a cosmetic delay. The ring
+  // itself closes the instant a bubble is tapped (see handleBubbleClick),
+  // so the FAB is the only thing still on screen to show it against.
+  const [isNavigating, startNavigation] = useTransition();
   const unreadCount = useUnreadNotificationCount();
   const { data: orgContext } = useMyOrgContext();
   const isAdmin = role === "dispatcher_admin";
@@ -51,25 +56,40 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   // a fixed radius/offset looked right on a normal desktop window but sent
   // the bottom bubbles off-screen on a shorter one. Recomputed on resize so
   // rotating a phone or resizing a window doesn't leave it stale.
+  //
+  // window.innerHeight is the wrong signal on a phone: it doesn't reliably
+  // track the browser's own collapsing/expanding address bar (Safari in
+  // particular can under- or over-report it right after load, before the
+  // chrome settles), which put the closed FAB noticeably above the real
+  // bottom edge — reading as "stuck in the middle of the screen" once you
+  // account for how far off it was. window.visualViewport is the layer
+  // built for exactly this: it reports the actual visible viewport and
+  // fires its own resize event when the browser chrome changes size, not
+  // just when the window itself does.
   useEffect(() => {
     function updateViewport() {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      const vv = window.visualViewport;
+      setViewport({ width: vv?.width ?? window.innerWidth, height: vv?.height ?? window.innerHeight });
     }
     updateViewport();
     window.addEventListener("resize", updateViewport);
-    return () => window.removeEventListener("resize", updateViewport);
-  }, []);
-
-  // Touch devices have no hover state to reveal a tooltip on, so the bubble
-  // label is shown permanently underneath instead of on :hover.
-  useEffect(() => {
-    setIsTouchDevice(window.matchMedia("(hover: none)").matches);
+    window.visualViewport?.addEventListener("resize", updateViewport);
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+    };
   }, []);
 
   const bubbles: BubbleItem[] = [
     ...(canSeeLogs ? [{ key: "logs", label: "יומן טיסות", icon: BookOpen, href: "/logs" }] : []),
     { key: "marketplace", label: "מארקטפלייס", icon: Store, href: "/marketplace" },
-    { key: "coordination", label: "תיאומים", icon: ClipboardCheck, href: "/dashboard" },
+    // Pilot-only: for dispatcher_admin, /dashboard renders nothing but a
+    // single link card pointing at /ops (everything else there — drones,
+    // license, flight hours — is pilot-personal data an admin account
+    // never has), which made this bubble a dead-end detour to the exact
+    // same place the "ops" bubble below goes to directly. Showing both to
+    // an admin was pure duplication.
+    ...(!isAdmin ? [{ key: "coordination", label: "תיאומים", icon: ClipboardCheck, href: "/dashboard" }] : []),
     // /ops is the dispatcher's actual day-to-day workflow (live queue,
     // NOTAM publishing) — split out from the other admin-only bubble so it
     // isn't buried behind an extra hub screen the way one-off setup tasks
@@ -89,7 +109,10 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   function handleBubbleClick(bubble: BubbleItem) {
     setRingOpen(false);
     if (bubble.action) bubble.action();
-    else if (bubble.href) router.push(bubble.href);
+    else if (bubble.href) {
+      const href = bubble.href;
+      startNavigation(() => router.push(href));
+    }
   }
 
   // BubbleLauncher is persistent chrome mounted on every route, so this runs
@@ -107,16 +130,21 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
   }, [canSeeLogs, isAdmin]);
 
   const count = bubbles.length;
-  const satelliteHalf = 24; // h-12 button, half its size
+  const satelliteHalf = 28; // h-14 button, half its size
   const margin = 12;
 
   // Closed: docked near the bottom edge, out of the way of the map like any
   // other FAB. Open: the whole launcher moves to true screen center first —
   // simpler and more robust than trying to fit a ring around a button
   // pinned near an edge, which is what clipped bubbles off-screen before.
+  // The closed position also backs off by the phone's own home-indicator/
+  // gesture-bar inset (env(safe-area-inset-bottom), 0 on anything without
+  // one) so the FAB doesn't sit under it — done as a calc() added on top of
+  // the JS pixel value rather than folded into closedTop itself, since env()
+  // isn't a number useVisualViewport can reason about.
   const closedTop = viewport.height - 60;
   const openTop = viewport.height / 2;
-  const centerTop = ringOpen ? openTop : closedTop;
+  const centerTop = ringOpen ? `${openTop}px` : `calc(${closedTop}px - env(safe-area-inset-bottom, 0px))`;
 
   // Largest radius that fits from true center to the nearest edge in every
   // direction — always symmetric now that the ring only ever opens centered.
@@ -142,9 +170,9 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
           the closed-to-open move above is one animatable property. */}
       <div
         className="fixed left-1/2 z-40 -translate-x-1/2 -translate-y-1/2 transition-[top] duration-300 ease-out"
-        style={{ top: `${centerTop}px` }}
+        style={{ top: centerTop }}
       >
-        <div className="relative h-14 w-14">
+        <div className="relative h-16 w-16">
           {bubbles.map((bubble, i) => {
             // Full circle around the center bubble, starting straight up and going clockwise.
             const angleDeg = -90 + (360 * i) / count;
@@ -160,42 +188,45 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
                   aria-label={bubble.label}
                   tabIndex={ringOpen ? 0 : -1}
                   className={cn(
-                    "peer absolute left-1/2 top-1/2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-all duration-300 ease-out",
+                    "group absolute left-1/2 top-1/2 z-10 flex h-14 w-14 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-lg transition-[opacity,transform,background-color,box-shadow] duration-300 ease-out hover:bg-accent hover:shadow-xl",
                     ringOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
                   )}
                   style={{
                     // Combines the button's own centering offset with its ring
                     // position and open/closed scale into one transform —
                     // mixing this with Tailwind's translate/scale utility
-                    // classes would silently drop whichever set it last.
+                    // classes would silently drop whichever set it last. A
+                    // hover scale can't join this inline transform (it isn't
+                    // reactive to :hover), so the icon below scales up on
+                    // group-hover instead — same visible "lift" feedback
+                    // without fighting the positional transform.
                     transform: ringOpen
                       ? `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1)`
                       : "translate(-50%, -50%) scale(0)",
                     transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-6 w-6 transition-transform duration-150 group-hover:scale-125" />
                   {Boolean(bubble.badge) && (
                     <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                       {bubble.badge}
                     </span>
                   )}
                 </button>
-                {/* Bubble name label — on hover for a mouse/trackpad (via the
-                    peer-hover: on the button above), permanently visible
-                    instead for a touch device, which has no hover state to
-                    reveal it with. */}
+                {/* Bubble name label — always visible whenever the ring is
+                    open, not just on hover, so it reads the same on touch
+                    and with a mouse. */}
                 <span
                   aria-hidden="true"
                   className={cn(
                     "pointer-events-none absolute left-1/2 top-1/2 z-10 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-md transition-opacity duration-200",
-                    ringOpen ? (isTouchDevice ? "opacity-100" : "opacity-0 peer-hover:opacity-100") : "opacity-0"
+                    ringOpen ? "opacity-100" : "opacity-0"
                   )}
                   style={{
                     transform: ringOpen
-                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 34}px))`
+                      ? `translate(calc(-50% + ${x}px), calc(-50% + ${y + 38}px))`
                       : "translate(-50%, -50%)",
-                    transitionDelay: ringOpen && !isTouchDevice ? "0ms" : ringOpen ? `${i * 30}ms` : "0ms",
+                    transitionDelay: ringOpen ? `${i * 30}ms` : "0ms",
                   }}
                 >
                   {bubble.label}
@@ -207,16 +238,20 @@ export function BubbleLauncher({ role }: { role: UserRole }) {
           <button
             type="button"
             onClick={() => setRingOpen(!ringOpen)}
-            aria-label="תפריט MetisOps"
-            title="תפריט MetisOps"
+            aria-label="תפריט Metisim"
+            title="תפריט Metisim"
             aria-expanded={ringOpen}
             className={cn(
-              "relative z-20 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300",
+              "relative z-20 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 hover:scale-110 hover:shadow-2xl active:scale-95",
               ringOpen && "rotate-90"
             )}
           >
-            <MetisOpsLogo className="h-7 w-7" />
-            {!ringOpen && unreadCount > 0 && (
+            {isNavigating ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <MetisOpsLogo className="h-8 w-8" />
+            )}
+            {!ringOpen && !isNavigating && unreadCount > 0 && (
               <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {unreadCount}
               </span>

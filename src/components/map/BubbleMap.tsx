@@ -18,6 +18,7 @@ import { useMapDrawStore } from "@/stores/useMapDrawStore";
 import { useAirspaceCheck } from "@/hooks/useAirspaceCheck";
 import { useAirspaceZones } from "@/hooks/useAirspaceZones";
 import { useAipReferenceZones } from "@/hooks/useAipReferenceZones";
+import { useLiveNotamZones } from "@/hooks/useLiveNotamZones";
 import {
   useMyFlightRequests,
   useControlTowerFlightRequests,
@@ -30,7 +31,11 @@ import {
   ISRAEL_MAP_CENTER,
   ISRAEL_MAP_DEFAULT_ZOOM,
 } from "@/lib/constants/airspace-zones";
-import { AIP_ZONE_KIND_COLORS } from "@/lib/constants/aip-reference-zones";
+import { AIP_ZONE_KIND_COLORS, AIP_ZONE_KIND_LABELS, LIVE_NOTAM_COLOR } from "@/lib/constants/aip-reference-zones";
+import { notamsValidUntilLabel, isNotamActiveNow, formatNotamSchedule } from "@/lib/geo/live-notams";
+import type { LiveNotam } from "@/lib/notams/live-feed";
+import { formatAltitudeRangeMeters } from "@/lib/geo/aip";
+import { isWeekdayEditionAt } from "@/lib/geo/weekday-zones";
 import { FLIGHT_REQUEST_STATUS_COLORS, FLIGHT_REQUEST_STATUS_LABELS } from "@/lib/constants/flight-request-status";
 import {
   DEFAULT_MAP_BASE_STYLE,
@@ -40,6 +45,9 @@ import {
   type MapLayerVisibility,
 } from "@/lib/types/map-ui";
 import { MapPin, Radar } from "lucide-react";
+
+/** Hoisted to module scope so it's a stable reference across renders — react-map-gl re-subscribes its internal feature-state listeners when this array's identity changes. */
+const ZONE_INTERACTIVE_LAYER_IDS = ["aip-reference-zones-fill", "live-notam-zones-fill"];
 
 const MAPBOX_STYLE_URLS: Record<MapBaseStyle, string> = {
   colorful: "mapbox://styles/mapbox/outdoors-v12",
@@ -73,6 +81,22 @@ export function BubbleMap({
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Small popup preview for an AIP/NOTAM zone — hover on desktop, long
+  // press on touch (same split as the coordination markers below), always
+  // additional to the full-detail LocationInfoCard a real click/tap still
+  // opens, never a replacement for it.
+  const [zonePopup, setZonePopup] = useState<{
+    lng: number;
+    lat: number;
+    properties: Record<string, unknown>;
+  } | null>(null);
+  const zoneLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sits outside React state on purpose: it must be readable synchronously
+  // inside the very next click handler (the touchend that follows a fired
+  // long press), before any state update from setZonePopup could have
+  // re-rendered and been read back.
+  const zoneLongPressFiredRef = useRef(false);
+
   // A touch device has no hover state to reveal a coordination's details on
   // — a long press stands in for it there, so a normal tap/pan while
   // browsing the map never opens a card by accident.
@@ -95,6 +119,7 @@ export function BubbleMap({
   const spatialCheck = useAirspaceCheck();
   const { data: airspaceZones = [] } = useAirspaceZones();
   const { data: aipZones = [] } = useAipReferenceZones();
+  const { data: liveNotams = [] } = useLiveNotamZones();
   const { data: myFlightRequests = [] } = useMyFlightRequests();
   const setSelectedHistoryId = onSelectedHistoryIdChange ?? (() => {});
 
@@ -213,23 +238,72 @@ export function BubbleMap({
       .filter((m): m is NonNullable<typeof m> => m !== null);
   }, [allCoordinations, layerVisibility.allCoordinations]);
 
+  // Weekday-only areas (ranges, helicopter areas) are drawn on weekdays only. Re-checked every minute
+  // so a map left open across Friday midday updates itself.
+  const [isWeekdayEdition, setIsWeekdayEdition] = useState(() => isWeekdayEditionAt(new Date()));
+  useEffect(() => {
+    const id = setInterval(() => setIsWeekdayEdition(isWeekdayEditionAt(new Date())), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const aipZonesGeojson = useMemo<GeoJSON.FeatureCollection>(
     () => ({
       type: "FeatureCollection",
       features: aipZones
         .filter((zone) => zone.geom_geojson && typeof zone.geom_geojson === "object")
+        .filter((zone) => isWeekdayEdition || !zone.weekdays_only)
         .map((zone) => ({
           type: "Feature",
           geometry: zone.geom_geojson as unknown as GeoJSON.Geometry,
-          properties: { id: zone.id, name: zone.name, color: AIP_ZONE_KIND_COLORS[zone.kind] },
+          properties: {
+            id: zone.id,
+            name: zone.name,
+            code: zone.code,
+            kind: zone.kind,
+            color: AIP_ZONE_KIND_COLORS[zone.kind],
+            minAltitudeFt: zone.min_altitude_ft,
+            maxAltitudeFt: zone.max_altitude_ft,
+            weekdaysOnly: Boolean(zone.weekdays_only),
+            droneMaxAltitudeM: zone.drone_max_altitude_m,
+            note: zone.note,
+          },
         })),
     }),
-    [aipZones]
+    [aipZones, isWeekdayEdition]
+  );
+
+  const liveNotamsGeojson = useMemo<GeoJSON.FeatureCollection>(
+    () => ({
+      type: "FeatureCollection",
+      // The feed also carries NOTAMs that start later — only what's in force now is drawn.
+      features: liveNotams.filter(isNotamActiveNow).map((notam) =>
+        turf.circle([notam.position.lon, notam.position.lat], notam.position.radiusNm * 1.852, {
+          units: "kilometers",
+          properties: {
+            id: notam.id,
+            eText: notam.eText,
+            toDate: notam.toDate,
+            fromDate: notam.fromDate,
+            schedule: notam.schedule,
+            label: `נוטאם · ${notam.id}`,
+          },
+        })
+      ),
+    }),
+    [liveNotams]
   );
 
   const handleMapClick = useCallback(
     (event: MapLayerMouseEvent) => {
       const point: [number, number] = [event.lngLat.lng, event.lngLat.lat];
+
+      // A long press just showed the small zone popup for this exact tap —
+      // the touchend that follows it must not also pop the full
+      // LocationInfoCard open, or a pilot gets both at once.
+      if (zoneLongPressFiredRef.current) {
+        zoneLongPressFiredRef.current = false;
+        return;
+      }
 
       // Plain browsing (not actively placing a coordination pin): every
       // click — on an AIP zone or open ground — inspects that point instead
@@ -249,22 +323,71 @@ export function BubbleMap({
     [shapeType, drawMode, setCenter, setDrawMode, onInspectPoint]
   );
 
-  const handleMouseDown = useCallback(() => {
-    if (shapeType === "circle" && drawMode === "sizing_radius") {
-      setIsSizingRadius(true);
-    }
-  }, [shapeType, drawMode]);
+  const handleMouseDown = useCallback(
+    // Minimal structural type, same reasoning as handleMouseMove below —
+    // shared by onMouseDown (a real MouseEvent-backed point) and
+    // onTouchStart (a TouchEvent-backed one); both carry `.point`.
+    (event: { point: { x: number; y: number } }) => {
+      if (shapeType === "circle" && drawMode === "sizing_radius") {
+        setIsSizingRadius(true);
+        return;
+      }
+      // Long-press-to-preview only matters while just browsing — mid-draw,
+      // the pin/radius flow already owns this gesture.
+      if (!isTouchDevice || drawMode !== "idle") return;
+      const point: [number, number] = [event.point.x, event.point.y];
+      zoneLongPressTimer.current = setTimeout(() => {
+        const map = mapRef.current?.getMap();
+        if (!map) return;
+        const features = map.queryRenderedFeatures(point, { layers: ZONE_INTERACTIVE_LAYER_IDS });
+        if (!features[0]) return;
+        zoneLongPressFiredRef.current = true;
+        const lngLat = map.unproject(point);
+        setZonePopup({ lng: lngLat.lng, lat: lngLat.lat, properties: features[0].properties ?? {} });
+      }, 500);
+    },
+    [shapeType, drawMode, isTouchDevice]
+  );
 
   const handleMouseMove = useCallback(
-    (event: MapLayerMouseEvent) => {
-      if (!isSizingRadius || !center) return;
-      const distanceKm = turf.distance(center, [event.lngLat.lng, event.lngLat.lat], { units: "kilometers" });
-      setRadiusMeters(Math.max(10, Math.round(distanceKm * 1000)));
+    // Shared by onMouseMove and onTouchMove (react-map-gl types those two
+    // props with different event classes, but both carry lngLat/features) —
+    // a minimal structural type here instead of MapLayerMouseEvent
+    // specifically is what lets one handler serve both without a cast.
+    (event: {
+      lngLat: { lng: number; lat: number };
+      features?: Array<{ properties?: Record<string, unknown> | null }>;
+    }) => {
+      if (isSizingRadius && center) {
+        const distanceKm = turf.distance(center, [event.lngLat.lng, event.lngLat.lat], { units: "kilometers" });
+        setRadiusMeters(Math.max(10, Math.round(distanceKm * 1000)));
+        return;
+      }
+
+      // A finger that's moving is panning, not holding still — cancel
+      // whatever long press might be timing (same rule the coordination
+      // marker buttons already use).
+      if (isTouchDevice) {
+        if (zoneLongPressTimer.current) clearTimeout(zoneLongPressTimer.current);
+        return;
+      }
+
+      // Desktop hover preview for AIP/NOTAM zones — touch gets the same
+      // preview via the long press above instead. Only while just browsing;
+      // mid-draw this would fight for the same mousemove as radius sizing.
+      if (drawMode !== "idle") return;
+      const feature = event.features?.[0];
+      if (feature) {
+        setZonePopup({ lng: event.lngLat.lng, lat: event.lngLat.lat, properties: feature.properties ?? {} });
+      } else {
+        setZonePopup((current) => (current ? null : current));
+      }
     },
-    [isSizingRadius, center, setRadiusMeters]
+    [isSizingRadius, center, setRadiusMeters, isTouchDevice, drawMode]
   );
 
   const handleMouseUp = useCallback(() => {
+    if (zoneLongPressTimer.current) clearTimeout(zoneLongPressTimer.current);
     if (isSizingRadius) {
       setIsSizingRadius(false);
       setDrawMode("done");
@@ -366,7 +489,19 @@ export function BubbleMap({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onTouchStart={handleMouseDown}
+        onTouchMove={handleMouseMove}
+        onTouchEnd={handleMouseUp}
+        // Dragging to size the radius was competing with the map's own
+        // drag-to-pan the whole time — both listen to the same pointer
+        // gesture, and Mapbox's own pan handler was winning most of the
+        // time on touch (its primary gesture) and some of the time even
+        // with a mouse. Disabled for exactly the one interaction that
+        // needs the drag for something else instead.
+        dragPan={!(shapeType === "circle" && drawMode === "sizing_radius")}
+        touchZoomRotate={!(shapeType === "circle" && drawMode === "sizing_radius")}
         cursor={shapeType === "circle" && drawMode !== "done" ? "crosshair" : "default"}
+        interactiveLayerIds={ZONE_INTERACTIVE_LAYER_IDS}
       >
         <NavigationControl position="top-left" />
 
@@ -416,6 +551,49 @@ export function BubbleMap({
                 "text-color": ["get", "color"],
                 "text-halo-color": "#ffffff",
                 "text-halo-width": 1.4,
+              }}
+            />
+          </Source>
+        )}
+
+        {/* Live Israeli NOTAMs (github.com/arielf-idra/notam-isr) — always a
+            circle (center + radius), never a real polygon; see
+            src/lib/notams/live-feed.ts. Visual only here, like the AIP layer
+            above — the actual E) text reads through LocationInfoCard when a
+            pilot clicks/taps a point (handleMapClick → onInspectPoint), not
+            a dedicated popup on the shape itself. */}
+        {layerVisibility.liveNotams && (
+          <Source id="live-notam-zones" type="geojson" data={liveNotamsGeojson}>
+            <Layer
+              id="live-notam-zones-fill"
+              type="fill"
+              paint={{ "fill-color": LIVE_NOTAM_COLOR, "fill-opacity": 0.22 }}
+            />
+            <Layer
+              id="live-notam-zones-line"
+              type="line"
+              paint={{ "line-color": LIVE_NOTAM_COLOR, "line-width": 1, "line-dasharray": [2, 1.5] }}
+            />
+            {/* Faded, always-on label identifying the shape as a NOTAM (not
+                just relying on color, which a colorblind pilot or a busy map
+                with several overlapping layers can't reliably tell apart) —
+                low opacity on purpose, this is a caption, not the primary
+                signal (the fill/line color + click-to-inspect are). */}
+            <Layer
+              id="live-notam-zones-label"
+              type="symbol"
+              minzoom={8}
+              layout={{
+                "text-field": ["get", "label"],
+                "text-size": ["interpolate", ["linear"], ["zoom"], 8, 9, 14, 12],
+                "text-allow-overlap": false,
+                "symbol-placement": "point",
+              }}
+              paint={{
+                "text-color": LIVE_NOTAM_COLOR,
+                "text-opacity": 0.55,
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.2,
               }}
             />
           </Source>
@@ -556,6 +734,64 @@ export function BubbleMap({
                 {new Date(selectedCoordination.start_time).toLocaleString("he-IL")} –{" "}
                 {new Date(selectedCoordination.end_time).toLocaleString("he-IL")}
               </p>
+            </div>
+          </Popup>
+        )}
+
+        {/* Small preview for an AIP/NOTAM zone — hover (desktop) or long
+            press (touch), see handleMouseMove/handleMouseDown above. Same
+            "just the essentials, near the tap point" card requested as a
+            lighter alternative to opening the full LocationInfoCard for
+            every zone glance. */}
+        {zonePopup && (
+          <Popup
+            longitude={zonePopup.lng}
+            latitude={zonePopup.lat}
+            anchor="bottom"
+            offset={12}
+            closeButton
+            closeOnClick={false}
+            onClose={() => setZonePopup(null)}
+          >
+            <div className="flex flex-col gap-0.5 text-xs" dir="rtl">
+              {"kind" in zonePopup.properties ? (
+                <>
+                  <p className="font-semibold">
+                    {String(zonePopup.properties.name ?? "")}
+                    {zonePopup.properties.code ? ` (${zonePopup.properties.code})` : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {AIP_ZONE_KIND_LABELS[zonePopup.properties.kind as keyof typeof AIP_ZONE_KIND_LABELS]}
+                  </p>
+                  <p className="font-medium">
+                    {formatAltitudeRangeMeters(
+                      (zonePopup.properties.minAltitudeFt as number | null) ?? null,
+                      (zonePopup.properties.maxAltitudeFt as number | null) ?? null
+                    )}
+                  </p>
+                  {zonePopup.properties.weekdaysOnly ? <p className="font-medium">בתוקף בימי חול בלבד</p> : null}
+                  {typeof zonePopup.properties.note === "string" && zonePopup.properties.note ? (
+                    <p className="max-w-[220px] text-muted-foreground">{zonePopup.properties.note}</p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold" style={{ color: LIVE_NOTAM_COLOR }} dir="ltr">
+                    {String(zonePopup.properties.id ?? "נוטאם")}
+                  </p>
+                  <p className="max-w-[220px]">{String(zonePopup.properties.eText ?? "")}</p>
+                  {typeof zonePopup.properties.toDate === "string" && (
+                    <p className="mt-1 text-xs font-medium">
+                      בתוקף עד {notamsValidUntilLabel([{ toDate: zonePopup.properties.toDate } as LiveNotam])}
+                    </p>
+                  )}
+                  {typeof zonePopup.properties.schedule === "string" && typeof zonePopup.properties.fromDate === "string" && (
+                    <p className="text-xs">
+                      שעות פעילות: {formatNotamSchedule(zonePopup.properties.schedule, zonePopup.properties.fromDate)}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </Popup>
         )}

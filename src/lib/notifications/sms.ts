@@ -14,7 +14,7 @@ export interface SendSmsInput {
 
 export async function sendSms({ toPhone, message }: SendSmsInput): Promise<{ sent: boolean }> {
   const apiKey = process.env.SMS_PROVIDER_API_KEY;
-  const senderId = process.env.SMS_PROVIDER_SENDER_ID ?? "MetisOps";
+  const senderId = process.env.SMS_PROVIDER_SENDER_ID ?? "Metisim";
   const endpoint = process.env.SMS_PROVIDER_ENDPOINT;
 
   if (!apiKey || !endpoint) {

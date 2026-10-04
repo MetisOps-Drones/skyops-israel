@@ -1,0 +1,14 @@
+Drop the redundant "תיאומים" bubble for dispatcher_admin
+
+Ohad's question: why do "תיאומים" and "מוקד תיאום" lead to the same
+place? They don't share a route, but for dispatcher_admin, /dashboard
+(the "תיאומים" target) renders nothing but a single link card pointing
+straight at /ops -- everything else on that page is pilot-personal data
+(own drones, license, flight hours) an admin account never has. So the
+bubble was a dead-end detour to the exact same destination the "ops"
+bubble already goes to directly.
+
+Made "coordination" conditional on !isAdmin, mirroring how "ops" and
+"admin" are already conditional on isAdmin. Pilots are unaffected --
+/dashboard is a real, full personal dashboard for them, and there's no
+"ops" bubble in their menu to duplicate against.

@@ -44,6 +44,7 @@ export type Database = {
           altitude_text: string
           code: string | null
           created_at: string
+          drone_max_altitude_m: number | null
           geom_geojson: Json
           geometry_precise: boolean
           id: string
@@ -51,13 +52,16 @@ export type Database = {
           max_altitude_ft: number | null
           min_altitude_ft: number | null
           name: string
+          note: string | null
           source_edition: string
           source_sheet: string
+          weekdays_only: boolean
         }
         Insert: {
           altitude_text: string
           code?: string | null
           created_at?: string
+          drone_max_altitude_m?: number | null
           geom_geojson: Json
           geometry_precise?: boolean
           id?: string
@@ -65,13 +69,16 @@ export type Database = {
           max_altitude_ft?: number | null
           min_altitude_ft?: number | null
           name: string
+          note?: string | null
           source_edition: string
           source_sheet: string
+          weekdays_only?: boolean
         }
         Update: {
           altitude_text?: string
           code?: string | null
           created_at?: string
+          drone_max_altitude_m?: number | null
           geom_geojson?: Json
           geometry_precise?: boolean
           id?: string
@@ -79,8 +86,10 @@ export type Database = {
           max_altitude_ft?: number | null
           min_altitude_ft?: number | null
           name?: string
+          note?: string | null
           source_edition?: string
           source_sheet?: string
+          weekdays_only?: boolean
         }
         Relationships: []
       }
@@ -690,6 +699,8 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone: string | null
+          whatsapp_phone: string | null
+          contacts: Json
           notes: string | null
           center_lng: number
           center_lat: number
@@ -703,6 +714,8 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone?: string | null
+          whatsapp_phone?: string | null
+          contacts?: Json
           notes?: string | null
           center_lng: number
           center_lat: number
@@ -716,6 +729,8 @@ export type Database = {
           unit_type?: string
           phone?: string
           backup_phone?: string | null
+          whatsapp_phone?: string | null
+          contacts?: Json
           notes?: string | null
           center_lng?: number
           center_lat?: number
@@ -724,6 +739,51 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      coordination_quota_overrides: {
+        Row: {
+          user_id: string
+          override_count: number
+          override_period: string
+          override_complex_allowed: number
+          note: string | null
+          set_by: string | null
+          set_at: string
+        }
+        Insert: {
+          user_id: string
+          override_count: number
+          override_period: string
+          override_complex_allowed?: number
+          note?: string | null
+          set_by?: string | null
+          set_at?: string
+        }
+        Update: {
+          user_id?: string
+          override_count?: number
+          override_period?: string
+          override_complex_allowed?: number
+          note?: string | null
+          set_by?: string | null
+          set_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coordination_quota_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coordination_quota_overrides_set_by_fkey"
+            columns: ["set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documents: {
         Row: {
@@ -1171,9 +1231,56 @@ export type Database = {
           },
         ]
       }
+      flight_request_decisions: {
+        Row: {
+          id: string
+          flight_request_id: string
+          action: string
+          notam_code: string | null
+          notes: string | null
+          decided_by: string | null
+          decided_at: string
+        }
+        Insert: {
+          id?: string
+          flight_request_id: string
+          action: string
+          notam_code?: string | null
+          notes?: string | null
+          decided_by?: string | null
+          decided_at?: string
+        }
+        Update: {
+          id?: string
+          flight_request_id?: string
+          action?: string
+          notam_code?: string | null
+          notes?: string | null
+          decided_by?: string | null
+          decided_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_request_decisions_flight_request_id_fkey"
+            columns: ["flight_request_id"]
+            isOneToOne: false
+            referencedRelation: "flight_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flight_request_decisions_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flight_requests: {
         Row: {
           booking_id: string | null
+          camera_type: string | null
+          infrastructure_declaration: string | null
           center_point: unknown
           center_point_geojson: Json
           created_at: string
@@ -1195,11 +1302,14 @@ export type Database = {
           reviewed_by: string | null
           start_time: string
           status: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
           booking_id?: string | null
+          camera_type?: string | null
+          infrastructure_declaration?: string | null
           center_point: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -1221,11 +1331,14 @@ export type Database = {
           reviewed_by?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
           booking_id?: string | null
+          camera_type?: string | null
+          infrastructure_declaration?: string | null
           center_point?: unknown
           center_point_geojson?: Json
           created_at?: string
@@ -1247,6 +1360,7 @@ export type Database = {
           reviewed_by?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["flight_request_status"]
+          takedown_response_seconds?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -1674,6 +1788,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           org_id: string
+          position: string | null
           role: Database["public"]["Enums"]["user_role"] | null
           status: Database["public"]["Enums"]["org_membership_status"]
           user_id: string
@@ -1683,6 +1798,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           org_id: string
+          position?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           status?: Database["public"]["Enums"]["org_membership_status"]
           user_id: string
@@ -1692,6 +1808,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           org_id?: string
+          position?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
           status?: Database["public"]["Enums"]["org_membership_status"]
           user_id?: string
@@ -2469,6 +2586,8 @@ export type Database = {
           unit_type: string
           phone: string
           backup_phone: string | null
+          whatsapp_phone: string | null
+          contacts: Json
           notes: string | null
           center_lng: number
           center_lat: number
@@ -2707,6 +2826,14 @@ export type Database = {
           pilot_avatar_url: string
           pilot_full_name: string
           pilot_id: string
+        }[]
+      }
+      my_coordination_override: {
+        Args: never
+        Returns: {
+          override_count: number
+          override_period: string
+          override_complex_allowed: number
         }[]
       }
       my_marketplace_bookings: {

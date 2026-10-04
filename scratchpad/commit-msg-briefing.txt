@@ -1,0 +1,19 @@
+Location card: what limits the flight at the time asked about
+
+- Height-limited areas (helicopter areas 60 m, 100-ft area 30 m) are now a
+  ceiling for every account - hobby or commercial - not a coordination
+  requirement: "at this point you may fly up to 60 m only". The flight
+  request form caps the altitude field at it and the server rejects a
+  request above it.
+- New location briefing (lib/geo/location-briefing.ts): the cap, weekday-only
+  limits in force with "until when", and what is about to start (a weekday-only
+  area coming into force on Sunday, NOTAMs that begin soon). The card opens
+  "you may fly here, but pay attention to:" followed by those lines.
+- The card can be checked for a later moment (date/time field): zones,
+  caps and NOTAMs are judged at that time, not only "now".
+- The weekend is now defined in UTC like the AIP publishes it: Friday
+  10:00 UTC to Sunday 04:00 UTC (13:00 Friday to 07:00 Sunday Israel summer
+  time). The two hours are single constants - not yet confirmed against ENR 5.1.
+
+Tests: weekday-zones.spec.ts rewritten (UTC weekend, next change, caps,
+briefing), map-briefing.spec.ts (card on a weekday and on a Saturday).
