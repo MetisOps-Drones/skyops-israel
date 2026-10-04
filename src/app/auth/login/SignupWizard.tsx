@@ -152,7 +152,7 @@ export function SignupWizard() {
       formData.set("fullName", state.fullName);
       formData.set("email", state.email);
       formData.set("password", state.password);
-      // Only ever request a free-tier plan_code from the signup request itself — the server (0082)
+      // Only ever request a free-tier plan_code from the signup request itself — the server (0097)
       // ignores anything else anyway, since this metadata is entirely client-controlled. A paid
       // plan/org is granted afterwards through a confirmed Cardcom checkout, below.
       formData.set("planCode", state.customerType === "hobby" ? "private_free" : "business_free");
