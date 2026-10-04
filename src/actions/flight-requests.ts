@@ -89,9 +89,14 @@ async function evaluateFlightRequestSafety(
   const flightWindow = { start: data.start_time, end: data.end_time };
   const authCheck = checkFlightAuthorizationRequirement(centerPoint, aipZones, isHobby, {
     maxAltitudeAmslM: terrainM === null ? null : terrainM + data.max_altitude_meters,
-    plannedAltitudeM: data.max_altitude_meters,
     window: flightWindow,
   });
+  // Height-limited areas (helicopter areas, the 100-ft area) cap the flight for every account.
+  if (authCheck.altitudeCapM !== null && data.max_altitude_meters > authCheck.altitudeCapM) {
+    return {
+      error: `באזור זה (${authCheck.capZones.map((z) => z.name).join(", ")}) מותר להטיס עד ${authCheck.altitudeCapM} מ' מעל הקרקע בלבד — לא ניתן לבקש גובה של ${data.max_altitude_meters} מ'.`,
+    };
+  }
   const altitudeAtPoint = maxLegalAltitudeAtPoint(centerPoint, aipZones, flightWindow);
 
   if (altitudeAtPoint.blockedFromGround || authCheck.blockLevel === "forbidden") {

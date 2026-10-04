@@ -94,7 +94,6 @@ export function RequestDetailPanel({
     () =>
       checkFlightAuthorizationRequirement([requestLng, requestLat], aipZones, false, {
         maxAltitudeAmslM: terrainM === null ? null : terrainM + requestAltitudeM,
-        plannedAltitudeM: requestAltitudeM,
         window: requestStart && requestEnd ? { start: new Date(requestStart), end: new Date(requestEnd) } : null,
       }),
     [requestLng, requestLat, aipZones, terrainM, requestAltitudeM, requestStart, requestEnd]

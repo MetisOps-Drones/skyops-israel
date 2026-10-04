@@ -80,8 +80,8 @@ export function isNotamActiveNow(n: LiveNotam): boolean {
 }
 
 /** NOTAMs covering this point that have not started yet but will within `days` — so a pilot planning ahead isn't told "clear" about something that begins tomorrow. */
-export function upcomingNotamsAt(point: [number, number], notams: LiveNotam[], days = 14): LiveNotam[] {
-  const now = Date.now();
+export function upcomingNotamsAt(point: [number, number], notams: LiveNotam[], days = 14, from?: Date): LiveNotam[] {
+  const now = from ? from.getTime() : Date.now();
   const horizon = now + days * 24 * 60 * 60 * 1000;
   const turfPoint = turf.point(point);
   return notams

@@ -2,36 +2,33 @@
  * Some areas on the official CAAI drone map (firing ranges, helicopter-flight
  * areas, the 100-ft area) exist on the weekday edition only — the weekend
  * edition does not carry them. Zones flagged `weekdays_only` are therefore
- * drawn on the map only while it is a weekday in Israel, and a flight request
- * is checked against them only if its time window touches a weekday.
+ * drawn on the map only while it is a weekday, and a flight request is checked
+ * against them only if its time window touches a weekday.
  *
- * Israel's weekend: Friday from WEEKEND_STARTS_FRIDAY_HOUR through Saturday
- * night. The 13:00 start is NOT confirmed against the CAAI publication —
- * it's a single constant so it can be corrected in one place.
+ * The weekend is defined in UTC, as the AIP publishes its activity hours:
+ * from Friday WEEKEND_STARTS_FRIDAY_UTC_HOUR until Sunday WEEKEND_ENDS_SUNDAY_UTC_HOUR
+ * (10:00 UTC Friday = 13:00 Israel summer time, 12:00 in winter; 04:00 UTC Sunday
+ * = 07:00 / 06:00). These two hours are NOT yet confirmed against the AIP
+ * itself — they are single constants so they can be corrected in one place.
  */
 export const ISRAEL_TIME_ZONE = "Asia/Jerusalem";
-export const WEEKEND_STARTS_FRIDAY_HOUR = 13;
-
-const israelClock = new Intl.DateTimeFormat("en-US", {
-  timeZone: ISRAEL_TIME_ZONE,
-  weekday: "short",
-  hour: "numeric",
-  hourCycle: "h23",
-});
-
-/** True while a weekday-only area is in force at this instant (Sunday to Friday midday, Israel time). */
-export function isWeekdayEditionAt(instant: Date): boolean {
-  const parts = israelClock.formatToParts(instant);
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  if (weekday === "Sat") return false;
-  if (weekday === "Fri") return hour < WEEKEND_STARTS_FRIDAY_HOUR;
-  return true;
-}
+export const WEEKEND_STARTS_FRIDAY_UTC_HOUR = 10;
+export const WEEKEND_ENDS_SUNDAY_UTC_HOUR = 4;
 
 const HOUR_MS = 60 * 60 * 1000;
-/** The weekend lasts under 36 h, so any window longer than that must reach a weekday. */
-const LONGEST_WEEKEND_MS = 36 * HOUR_MS;
+const DAY_MS = 24 * HOUR_MS;
+/** The longest the weekend can last — any window longer than that must reach a weekday. */
+const LONGEST_WEEKEND_MS = (2 * 24 + (24 - WEEKEND_STARTS_FRIDAY_UTC_HOUR) + WEEKEND_ENDS_SUNDAY_UTC_HOUR) * HOUR_MS;
+
+/** True while a weekday-only area is in force at this instant. */
+export function isWeekdayEditionAt(instant: Date): boolean {
+  const day = instant.getUTCDay(); // 0 = Sunday
+  const hour = instant.getUTCHours();
+  if (day === 6) return false;
+  if (day === 5) return hour < WEEKEND_STARTS_FRIDAY_UTC_HOUR;
+  if (day === 0) return hour >= WEEKEND_ENDS_SUNDAY_UTC_HOUR;
+  return true;
+}
 
 /**
  * Whether a weekday-only area applies to a flight window: true if any moment
@@ -57,4 +54,26 @@ export function zoneIsInForce(
   now: Date = new Date()
 ): boolean {
   return !zone.weekdays_only || weekdayEditionAppliesTo(window, now);
+}
+
+/**
+ * The next moment after `from` at which the weekday edition starts or stops
+ * (the weekend begins Friday, ends Sunday) — "this area comes into force on
+ * Sunday 07:00" / "stops on Friday 13:00".
+ */
+export function nextEditionChange(from: Date): { at: Date; weekdayEditionAfter: boolean } {
+  const midnight = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+  for (let d = 0; d <= 8; d++) {
+    const day = new Date(midnight + d * DAY_MS);
+    const dow = day.getUTCDay();
+    if (dow === 5) {
+      const at = new Date(day.getTime() + WEEKEND_STARTS_FRIDAY_UTC_HOUR * HOUR_MS);
+      if (at > from) return { at, weekdayEditionAfter: false };
+    }
+    if (dow === 0) {
+      const at = new Date(day.getTime() + WEEKEND_ENDS_SUNDAY_UTC_HOUR * HOUR_MS);
+      if (at > from) return { at, weekdayEditionAfter: true };
+    }
+  }
+  throw new Error("unreachable: the weekend boundaries repeat every week");
 }

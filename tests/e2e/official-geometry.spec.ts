@@ -15,7 +15,7 @@ test.beforeAll(async () => {
   zones = (await loadAipZones()).filter((z) => !z.weekdays_only);
 });
 const migrated = () => zones.some((z) => z.code === "CAAI-LLBG-1");
-const level = (pt: [number, number]) => checkFlightAuthorizationRequirement(pt, zones, false, { maxAltitudeAmslM: 100, plannedAltitudeM: 100 }).blockLevel;
+const level = (pt: [number, number]) => checkFlightAuthorizationRequirement(pt, zones, false, { maxAltitudeAmslM: 100 }).blockLevel;
 
 test("the Ben Gurion CTR covers the official 484 km² (central Tel Aviv, Ramat Gan, Rishon LeZion need the tower)", () => {
   test.skip(!migrated(), "Migration 0094 has not been run yet");

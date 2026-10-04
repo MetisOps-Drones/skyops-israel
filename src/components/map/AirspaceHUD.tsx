@@ -57,7 +57,6 @@ export function AirspaceHUD({
     coords && aipZones
       ? checkFlightAuthorizationRequirement(coords, aipZones, isHobby, {
           maxAltitudeAmslM: terrainM === null ? null : terrainM + generalCeilingM,
-          plannedAltitudeM: generalCeilingM,
         })
       : null;
   const notamCheck = coords && liveNotams ? checkLiveNotamOverlap(coords, liveNotams) : null;

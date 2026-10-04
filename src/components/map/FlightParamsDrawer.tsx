@@ -143,12 +143,14 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
       checkPoint
         ? checkFlightAuthorizationRequirement(checkPoint, aipZones, isHobby, {
             maxAltitudeAmslM: terrainM === null ? null : terrainM + maxAltitudeMeters,
-            plannedAltitudeM: maxAltitudeMeters,
             window: notamWindow,
           })
         : null,
     [checkPoint, aipZones, isHobby, terrainM, maxAltitudeMeters, notamWindow]
   );
+  // A height-limited area at the point (helicopter areas, the 100-ft area) caps the flight for every account.
+  const areaCapM = authCheck?.altitudeCapM ?? null;
+  const maxAllowedAltitudeM = areaCapM === null ? altitudeCeilingM : Math.min(altitudeCeilingM, areaCapM);
   const altitudeResult = useMemo(
     () => (checkPoint ? maxLegalAltitudeAtPoint(checkPoint, aipZones, notamWindow) : null),
     [checkPoint, aipZones, notamWindow]
@@ -234,8 +236,8 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
   // account may legally request (e.g. left over from a previous session), pull it back down
   // instead of silently submitting a request the server will reject anyway.
   useEffect(() => {
-    if (maxAltitudeMeters > altitudeCeilingM) setMaxAltitudeMeters(altitudeCeilingM);
-  }, [maxAltitudeMeters, altitudeCeilingM, setMaxAltitudeMeters]);
+    if (maxAltitudeMeters > maxAllowedAltitudeM) setMaxAltitudeMeters(maxAllowedAltitudeM);
+  }, [maxAltitudeMeters, maxAllowedAltitudeM, setMaxAltitudeMeters]);
 
   // The pilot thinks in meters above the ground; ATC and the AIP in feet above sea level (מעפ"י).
   // Shown live so the conversion the coordinator will see is never a surprise.
@@ -505,9 +507,19 @@ export function FlightParamsDrawer({ open, onOpenChange }: { open: boolean; onOp
               value={maxAltitudeMeters}
               onChange={setMaxAltitudeMeters}
               min={1}
-              max={altitudeCeilingM}
-              errorText={`הגובה חייב להיות בין 1 ל-${altitudeCeilingM} מטרים (התקרה החוקית ${isHobby ? "למטיסן" : "לכטב״ם קטן"})`}
+              max={maxAllowedAltitudeM}
+              errorText={
+                areaCapM !== null && areaCapM < altitudeCeilingM
+                  ? `באזור זה מותר להטיס עד ${areaCapM} מטרים בלבד`
+                  : `הגובה חייב להיות בין 1 ל-${altitudeCeilingM} מטרים (התקרה החוקית ${isHobby ? "למטיסן" : "לכטב״ם קטן"})`
+              }
             />
+            {areaCapM !== null && areaCapM < altitudeCeilingM && (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                {`באזור זה (${authCheck?.capZones.map((z) => z.name).join(", ")}) מותר להטיס עד ${areaCapM} מ' מעל הקרקע בלבד`}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground" dir="rtl">
               = {altitudeFt.toLocaleString("he-IL")} רגל מעל הקרקע
               {altitudeAmsl !== null

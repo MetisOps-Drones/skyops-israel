@@ -3,7 +3,6 @@ import type { AipReferenceZone } from "@/hooks/useAipReferenceZones";
 import type { ProximityFinding } from "@/lib/geo/proximity-check";
 import { AERODROME_RUNWAYS, type AerodromeRunway } from "@/lib/geo/aerodrome-runways";
 import { ftToM } from "@/lib/geo/aip";
-import { HOBBY_GENERAL_CEILING_M } from "@/lib/geo/altitude-ceiling";
 import { zoneIsInForce } from "@/lib/geo/weekday-zones";
 
 /**
@@ -221,6 +220,10 @@ export interface FlightAuthorizationCheck {
   /** The most restrictive level triggered by any overlapping/nearby zone. */
   blockLevel: ZoneBlockLevel;
   reasons: AuthorizationReason[];
+  /** The lowest height cap (meters above ground) among the height-limited areas covering the point; null = none. */
+  altitudeCapM: number | null;
+  /** The height-limited areas behind that cap, for naming them to the pilot. */
+  capZones: AipReferenceZone[];
 }
 
 /**
@@ -271,13 +274,6 @@ export function checkFlightAuthorizationRequirement(
      */
     maxAltitudeAmslM?: number | null;
     /**
-     * Planned flight height above the ground, in meters. Areas that only limit small drones to a height
-     * (helicopter areas, the 100-ft area — `drone_max_altitude_m`) count only when this exceeds that cap.
-     * Omitted/null = not chosen yet: a hobby account is judged at its fixed ceiling, anyone else is assumed
-     * to fly above the cap.
-     */
-    plannedAltitudeM?: number | null;
-    /**
      * The requested flight window. Weekday-only areas (`weekdays_only`) count only if the window touches a
      * weekday; omitted = judged at the current moment (a point inspected on the map).
      */
@@ -301,13 +297,12 @@ export function checkFlightAuthorizationRequirement(
   }
 
   const ceilingAmslM = options?.maxAltitudeAmslM ?? null;
-  const plannedAltitudeM = options?.plannedAltitudeM ?? (isHobby ? HOBBY_GENERAL_CEILING_M : null);
+  const capZones: AipReferenceZone[] = [];
 
   for (const zone of zones) {
     const geom = zone.geom_geojson as unknown as GeoJSON.Geometry;
     if (!geom || geom.type !== "Polygon") continue;
     if (!zoneIsInForce(zone, options?.window)) continue;
-    if (zone.drone_max_altitude_m != null && plannedAltitudeM !== null && plannedAltitudeM <= zone.drone_max_altitude_m) continue;
     if (ceilingAmslM !== null && zone.min_altitude_ft !== null && ftToM(zone.min_altitude_ft) > ceilingAmslM) continue;
 
     let inside = false;
@@ -317,12 +312,18 @@ export function checkFlightAuthorizationRequirement(
       continue;
     }
 
-    if (inside) {
-      raiseTo(blockLevelForKind(zone.kind));
-      const capNote = zone.drone_max_altitude_m != null ? ` — כטב"ם מעל ${zone.drone_max_altitude_m} מ' טעון תיאום` : "";
-      reasons.push({ label: `בתוך ${zone.name}${zone.code ? ` (${zone.code})` : ""}${capNote}`, zone });
+    if (!inside) continue;
+    if (zone.drone_max_altitude_m != null) {
+      // A height-limited area (helicopter areas, the 100-ft area): the law lets a small drone fly here
+      // up to that height. It is a ceiling, not a coordination requirement — and it holds for every
+      // account, hobby or commercial.
+      capZones.push(zone);
+      continue;
     }
+    raiseTo(blockLevelForKind(zone.kind));
+    reasons.push({ label: `בתוך ${zone.name}${zone.code ? ` (${zone.code})` : ""}`, zone });
   }
 
-  return { blockLevel, reasons };
+  const altitudeCapM = capZones.length > 0 ? Math.min(...capZones.map((z) => z.drone_max_altitude_m as number)) : null;
+  return { blockLevel, reasons, altitudeCapM, capZones };
 }

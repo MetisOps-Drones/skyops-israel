@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MapPinned, ShieldAlert, ShieldCheck, ArrowUpToLine, Lock, Ban, Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -37,6 +38,8 @@ import {
   COMMERCIAL_GENERAL_CEILING_M,
 } from "@/lib/geo/altitude-ceiling";
 import { toDMS } from "@/lib/geo/spatial";
+import { buildLocationBriefing } from "@/lib/geo/location-briefing";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function LocationInfoCard({
@@ -58,6 +61,8 @@ export function LocationInfoCard({
   const altitudeCeiling = useAltitudeCeiling(point);
   const isHobby = role === "pilot_hobby";
   const hasOrg = Boolean(orgContext?.orgId);
+  // "" = now; otherwise a datetime-local value for the time the pilot is planning.
+  const [checkTime, setCheckTime] = useState("");
 
   // Altitude isn't chosen yet at this pre-planning stage (that happens in
   // FlightParamsDrawer) — use the role's flat general ceiling as the
@@ -92,17 +97,31 @@ export function LocationInfoCard({
   const buildingsOnlyReady = !buildingProximity.isLoading;
 
   const terrainM = altitudeCeiling.data?.terrainElevationM ?? null;
+  // Everything below is judged at the time the pilot asks about: "now" by default, or a later moment
+  // they pick — so what limits a flight tomorrow is shown for tomorrow, not for this minute.
+  const checkAt = useMemo(() => {
+    if (!checkTime) return null;
+    const d = new Date(checkTime);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }, [checkTime]);
+  const checkWindow = useMemo(() => (checkAt ? { start: checkAt, end: new Date(checkAt.getTime() + 60 * 60 * 1000) } : null), [checkAt]);
   const aipCheck = point
     ? checkFlightAuthorizationRequirement(point, aipZones, isHobby, {
         maxAltitudeAmslM: terrainM === null ? null : terrainM + conservativeAltitudeM,
+        window: checkWindow,
       })
     : null;
-  const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams) : null;
+  const notamCheck = point ? checkLiveNotamOverlap(point, liveNotams, checkWindow) : null;
   const notamUntil = notamCheck?.inside ? notamsValidUntilLabel(notamCheck.notams) : null;
   const notamHours = notamCheck?.inside ? notamsActivityLabel(notamCheck.notams) : null;
   // Not in force yet, but will be within two weeks — shown so planning ahead isn't told "clear".
-  const upcomingNotams = point ? upcomingNotamsAt(point, liveNotams) : [];
-  const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones) : null;
+  const upcomingNotams = point ? upcomingNotamsAt(point, liveNotams, 14, checkAt ?? undefined) : [];
+  const altitudeResult = point ? maxLegalAltitudeAtPoint(point, aipZones, checkWindow) : null;
+  const briefing = useMemo(
+    () => (point ? buildLocationBriefing({ point, zones: aipZones, notams: liveNotams, at: checkAt ?? new Date() }) : null),
+    [point, aipZones, liveNotams, checkAt]
+  );
+  const hasBriefing = Boolean(briefing && (briefing.ceiling || briefing.notes.length > 0 || briefing.upcoming.length > 0));
   const fullCeiling = altitudeResult
     ? computeFullAltitudeCeiling(
         altitudeResult,
@@ -199,6 +218,30 @@ export function LocationInfoCard({
             <p className="text-xs text-muted-foreground" dir="ltr">
               {toDMS(point[1], "lat")} {toDMS(point[0], "lng")}
             </p>
+
+            {/* The picture is for a moment in time — now by default; planning a flight for later shows what
+                limits it then (weekday-only areas, NOTAMs that start or end by that time). */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label htmlFor="check-time" className="font-medium">
+                {checkAt ? "מצב המרחב למועד:" : "מצב המרחב עכשיו —"}
+              </label>
+              <Input
+                id="check-time"
+                type="datetime-local"
+                value={checkTime}
+                onChange={(e) => setCheckTime(e.target.value)}
+                dir="ltr"
+                className="h-8 w-auto text-xs"
+                aria-label="בדיקה למועד אחר"
+              />
+              {checkAt ? (
+                <button type="button" onClick={() => setCheckTime("")} className="font-medium text-primary underline">
+                  חזרה לעכשיו
+                </button>
+              ) : (
+                <span className="text-muted-foreground">לבדיקה למועד אחר — בחרו תאריך ושעה</span>
+              )}
+            </div>
 
             {/* The answer, first — everything below this is "why", collapsed by default so a
                 pilot who just wants a yes/no doesn't have to read a legal brief to get it.
@@ -302,8 +345,43 @@ export function LocationInfoCard({
             ) : (
               <div className="flex items-center gap-3 rounded-xl bg-success/10 p-4 text-success">
                 <ShieldCheck className="h-5 w-5 shrink-0" />
-                <p className="text-base font-semibold">מותר לטיסה בנקודה זו</p>
+                <p className="text-base font-semibold">
+                  {hasBriefing ? "מותר להטיס במיקומך, אך יש לשים לב:" : "מותר לטיסה בנקודה זו"}
+                </p>
               </div>
+            )}
+
+            {/* What the law limits here at the time asked about, and what is about to start —
+                the same for every account (a height cap is what's permitted, not a licence matter). */}
+            {!forbiddenByAirspace && !isChecking && hasBriefing && briefing && (
+              <ul className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
+                {briefing.ceiling && (
+                  <li className="flex items-start gap-2 font-semibold">
+                    <ArrowUpToLine className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    <span>
+                      {briefing.ceiling.text}
+                      {briefing.ceiling.detail && (
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{briefing.ceiling.detail}</span>
+                      )}
+                    </span>
+                  </li>
+                )}
+                {briefing.notes.map((n, i) => (
+                  <li key={`n-${i}`} className="flex items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>{n.text}</span>
+                  </li>
+                ))}
+                {briefing.upcoming.map((u, i) => (
+                  <li key={`u-${i}`} className="flex items-start gap-2 font-medium text-warning">
+                    <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      בקרוב: {u.text}
+                      {u.detail && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{u.detail}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
 
             {/* Right under the verdict, so what the pilot can DO about it is visible without
@@ -333,14 +411,6 @@ export function LocationInfoCard({
                   בקשת תיאום לנקודה זו
                 </Button>
               ) : null)}
-
-            {upcomingNotams[0] && (
-              <p className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "#ea580c" }}>
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                נוטאם עתידי בנקודה זו — מתחיל {formatNotamTime(upcomingNotams[0].fromDate)}
-                {upcomingNotams.length > 1 ? ` (ועוד ${upcomingNotams.length - 1})` : ""}
-              </p>
-            )}
 
             {/* Primary safety signal: distance to the nearest real building footprint
                 (/api/building-proximity — the R2 bitmap grid built from the same
@@ -384,7 +454,12 @@ export function LocationInfoCard({
               {altitudeResult?.blockedFromGround
                 ? "אסור לטיסה מהקרקע בנקודה זו"
                 : fullCeiling?.combinedAglM !== null && fullCeiling?.combinedAglM !== undefined
-                  ? `תקרת טיסה: עד ${fullCeiling.combinedAglM.toLocaleString("he-IL")} מ' מעל פני הקרקע`
+                  ? `תקרת טיסה: עד ${(briefing?.ceilingM != null
+                      ? Math.min(fullCeiling.combinedAglM, briefing.ceilingM)
+                      : fullCeiling.combinedAglM
+                    ).toLocaleString("he-IL")} מ' מעל פני הקרקע${
+                      briefing?.ceilingM != null && briefing.ceilingM < fullCeiling.combinedAglM ? " (מגבלת האזור)" : ""
+                    }`
                   : altitudeResult?.maxAltitudeFt !== null && altitudeResult?.maxAltitudeFt !== undefined
                     ? `תקרת מרחב אווירי ידועה (AMSL): ${formatAltitudeRangeMeters(0, altitudeResult.maxAltitudeFt)}`
                     : "אין מגבלת מרחב אווירי ידועה בנקודה זו"}
