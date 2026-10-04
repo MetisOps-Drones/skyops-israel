@@ -191,7 +191,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "controlled_airspace":
       return {
         tone: "warning",
-        shortLabel: "מרחב מבוקר — נדרש תיאום",
+        shortLabel: "מותר להטיס במיקומך בתיאום בלבד",
         headline: "בתוך מרחב מבוקר (CTR/ATZ) — נדרש תיאום מול מגדל הפיקוח",
         detail:
           'מעבר למרחק האסור מהמסלול (2 ק"מ, ו-3 ק"מ משדה צבאי למפעיל מסחרי), טיסה בתוך המרחב המבוקר מותרת רק באישור מראש של מגדל הפיקוח. ניתן להגיש בקשת תיאום — המוקדן יתאם מול המגדל ויאמת מול NOTAM עדכני לפני אישור.',
@@ -201,7 +201,7 @@ export function zoneVerdictFor(level: ZoneBlockLevel, hasOrg: boolean): ZoneVerd
     case "coordination_ok":
       return {
         tone: "conditions",
-        shortLabel: "אזור מוגבל — נדרש תיאום",
+        shortLabel: "מותר להטיס במיקומך בתיאום בלבד",
         headline: "אזור מוגבל — טיסה רק לפי תנאי האזור או באישור הגורם השולט",
         detail: "ניתן להגיש בקשת תיאום — המוקדן יתאם מול הגורם השולט באזור ויבדוק את התנאים שפורסמו.",
         canSubmit: true,

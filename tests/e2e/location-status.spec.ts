@@ -17,7 +17,7 @@ test.describe("top-bar location status", () => {
     const s = locationStatusFor({ ...base, blockLevel: "controlled_airspace" });
     expect(s.tone).toBe("caution");
     expect(s.label).toBe(zoneVerdictFor("controlled_airspace", false).shortLabel);
-    expect(s.label).not.toContain("אסור");
+    expect(s.label).toBe("מותר להטיס במיקומך בתיאום בלבד");
   });
 
   test("a restricted area is coordination", () => {

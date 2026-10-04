@@ -24,7 +24,7 @@ test.describe("map top bar", () => {
     const creds = readCredentials("E2E_HOBBY");
     test.skip(!creds, "Set E2E_HOBBY_EMAIL / E2E_HOBBY_PASSWORD to run this spec");
     await login(page, creds!);
-    await expect(page.getByText("מרחב מבוקר — נדרש תיאום")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("מותר להטיס במיקומך בתיאום בלבד")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("אסור לטיסה במיקומך")).toHaveCount(0);
     await expect(page.getByText(/עד 0 מ'/)).toHaveCount(0);
 

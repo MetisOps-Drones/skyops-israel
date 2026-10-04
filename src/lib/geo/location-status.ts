@@ -30,6 +30,6 @@ export function locationStatusFor(input: {
     const verdict = zoneVerdictFor(input.blockLevel, input.hasOrg);
     return { tone: verdict.tone === "forbidden" ? "forbidden" : "caution", label: verdict.shortLabel };
   }
-  if (input.notamInside) return { tone: "caution", label: "נוטאם פעיל במיקום — נדרש תיאום" };
+  if (input.notamInside) return { tone: "caution", label: "מותר להטיס במיקומך בתיאום בלבד (נוטאם פעיל)" };
   return { tone: "clear", label: "מותר לטיסה במיקומך" };
 }
