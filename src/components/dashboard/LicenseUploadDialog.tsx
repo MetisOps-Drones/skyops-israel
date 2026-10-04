@@ -42,7 +42,7 @@ function suggestedCommercialExpiry(): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function LicenseUploadDialog() {
+export function LicenseUploadDialog({ hasExistingLicense = false }: { hasExistingLicense?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -92,13 +92,19 @@ export function LicenseUploadDialog() {
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <Upload />
-          העלאת רישיון
+          {hasExistingLicense ? "אימות רישיון מחדש" : "העלאת רישיון"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>העלאת מסמך רישיון</DialogTitle>
+          <DialogTitle>{hasExistingLicense ? "אימות רישיון מחדש" : "העלאת מסמך רישיון"}</DialogTitle>
         </DialogHeader>
+        {hasExistingLicense && (
+          <p className="text-sm text-muted-foreground">
+            לא ניתן לערוך רישיון קיים ישירות — העלאה מחדש מריצה את תהליך האימות מההתחלה ומחליפה את הרישיון הקיים
+            מאותו סוג.
+          </p>
+        )}
         <DemoModeNotice>
           זיהוי תאריך התפוגה (OCR) עשוי לפעול במצב מדומה אם לא הוגדר ספק OCR אמיתי בסביבה זו — יש לבדוק את התאריך
           שמוצג ולתקן אותו במידת הצורך.

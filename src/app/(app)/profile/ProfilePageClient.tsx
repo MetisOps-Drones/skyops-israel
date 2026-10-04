@@ -260,7 +260,7 @@ export function ProfilePageClient({ profile }: { profile: Tables<"profiles"> }) 
                 </span>
                 הרישיון שלי
               </CardTitle>
-              <LicenseUploadDialog />
+              <LicenseUploadDialog hasExistingLicense={licenses.length > 0} />
             </CardHeader>
             <CardContent>
               {licensesLoading && <p className="text-sm text-muted-foreground">טוען...</p>}
